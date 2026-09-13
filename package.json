@@ -23,9 +23,10 @@
     "windmill:pull": "pnpm run build:scripts && node --env-file-if-exists=.env dist/scripts/wmill.js sync pull --yes",
     "windmill:diff": "pnpm run build:scripts && node --env-file-if-exists=.env dist/scripts/wmill.js sync push --dry-run",
     "check-env": "pnpm run build:scripts && node dist/scripts/check-env.js",
+    "audit": "pnpm audit --audit-level=low",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "pnpm run format:check && pnpm run check-env && pnpm run typecheck && pnpm test && pnpm run check:ci-parity && pnpm run site:check",
+    "check": "pnpm run audit && pnpm run format:check && pnpm run check-env && pnpm run typecheck && pnpm test && pnpm run check:ci-parity && pnpm run site:check",
     "clean:scripts": "rm -rf dist",
     "build:scripts": "pnpm run clean:scripts && tsc -p tsconfig.scripts.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -54,6 +55,6 @@
     "vitest": "^5.0.0",
     "windmill-cli": "1.806.0",
     "windmill-client": "1.806.0",
-    "yaml": "2.8.1"
+    "yaml": "2.8.4"
   }
 }

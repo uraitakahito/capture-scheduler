@@ -66,6 +66,7 @@ const ONLY_IN_CI = {
 
 /** 別の job / workflow が持っている `check` の構成要素。 */
 const ONLY_IN_CHECK = {
+  audit: "audit.yaml。PR と push に加えて毎日走る (勧告は PR の合間にも公開される)",
   "site:check": "site.yaml。全 PR に走るので、ここで呼ぶと二重になる",
 };
 

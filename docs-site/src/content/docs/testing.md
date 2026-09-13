@@ -6,7 +6,7 @@ description: 61 unit tests that need nothing, one end-to-end test that needs the
 ```sh
 pnpm run test        # 61 unit tests, no stack, a few seconds
 pnpm run test:e2e    # 1 end-to-end test, needs the stack
-pnpm run check       # format, env, typecheck, unit tests
+pnpm run check       # audit, format, env, typecheck, unit tests, CI parity, docs site
 ```
 
 `pretest:e2e` runs `scripts/check-stack.ts` first and names **everything**

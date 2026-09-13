@@ -27,3 +27,24 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - windmill-cli@1.806.0
   - windmill-client@1.806.0
+
+# 既知の脆弱性を lockfile から除くための上書き。lockfile を進めない上書きは効かないので、
+# 足したら `pnpm why <pkg>` で版が動いたことを見ること。
+#
+#   windmill-cli>esbuild@0.28.0 — windmill-cli は esbuild を **0.28.0 ちょうど**に固定して
+#             いる (1.806.0 から、2026-09-13 時点の最新 1.811.0 まで同じ)。0.28.0 には
+#             GHSA-g7r4-m6w7-qqqr がある (Windows で esbuild の開発サーバを動かすと任意の
+#             ファイルを読まれる。0.28.1 で修正)。この repo はその経路を通らないが、固定の
+#             せいで lockfile の更新では上がらず、audit が赤いまま残る。0.28 の中の patch
+#             なので互換は崩れない (windmill-cli の側から require して、変換と bundle が
+#             通ることを確かめた)。
+#
+#             キーは 2 つの条件で絞ってある。`windmill-cli>` があるので、astro と vite の
+#             esbuild には触らない (あちらは ^0.28.0 で求めるので lockfile の更新だけで上がる)。
+#             `@0.28.0` は「求める範囲が 0.28.0 と重なるとき」だけ効くので、windmill-cli が
+#             固定を動かせばこの行は何にも効かなくなり、後の版を 0.28 へ引き戻すことは無い。
+#             **効かなくなっても pnpm は何も言わない** (2026-09-13 に確かめた)。windmill-cli を
+#             上げるときに `npm view windmill-cli@<版> dependencies.esbuild` を見て、0.28.0 で
+#             なければこの行を消す。
+overrides:
+  "windmill-cli>esbuild@0.28.0": "^0.28.1"

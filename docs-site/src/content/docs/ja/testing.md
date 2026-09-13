@@ -6,7 +6,7 @@ description: 何も要らない単体 61 件と、スタック一式が要る e2
 ```sh
 pnpm run test        # 単体 61 件。スタック不要、数秒
 pnpm run test:e2e    # e2e 1 件。スタックが要る
-pnpm run check       # format / env / typecheck / 単体
+pnpm run check       # audit / format / env / typecheck / 単体 / CI との一致 / docs サイト
 ```
 
 `pretest:e2e` が先に `scripts/check-stack.ts` を走らせ、足りないものを**全部まとめて**
