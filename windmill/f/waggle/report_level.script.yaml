@@ -35,6 +35,14 @@ schema:
             type: string
             description: ""
             originalType: string
+          manifestError:
+            type: string
+            description: ""
+            originalType: string
+          manifestLocation:
+            type: string
+            description: ""
+            originalType: string
           skipReason:
             type: string
             description: ""

@@ -98,6 +98,17 @@ export interface PageResult {
    * 「見つけた URL は何か」の判断材料が 2 か所に散る。
    */
   linksLocation?: string;
+  /**
+   * `.result.json` を書けた場所 (`s3://…`)。**綴りはこちらで組まない** —— BrowserHive
+   * (または受け口) が応答で答えた場所をそのまま運ぶ。capture-ledger はこれを鍵にして
+   * manifest を読み、台帳に書き留める。
+   */
+  manifestLocation?: string;
+  /**
+   * 書けなかった理由。**`taskId` を持つ結果は、この 2 つのどちらか一方を必ず持つ** ——
+   * capture-ledger は、どちらも持たない報告を 400 で断る。
+   */
+  manifestError?: string;
 }
 
 /**
@@ -286,7 +297,37 @@ interface CaptureResponse {
     artifacts?: { links?: string };
     errorDetails?: { type: ErrorType; message: string };
   };
+  /**
+   * manifest (`.result.json`) の結末。proto の `oneof outcome`。proto-loader に
+   * `oneofs: true` を渡しているので、立っている側の名前が `outcome` に入る。欄そのものが
+   * 無ければ `null` (`defaults: true`)。どれも実測で確かめた形。
+   */
+  manifest?: { outcome?: "location" | "error"; location?: string; error?: string } | null;
 }
+
+/**
+ * 応答の manifest の結末を、報告の欄にする。**export は試験のため。**
+ *
+ * **`outcome` で分ける。** proto3 の oneof は空文字でも「立っている」ので、`location` の
+ * 値だけを見ると空の場所を「書けた」と読んでしまう。欄の無い応答 (v10.0.0 より前の
+ * BrowserHive) と空の場所は「書けた」と言えないので、理由を付けて error の側に倒す ——
+ * capture-ledger はどちらかを必ず受け取る。
+ */
+export const manifestFields = (
+  manifest: CaptureResponse["manifest"],
+): { manifestLocation: string } | { manifestError: string } => {
+  if (
+    manifest?.outcome === "location" &&
+    manifest.location !== undefined &&
+    manifest.location !== ""
+  ) {
+    return { manifestLocation: manifest.location };
+  }
+  if (manifest?.outcome === "error" && manifest.error !== undefined && manifest.error !== "") {
+    return { manifestError: manifest.error };
+  }
+  return { manifestError: "the capture response carried no manifest outcome" };
+};
 
 /** 全 endpoint が busy だったときの待ち。幅の中で散らす —— 揃って待つと揃って当たる。 */
 const busyWait = (retry: BusyRetry): Promise<void> =>
@@ -419,6 +460,8 @@ const captureOne = async (
       correlationId: crawlId,
       submittedAt,
       finishedAt,
+      // taskId を持つ結果には、manifest の結末を必ず載せる (上の `manifestFields`)。
+      ...manifestFields(response.manifest),
       ...(ok
         ? {}
         : {
