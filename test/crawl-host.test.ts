@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { loadSync } from "@grpc/proto-loader";
 import {
+  assertKnowsManifestOutcome,
   captureHost,
   parseEndpoints,
   ServerUnavailable,
@@ -48,6 +50,11 @@ interface Reply {
   status?: string;
   errorType?: string;
   links?: string;
+  /**
+   * 応答の manifest の結末。省くと「書けた」(`outcome: "location"`)。`null` は欄の無い応答。
+   * 形は proto-loader (`oneofs: true`, `defaults: true`) が実際に返すもの。
+   */
+  manifest?: { outcome?: string; location?: string; error?: string } | null;
 }
 
 /**
@@ -98,6 +105,10 @@ const fakeEndpoint = (
               ? {}
               : { errorDetails: { type: reply.errorType, message: "boom" } }),
           },
+          manifest:
+            reply.manifest === undefined
+              ? { outcome: "location", location: `s3://b/task-${req.url}.result.json` }
+              : reply.manifest,
         });
       },
     } as unknown as Record<string, unknown>,
@@ -182,6 +193,87 @@ describe("成果物の場所", () => {
     const endpoint = fakeEndpoint("bh-1", { responses: [{ status: "CAPTURE_STATUS_FAILED" }] });
     const [result] = await run([endpoint], ["a"]);
     expect(result).not.toHaveProperty("linksLocation");
+  });
+});
+
+describe("manifest の結末", () => {
+  /**
+   * **綴りはこちらで組まない。** 見本の場所は BrowserHive の命名規則では作れない綴りに
+   * してある —— 規則どおりの名前だと、taskId から組み直す実装でも同じ値になって緑で通る。
+   */
+  it("書けた場所をそのまま運ぶ", async () => {
+    const location = "s3://b/elsewhere/x y+z.result.json";
+    const [result] = await run(
+      [fakeEndpoint("bh-1", { responses: [{ manifest: { outcome: "location", location } }] })],
+      ["a"],
+    );
+    expect(result!.manifestLocation).toBe(location);
+    expect(result).not.toHaveProperty("manifestError");
+  });
+
+  it("書けなかった理由を運ぶ", async () => {
+    const error = "s3://b/t_.result.json: not written within 10000ms";
+    const [result] = await run(
+      [fakeEndpoint("bh-1", { responses: [{ manifest: { outcome: "error", error } }] })],
+      ["a"],
+    );
+    expect(result!.manifestError).toBe(error);
+    expect(result).not.toHaveProperty("manifestLocation");
+  });
+
+  // v10.0.0 より前の BrowserHive。capture-ledger は結末の無い報告を 400 で断るので、
+  // 「無かった」ことを理由として運ぶ。
+  it("応答に結末が無ければ、無いと報告する", async () => {
+    const [result] = await run([fakeEndpoint("bh-1", { responses: [{ manifest: null }] })], ["a"]);
+    expect(result!.manifestError).toMatch(/no manifest outcome/);
+    expect(result).not.toHaveProperty("manifestLocation");
+  });
+
+  // proto3 の oneof は空文字でも「立っている」。値だけを見る実装はここで場所を運んでしまう。
+  it("空の場所は書けたと扱わない", async () => {
+    const [result] = await run(
+      [fakeEndpoint("bh-1", { responses: [{ manifest: { outcome: "location", location: "" } }] })],
+      ["a"],
+    );
+    expect(result).not.toHaveProperty("manifestLocation");
+    expect(result!.manifestError).toMatch(/no manifest outcome/);
+  });
+
+  // 投入が通っていないので taskId が無い。結末の欄も付けない —— capture-ledger は
+  // 結末だけの報告も 400 にする。
+  it("投入が通らなければ、結末の欄も付けない", async () => {
+    const [result] = await run([fakeEndpoint("bh-1", { failOn: ["a"] })], ["a"]);
+    expect(result!.taskId).toBeUndefined();
+    expect(result).not.toHaveProperty("manifestLocation");
+    expect(result).not.toHaveProperty("manifestError");
+  });
+});
+
+describe("proto の写し", () => {
+  /**
+   * **本物の proto を、crawl_host.ts と同じ設定で読んで確かめる。** 鍵の綴り
+   * (`browserhive.v1.ManifestOutcome`) を試験の中で書き写すだけだと、実装と試験が同じ
+   * 綴り違いをしたときに緑で通る —— 読み込みの結果に在ることを見る。
+   */
+  it("vendor した proto は ManifestOutcome を知っている", () => {
+    const definition = loadSync("proto/browserhive/v1/capture.proto", {
+      keepCase: false,
+      longs: String,
+      enums: String,
+      defaults: true,
+      oneofs: true,
+    });
+    expect(() => assertKnowsManifestOutcome(definition)).not.toThrow();
+  });
+
+  // v10.0.0 より前の写し。応答は読めてしまうので、ここで止めないと黙って台帳から欠ける。
+  it("ManifestOutcome を知らない写しは、push-proto を名指しして止める", () => {
+    expect(() =>
+      assertKnowsManifestOutcome({
+        "browserhive.v1.CaptureService": {},
+        "browserhive.v1.CaptureResponse": {},
+      }),
+    ).toThrow(/windmill:push-proto/);
   });
 });
 

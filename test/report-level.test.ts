@@ -34,7 +34,14 @@ const responding = (status: number, body: unknown) => {
   return seen;
 };
 
-const CAPTURED = [{ url: "http://m/a", status: "captured" as const, taskId: "t1" }];
+const CAPTURED = [
+  {
+    url: "http://m/a",
+    status: "captured" as const,
+    taskId: "t1",
+    manifestLocation: "s3://b/t1_c-1.result.json",
+  },
+];
 
 afterEach(() => {
   vi.unstubAllGlobals();

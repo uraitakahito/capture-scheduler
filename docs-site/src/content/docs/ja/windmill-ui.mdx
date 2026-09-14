@@ -187,6 +187,11 @@ flow が `Resource not found` で落ちる（上の失敗①）。
 **`windmill:push-proto` は `windmill:push` に含まれない。** proto を取り直したら
 これも実行し直すこと —— Windmill が読むのはこの写しで、submodule ではない。
 
+`crawl_host` は BrowserHive v10.0.0 より前の写し（`ManifestOutcome` の無いもの）を読むと、
+このコマンドを名指しして止まる。そういう写しでも応答は復号できてしまい、manifest の場所だけが
+黙って落ちる —— すべての取り込みが場所なしで報告され、クロールは成功し、capture-ledger には
+何も入らない。
+
 ## 全部消えたときの復旧
 
 windmill-db の volume を消すと、workspace・token・変数が全部消える。
