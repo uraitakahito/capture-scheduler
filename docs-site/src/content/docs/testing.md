@@ -49,9 +49,10 @@ cost a round trip.
 One test, about 40 seconds. It goes through capture-ledger's API — **not** Windmill's
 run endpoint — because the point is to carry the arguments capture-ledger actually sends:
 `crawl_id`, `depth`, `frontier`, `per_host_delay_ms`, `host_parallelism`,
-`capture_formats`, `signing`. **`respect_robots` is not among them.**
+`capture_formats`, `signing`, and `artifact_sink` where capture-ledger serves the
+sink. **`respect_robots` is not among them.**
 
-It asserts three things:
+It asserts four things:
 
 1. **capture-fixtures never received `/links/hidden`**, which its robots.txt disallows. The
    verdict comes from the _other end's_ request log, because the ledger can only
@@ -59,6 +60,11 @@ It asserts three things:
 2. the crawl succeeded and captured at least one page
 3. `GET /api/search?q=hub` returns a hit — so the indexing step completed inside
    the flow
+4. if capture-ledger serves the sink — an unauthenticated `PUT /api/sink/…` answers
+   401 rather than 404 — every archive of the crawl has an `objectKey` under
+   `org/acme/<YYYY-MM>/`. A flat key means the sink was never handed out and
+   BrowserHive wrote into its own bucket. That is what happened from capture-ledger
+   #226 until it was fixed, and such a crawl passes the first three.
 
 Breaking `?? true` in `plan_level.ts` and deploying turns **both** the unit test
 and the e2e red, and the e2e shows capture-fixtures receiving the forbidden page. That pair

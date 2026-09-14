@@ -45,10 +45,10 @@ pnpm run check       # audit / format / env / typecheck / 単体 / CI との一�
 
 1 件、約 40 秒。Windmill の実行の口ではなく **capture-ledger の API** を通す —— 目的が
 「capture-ledger が実際に送る引数」を運ぶことだから: `crawl_id` / `depth` / `frontier` /
-`per_host_delay_ms` / `host_parallelism` / `capture_formats` / `signing` の 7 つで、
-**`respect_robots` は入っていない**。
+`per_host_delay_ms` / `host_parallelism` / `capture_formats` / `signing` と、受け口を出している
+配備では `artifact_sink` で、**`respect_robots` は入っていない**。
 
-見ているのは 3 つ:
+見ているのは 4 つ:
 
 1. **capture-fixtures が `/links/hidden` を一度も受け取っていない**こと。robots.txt が禁じている
    ページで、判定は**相手のリクエストログ**から採る —— 台帳は「記録したこと」しか
@@ -56,6 +56,10 @@ pnpm run check       # audit / format / env / typecheck / 単体 / CI との一�
 2. クロールが成功し、1 ページ以上取り込んでいること
 3. `GET /api/search?q=hub` がヒットを返すこと —— 索引の step まで flow の中で
    終わっている証拠
+4. capture-ledger が受け口を出していれば（トークン無しの `PUT /api/sink/…` が 404 でなく
+   401 を返す）、そのクロールのアーカイブの `objectKey` が全部 `org/acme/<YYYY-MM>/` の下に
+   あること。平らな鍵は、口が配られず BrowserHive が自前の bucket へ書いた印 ——
+   capture-ledger #226 から直るまで実際にそうなっていて、その形のクロールは上の 3 つを通る。
 
 `plan_level.ts` の `?? true` を消して配備すると、**単体と e2e が両方赤くなり**、
 e2e のほうは capture-fixtures が禁じられたページを受け取ったことを示す。この対は一度わざと
