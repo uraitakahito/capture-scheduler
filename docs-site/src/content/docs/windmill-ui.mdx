@@ -204,6 +204,11 @@ Confuse the two and push stays green while the flow dies with
 **`windmill:push-proto` is not part of `windmill:push`.** Whenever the proto
 is refreshed, run it again — Windmill reads this copy, not the submodule.
 
+`crawl_host` refuses a copy older than BrowserHive v10.0.0 (one without
+`ManifestOutcome`) and names this command. With such a copy the capture responses
+still decode, but their manifest location is silently dropped: every capture is
+reported without one, the crawl succeeds, and capture-ledger admits nothing.
+
 ## Recovering from total loss
 
 Deleting the windmill-db volume erases the workspace, tokens and variables.

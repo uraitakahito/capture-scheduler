@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { loadSync } from "@grpc/proto-loader";
 import {
+  assertKnowsManifestOutcome,
   captureHost,
   parseEndpoints,
   ServerUnavailable,
@@ -244,6 +246,34 @@ describe("manifest の結末", () => {
     expect(result!.taskId).toBeUndefined();
     expect(result).not.toHaveProperty("manifestLocation");
     expect(result).not.toHaveProperty("manifestError");
+  });
+});
+
+describe("proto の写し", () => {
+  /**
+   * **本物の proto を、crawl_host.ts と同じ設定で読んで確かめる。** 鍵の綴り
+   * (`browserhive.v1.ManifestOutcome`) を試験の中で書き写すだけだと、実装と試験が同じ
+   * 綴り違いをしたときに緑で通る —— 読み込みの結果に在ることを見る。
+   */
+  it("vendor した proto は ManifestOutcome を知っている", () => {
+    const definition = loadSync("proto/browserhive/v1/capture.proto", {
+      keepCase: false,
+      longs: String,
+      enums: String,
+      defaults: true,
+      oneofs: true,
+    });
+    expect(() => assertKnowsManifestOutcome(definition)).not.toThrow();
+  });
+
+  // v10.0.0 より前の写し。応答は読めてしまうので、ここで止めないと黙って台帳から欠ける。
+  it("ManifestOutcome を知らない写しは、push-proto を名指しして止める", () => {
+    expect(() =>
+      assertKnowsManifestOutcome({
+        "browserhive.v1.CaptureService": {},
+        "browserhive.v1.CaptureResponse": {},
+      }),
+    ).toThrow(/windmill:push-proto/);
   });
 });
 

@@ -255,6 +255,8 @@ const connectAll = async (targets: string[], caPem: string): Promise<Endpoint[]>
     defaults: true,
     oneofs: true,
   });
+  // 写しが古ければ、1 件も取り込む前に止める (下の `assertKnowsManifestOutcome`)。
+  assertKnowsManifestOutcome(definition);
   const pkg = grpc.loadPackageDefinition(definition) as unknown as {
     browserhive: { v1: { CaptureService: new (t: string, c: unknown) => Record<string, unknown> } };
   };
@@ -313,6 +315,30 @@ interface CaptureResponse {
  * BrowserHive) と空の場所は「書けた」と言えないので、理由を付けて error の側に倒す ——
  * capture-ledger はどちらかを必ず受け取る。
  */
+/**
+ * 読み込んだ proto が、応答の manifest の結末 (`ManifestOutcome`) を知っているか。
+ * **export は試験のため。**
+ *
+ * proto は resource (`u/admin/browserhive_proto`) から読み、その写しは `windmill:push` では
+ * 更新されない (`windmill:push-proto` が別に要る)。古い写しのままだと、proto-loader は応答の
+ * `manifest` 欄を知らない欄として **黙って落とし**、すべての取り込みが「結末が無い」と
+ * 報告される。capture-ledger は鍵の無い取り込みを台帳に入れられないので、**クロールは成功と
+ * 記録されるのに台帳には 1 件も入らない** —— 2026-09-14 に実際にそうなった (resource が
+ * BrowserHive v10.0.0 より前の 508 行のままだった)。黙って欠けるより、ここで名指しして止める。
+ *
+ * 欄を知っている写しで、それでも応答に結末が無い (BrowserHive が v10.0.0 より前) ときは
+ * 止めない —— そちらは `manifestFields` が理由として運ぶ。
+ */
+export const assertKnowsManifestOutcome = (definition: Record<string, unknown>): void => {
+  if (definition["browserhive.v1.ManifestOutcome"] === undefined) {
+    throw new Error(
+      "u/admin/browserhive_proto に ManifestOutcome がありません (BrowserHive v10.0.0 より前の写し)。" +
+        "このままでは manifest の場所を運べず、台帳に何も入りません。" +
+        "capture-scheduler で pnpm run windmill:push-proto を実行してください",
+    );
+  }
+};
+
 export const manifestFields = (
   manifest: CaptureResponse["manifest"],
 ): { manifestLocation: string } | { manifestError: string } => {
