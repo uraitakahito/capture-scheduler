@@ -129,6 +129,12 @@ generates its keys in memory on every start (deliberately), so the old token
 starts returning 401. The error messages in `report_level.ts` and
 `trigger_crawl.ts` say so, because this is easy to hit and hard to guess.
 
+The API does not need a restart. The key's name (kid) changes along with the key, so the API
+refetches the keys as soon as it sees one new token (from capture-ledger v0.42.1; before that the
+kid was fixed and the API kept the old key for up to ten minutes, rejecting new tokens). For 30
+seconds right after the issuer restarts, new tokens may still be refused — the jwt line of
+`check:connection` says so.
+
 ## The picker returns 401
 
 Setting `CAPTURE_LEDGER_OIDC_ISSUER` makes capture-ledger accept **only** JWTs, which means the
