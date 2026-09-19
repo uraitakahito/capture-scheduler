@@ -50,26 +50,14 @@ else
   echo ".env を作りました (.env.example の写し)。"
 fi
 
+# 次の手順は docs にだけ置く。以前はここに写しを持っていて、docs を直したときに直し漏らし、
+# 古い手順 (webhook の 2 行も push-proto も check:connection も無い) を印字していた。
 cat <<'MSG'
 
-次にやること:
+次は docs のクイックスタートどおりに進めてください:
 
-  container-compose up -d          # windmill と windmill-db が立つ
-  pnpm install
-  pnpm run windmill:bootstrap      # workspace と token を作り、貼れる形で出力する
-                                   # → WINDMILL_TOKEN= を .env に貼る
-  pnpm run windmill:push           # スクリプトと schedule を投入する
+  https://uraitakahito.github.io/capture-scheduler/ja/quickstart/
+  https://uraitakahito.github.io/capture-scheduler/quickstart/   (English)
 
-capture-ledger 側 (別のターミナル):
-
-  cd ../capture-ledger
-  # .env に CAPTURE_LEDGER_API_HOST=0.0.0.0 と CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099
-  pnpm run oidc:issuer             # 127.0.0.1:9099 のまま。**外に出さないこと**
-  pnpm run api
-  pnpm run fga:grant submitter windmill acme
-
-戻ってきて、鍵を渡す:
-
-  pnpm run windmill:capture-ledger-token
-
+前提: capture-ledger のスタックが動いていること (capture-ledger のクイックスタートの §1〜§5)。
 MSG

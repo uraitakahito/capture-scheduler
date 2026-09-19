@@ -3,6 +3,22 @@ title: クイックスタート
 description: Windmill を立て、capture-ledger 用のトークンを渡し、UI を開くまで
 ---
 
+## 前提 —— capture-ledger のスタックが動いていること
+
+Windmill が働く相手は capture-ledger のスタック。付与は OpenFGA に書き、クロールは
+BrowserHive を呼ぶ。始める前に、capture-ledger の
+[クイックスタート](https://uraitakahito.github.io/capture-ledger/ja/quickstart/)の §1〜§5
+（DNS ドメイン、submodule と `.env`、`stack:up`、データベース、OpenFGA の 2 つの ID）を済ませ、
+スタックが動いていることを確かめる:
+
+```sh
+curl -s -o /dev/null -w '%{http_code}\n' -H 'authorization: Bearer dev-key' http://127.0.0.1:8090/stores
+# 200 なら動いている。000 なら止まっている → cd ../capture-ledger && pnpm run stack:up
+```
+
+`dev-key` は開発用の OpenFGA の既定の鍵。止まったままだと、下の `fga:grant` が
+「OpenFGA (http://localhost:8090) に届きません」で止まる。
+
 ## 立ち上げる
 
 ```sh
