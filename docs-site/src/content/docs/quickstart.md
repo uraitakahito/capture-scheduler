@@ -5,8 +5,9 @@ description: Bring up Windmill, hand it a token for capture-ledger, and open the
 
 ## Before you start: capture-ledger's stack is running
 
-Windmill works against capture-ledger's stack: grants go to its OpenFGA, and crawls call its
-BrowserHive. Before you start, finish §1–§5 of capture-ledger's
+Windmill uses two parts of capture-ledger's stack. `fga:grant` below writes a permission into its
+OpenFGA ("windmill may start crawls for acme"), and crawls call its BrowserHive to take the pages.
+Before you start, finish §1–§5 of capture-ledger's
 [Quickstart](https://uraitakahito.github.io/capture-ledger/quickstart/) (the DNS domain, the
 submodules and `.env`, `stack:up`, the database, the two OpenFGA ids) and check that the stack is up:
 
@@ -50,7 +51,7 @@ cd ../capture-ledger
 #   CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099  the flow identifies itself with a JWT
 pnpm run oidc:issuer                         # keep it running
 pnpm run api                                 # restart it if running (settings are read at startup)
-pnpm run fga:grant submitter windmill acme   # without this you get 404
+pnpm run fga:grant submitter windmill acme   # let windmill start crawls for acme (without it: 404)
 ```
 
 Back here, hand over the key and check the connection:
@@ -81,8 +82,8 @@ host                                   │ container
 
 **Keep the dev issuer on loopback.** It mints a token for whoever asks, under
 whatever name they ask for. Put it somewhere a container can reach and everyone
-on the bridge can claim to be `windmill` — which routes around the `submitter`
-grant and undoes the point of using JWTs at all.
+on the bridge can claim to be `windmill` — and so use the crawl permission that `fga:grant`
+gave to windmill alone, which undoes the point of using JWTs at all.
 
 The power to mint keys stays on the host. What crosses the boundary is **one
 finished token**.

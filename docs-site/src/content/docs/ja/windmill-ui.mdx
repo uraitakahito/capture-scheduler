@@ -206,10 +206,10 @@ pnpm run windmill:push                 # script / flow / schedule
 pnpm run windmill:push-proto           # ← 忘れると crawl_host が Resource not found
 pnpm run windmill:capture-ledger-token # 変数 4 つ
 cd ../capture-ledger
-pnpm run fga:grant submitter windmill acme
+pnpm run fga:grant submitter windmill acme  # windmill に acme のクロールを許可する
 ```
 
-capture-ledger 側の OpenFGA も同時に消えていたら、grant の前に
+capture-ledger 側の OpenFGA も同時に消えていたら、許可を書く前に
 `fga:migrate` → `fga:deploy` で store を作り直し、出てきた 2 つの ID を
 あちらの `.env` に貼る。
 

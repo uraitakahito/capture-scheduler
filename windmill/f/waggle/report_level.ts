@@ -70,7 +70,8 @@ export async function main(
       res.status === 401
         ? " —— トークンが古いかもしれません (issuer を再起動しましたか)"
         : res.status === 404
-          ? " —— submitter の付与がありますか"
+          ? " —— トークンの名前 (sub) に、その組織のクロールの許可がありますか" +
+            " (capture-ledger: pnpm run fga:grant submitter <sub> <org>。既定は windmill acme)"
           : "";
     throw new Error(
       `POST /api/crawls/${crawl_id}/pages → ${String(res.status)} ${body.slice(0, 300)}${hint}`,

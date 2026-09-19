@@ -5,8 +5,9 @@ description: Windmill を立て、capture-ledger 用のトークンを渡し、U
 
 ## 前提 —— capture-ledger のスタックが動いていること
 
-Windmill が働く相手は capture-ledger のスタック。付与は OpenFGA に書き、クロールは
-BrowserHive を呼ぶ。始める前に、capture-ledger の
+Windmill は capture-ledger のスタックの 2 つを使う。OpenFGA には、下の `fga:grant` で
+「windmill は acme のクロールを起こしてよい」という許可を書き込む。BrowserHive は、
+クロールがページを撮りに呼ぶ。始める前に、capture-ledger の
 [クイックスタート](https://uraitakahito.github.io/capture-ledger/ja/quickstart/)の §1〜§5
 （DNS ドメイン、submodule と `.env`、`stack:up`、データベース、OpenFGA の 2 つの ID）を済ませ、
 スタックが動いていることを確かめる:
@@ -51,7 +52,7 @@ cd ../capture-ledger
 #   CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099  flow は JWT で名乗る
 pnpm run oidc:issuer                         # 動かし続ける
 pnpm run api                                 # 動いていたら起こし直す（設定は起動時に読む）
-pnpm run fga:grant submitter windmill acme   # これが無いと 404
+pnpm run fga:grant submitter windmill acme   # windmill に acme のクロールを許可する（無いと 404）
 ```
 
 戻ってきて、鍵を渡し、つながったかを見る:
@@ -82,7 +83,8 @@ host                                   │ コンテナ
 
 **dev issuer は loopback から出さないこと。** あれは頼まれれば誰の名前でもトークンを
 出すので、コンテナから引ける場所に置いた瞬間、ブリッジに届く誰もが `windmill` を
-名乗れる —— `submitter` の付与を回り込めることになり、JWT にした意味が消える。
+名乗れる —— `fga:grant` で windmill だけに与えたクロールの許可を誰でも使えることになり、
+JWT にした意味が消える。
 
 鍵を作る力は host に残し、跨がせるのは**出来上がったトークン 1 本**だけ。
 
