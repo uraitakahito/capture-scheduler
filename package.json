@@ -10,7 +10,7 @@
   },
   "version": "0.1.0",
   "private": true,
-  "description": "Windmill が capture-ledger の取り込みを時刻どおりに起こす",
+  "description": "Windmill の上で capture-ledger のクロールを回す（1 段ずつ BrowserHive に撮らせ、毎日 04:00 に起こす）",
   "type": "module",
   "engines": {
     "node": ">=22"

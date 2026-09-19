@@ -1,7 +1,7 @@
 # wmill CLI の設定。`wmill sync push` / `pull` がこれを読む。
 #
 # **`includeSchedules: true` が肝。** 既定では schedule は同期されず、UI で作った
-# 定期実行が git のどこにも現れない —— 「いつ走るか」がこの repo の唯一の仕事なのに、
+# 定期実行が git のどこにも現れない —— 「いつ走るか」はこの repo が決めることなのに、
 # その設定だけが追跡から漏れる。
 defaultTs: bun
 includes:

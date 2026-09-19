@@ -1,13 +1,14 @@
 # capture-scheduler
 
-Starts [capture-ledger](https://github.com/uraitakahito/capture-ledger)'s captures **on time**.
-capture-ledger exposes `POST /api/crawls` so that "when to run" can live outside it —
-capture-scheduler is that outside: one [Windmill](https://www.windmill.dev/) instance, a
-cron expression, and a script that calls the endpoint. It also drives the
-link-following crawl, one level per flow execution.
+Runs [capture-ledger](https://github.com/uraitakahito/capture-ledger)'s crawls on
+[Windmill](https://www.windmill.dev/). capture-ledger hands each crawl over one level at a time;
+a flow here groups that level's URLs by host, checks robots.txt, has
+[BrowserHive](https://github.com/uraitakahito/browserhive) capture them over gRPC, and reports
+back. A Windmill schedule also starts a crawl every day at 04:00 — the on-time part is Windmill's
+own scheduler; this repository holds its settings and the scripts it runs.
 
-This repository contains **no URLs**. What to capture is capture-ledger's decision; when
-is this one's.
+This repository contains **no URLs**. What to capture, how far and how politely is
+capture-ledger's decision; this one decides when to start and how to carry each level out.
 
 ## Documentation
 
@@ -20,8 +21,8 @@ on the docs site:
 
 ## Related Projects
 
-- [capture-ledger](https://github.com/uraitakahito/capture-ledger) — decides what to capture and talks to BrowserHive; capture-scheduler only decides when.
-- [BrowserHive](https://github.com/uraitakahito/browserhive) — the web-capture server at the far end of the chain.
+- [capture-ledger](https://github.com/uraitakahito/capture-ledger) — decides what to capture and how far, records what came back, and decides whether a crawl has another level. It hands each level to this repository's flow and no longer talks to BrowserHive itself.
+- [BrowserHive](https://github.com/uraitakahito/browserhive) — the web-capture server; the flow here is what calls it.
 
 ## License
 
