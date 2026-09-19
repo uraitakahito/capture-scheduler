@@ -127,7 +127,11 @@ const main = async () => {
 
   const jwt = await mintToken();
   const tokenAction = await upsertVariable(windmillToken, TOKEN_PATH, jwt, true);
-  const urlAction = await upsertVariable(windmillToken, URL_PATH, ledgerApiUrl(), false);
+  // 1 度だけ決める。既定は default ネットワークの gateway を訊く (`env.ts` の `ledgerApiUrl`)。
+  const apiUrl = ledgerApiUrl();
+  const apiUrlFrom =
+    optional("CAPTURE_LEDGER_API_URL", "") === "" ? " —— default ネットワークの gateway から" : "";
+  const urlAction = await upsertVariable(windmillToken, URL_PATH, apiUrl, false);
   const endpointsAction = await upsertVariable(
     windmillToken,
     ENDPOINTS_PATH,
@@ -138,7 +142,7 @@ const main = async () => {
 
   process.stderr.write(
     `${TOKEN_PATH} を${tokenAction} (sub=${SUBJECT} orgs=${ORGANIZATIONS.join(",")} exp=${EXPIRES_IN})\n` +
-      `${URL_PATH} を${urlAction} (${ledgerApiUrl()})\n` +
+      `${URL_PATH} を${urlAction} (${apiUrl}${apiUrlFrom})\n` +
       `${ENDPOINTS_PATH} を${endpointsAction} (${BROWSERHIVE_ENDPOINTS.join(", ")})\n` +
       `${TLS_CA_PATH} を${tlsAction} (${TLS_CA_PEM === "" ? "空 = 平文" : "CA あり"})\n\n` +
       `付与を忘れずに:  cd ../capture-ledger && pnpm run fga:grant submitter ${SUBJECT} ${ORGANIZATIONS[0] ?? "acme"}\n`,
