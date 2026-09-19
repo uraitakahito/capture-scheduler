@@ -6,7 +6,7 @@
  *
  * dev issuer は **頼まれれば誰の名前でもトークンを出す**。だから届く範囲がそのまま
  * 「誰を名乗れるか」になる。コンテナから引けるところに置いた瞬間、ブリッジに届く
- * 誰もが `windmill` を名乗れる —— つまり `submitter` の付与を回り込める。
+ * 誰もが `windmill` を名乗れる —— つまり windmill だけに与えたクロールの許可を、誰でも使える。
  * ヘッダを信じる方式をやめた意味が消える。
  *
  * だから鍵を作る力は host の loopback に残す。ここを跨ぐのは**出来上がった
@@ -145,7 +145,8 @@ const main = async () => {
       `${URL_PATH} を${urlAction} (${apiUrl}${apiUrlFrom})\n` +
       `${ENDPOINTS_PATH} を${endpointsAction} (${BROWSERHIVE_ENDPOINTS.join(", ")})\n` +
       `${TLS_CA_PATH} を${tlsAction} (${TLS_CA_PEM === "" ? "空 = 平文" : "CA あり"})\n\n` +
-      `付与を忘れずに:  cd ../capture-ledger && pnpm run fga:grant submitter ${SUBJECT} ${ORGANIZATIONS[0] ?? "acme"}\n`,
+      `最後に、${SUBJECT} に ${ORGANIZATIONS[0] ?? "acme"} のクロールを許可する (1 度だけ。無いと 404):\n` +
+      `  cd ../capture-ledger && pnpm run fga:grant submitter ${SUBJECT} ${ORGANIZATIONS[0] ?? "acme"}\n`,
   );
 };
 

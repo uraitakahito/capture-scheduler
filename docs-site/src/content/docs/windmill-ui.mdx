@@ -223,7 +223,7 @@ pnpm run windmill:push                 # scripts / flow / schedule
 pnpm run windmill:push-proto           # ← forget this and crawl_host dies with Resource not found
 pnpm run windmill:capture-ledger-token # the four variables
 cd ../capture-ledger
-pnpm run fga:grant submitter windmill acme
+pnpm run fga:grant submitter windmill acme  # let windmill start crawls for acme
 ```
 
 If capture-ledger's OpenFGA store was wiped at the same time, run

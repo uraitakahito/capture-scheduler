@@ -88,14 +88,14 @@ describe("失敗したときの言い分", () => {
     await expect(main("http://capture-ledger:7070", "tok")).rejects.toThrow(/issuer/);
   });
 
-  it("404 には付与のしかたまで書く", async () => {
+  it("404 には許可の書き方まで書く", async () => {
     // 「見てはいけない」と「存在しない」を capture-ledger は区別せずに答えるので、
     // 404 だけでは辿れない。叩くべきコマンドまで書いてある。
     responding(404, { error: "not found" });
     await expect(main("http://capture-ledger:7070", "tok")).rejects.toThrow(/fga:grant submitter/);
   });
 
-  it("route が無い 404 には webhook の 2 行を示し、付与は疑わせない", async () => {
+  it("route が無い 404 には webhook の 2 行を示し、許可は疑わせない", async () => {
     // capture-ledger が webhook の 2 行無しで起動していると、route ごと無い。本文は Fastify のもの。
     responding(404, {
       message: "Route POST:/api/crawls not found",
@@ -107,7 +107,7 @@ describe("失敗したときの言い分", () => {
     expect(err.message).not.toMatch(/fga:grant/);
   });
 
-  it("付与の 404 には webhook を疑わせない", async () => {
+  it("許可が無い 404 には webhook を疑わせない", async () => {
     // 同じ 404 でも、本文が capture-ledger のものなら route は在る。
     responding(404, { error: "not found" });
     const err = (await main("http://capture-ledger:7070", "tok").catch((e: unknown) => e)) as Error;

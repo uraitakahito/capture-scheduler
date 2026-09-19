@@ -81,11 +81,11 @@ describe("失敗したときの言い分", () => {
     await expect(main("c-1", 0, CAPTURED)).rejects.toThrow(/issuer/);
   });
 
-  it("404 には付与の示唆を付ける", async () => {
+  it("404 には許可の示唆を付ける", async () => {
     // capture-ledger は「見てはいけない」と「存在しない」を区別せずに答えるので、
-    // 404 だけでは足りない。submitter の付与を疑う先を書いておく。
+    // 404 だけでは足りない。クロールの許可を疑う先を書いておく。
     responding(404, { error: "not found" });
-    await expect(main("c-1", 0, CAPTURED)).rejects.toThrow(/submitter/);
+    await expect(main("c-1", 0, CAPTURED)).rejects.toThrow(/fga:grant submitter/);
   });
 
   it("本文を必ず読む", async () => {

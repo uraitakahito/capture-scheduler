@@ -70,8 +70,8 @@ const ROUTE_MISSING = /Route [A-Z]+:\/api\/crawls\S* not found/;
  * 本文を必ず読んでから投げる。status だけにすると、capture-ledger が返している理由
  * (`{"error":"..."}`) が消えて「404 でした」しか残らない。
  *
- * **404 は 2 通りある。** route が無い (上) か、route は在るが呼び出し元に付与が無いか
- * (`{"error":"not found"}`)。status は同じで、本文で分かれる。以前はどちらでも付与を
+ * **404 は 2 通りある。** route が無い (上) か、route は在るが呼び出し元にクロールの許可が
+ * 無いか (`{"error":"not found"}`)。status は同じで、本文で分かれる。以前はどちらでも許可を
  * 疑わせていて、webhook の 2 行が無い配備でも「fga:grant を叩け」と言っていた。
  */
 const failure = async (res: Response, what: string): Promise<Error> => {
@@ -83,7 +83,8 @@ const failure = async (res: Response, what: string): Promise<Error> => {
         ? " —— capture-ledger が /api/crawls を出していません (capture-ledger の .env に" +
           " CAPTURE_LEDGER_CRAWL_WEBHOOK_URL と _TOKEN。windmill:bootstrap が出す 2 行)"
         : res.status === 404
-          ? " —— submitter の付与がありますか (capture-ledger: pnpm run fga:grant submitter <sub> <org>)"
+          ? " —— トークンの名前 (sub) に、その組織のクロールの許可がありますか" +
+            " (capture-ledger: pnpm run fga:grant submitter <sub> <org>。既定は windmill acme)"
           : "";
   return new Error(`${what} → ${String(res.status)} ${body.slice(0, 300)}${hint}`);
 };

@@ -38,7 +38,7 @@ const ISSUER = process.env["E2E_ISSUER_URL"] ?? "http://127.0.0.1:9099";
 /** capture-ledger のスタックの capture-fixtures。コンテナからも host からも同じ名前で引ける。 */
 const FIXTURES = process.env["E2E_FIXTURES_URL"] ?? "http://capture-fixtures.capture-ledger:8080";
 
-/** 取り込みを起こせる主体。capture-ledger 側で `submitter` の付与が要る。 */
+/** 取り込みを起こせる主体。capture-ledger 側でクロールの許可 (`fga:grant submitter`) が要る。 */
 const SUBJECT = process.env["E2E_SUBJECT"] ?? "e2e";
 
 let token = "";
@@ -81,7 +81,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
     // (実測)。先に文字列で受けて、それを両方に使う。
     const startedBody = await started.text();
     // 404 は「無い」とも「起こしてよくない」とも読める —— capture-ledger は列挙を避けるために
-    // 両者を区別せずに答える。付与を疑う先をここに書いておく。
+    // 両者を区別せずに答える。許可を疑う先をここに書いておく。
     expect(
       started.status,
       startedBody +
