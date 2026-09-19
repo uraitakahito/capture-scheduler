@@ -11,7 +11,8 @@ pnpm run check       # audit / format / env / typecheck / 単体 / CI との一�
 
 `pretest:e2e` が先に `scripts/check-stack.ts` を走らせ、足りないものを**全部まとめて**
 名指しする。立っているかだけでなく、クロールが最後まで走る設定かも見る —— `/api/crawls` が
-在るか（webhook の 2 行）、API が JWT を受けるか、Windmill の変数の宛先にコンテナから届くか。
+在るか（webhook の 2 行）、API が JWT を受けるか、Windmill が持っているトークンにクロールの許可があるか
+（`GET /api/me`）、Windmill の変数の宛先にコンテナから届くか。
 どれも外れていると、クロールは段の報告のところで初めて落ち、`running` のまま残る。つながりだけを
 見るなら `pnpm run check:connection`（capture-fixtures を見ない）。vitest の外に置いてあるのは意図的 —— global setup が throw すると vitest は
 必ず「No test files found, exiting with code 1」を先に出し、中に書いたどんなメッセージも

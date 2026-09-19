@@ -5,8 +5,10 @@ description: Bring up Windmill, hand it a token for capture-ledger, and open the
 
 ## Before you start: capture-ledger's stack is running
 
-Windmill works against capture-ledger's stack: grants go to its OpenFGA, and crawls call its
-BrowserHive. Before you start, finish §1–§5 of capture-ledger's
+Windmill uses two parts of capture-ledger's stack. [Let windmill start crawls](#let-windmill-start-crawls)
+below writes a permission into its OpenFGA ("windmill may start crawls for acme"), and crawls call
+its BrowserHive to take the pages.
+Before you start, finish §1–§5 of capture-ledger's
 [Quickstart](https://uraitakahito.github.io/capture-ledger/quickstart/) (the DNS domain, the
 submodules and `.env`, `stack:up`, the database, the two OpenFGA ids) and check that the stack is up:
 
@@ -50,10 +52,43 @@ cd ../capture-ledger
 #   CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099  the flow identifies itself with a JWT
 pnpm run oidc:issuer                         # keep it running
 pnpm run api                                 # restart it if running (settings are read at startup)
-pnpm run fga:grant submitter windmill acme   # without this you get 404
 ```
 
-Back here, hand over the key and check the connection:
+### Let windmill start crawls
+
+Windmill calls capture-ledger under the name `windmill` (the token's `sub`; organization `acme`).
+Each time it starts a crawl, reports a level, hands over the index, or closes a crawl,
+capture-ledger asks OpenFGA "may windmill start crawls for acme?" and answers 404 when it may not.
+Even a crawl you start by hand reports its levels under the name windmill.
+
+```
+pnpm run fga:grant submitter windmill acme      (you, once)
+    │ writes
+    ▼
+OpenFGA   user:windmill  submitter  organization:acme
+    ▲
+    │ asks: is user:windmill can_submit on organization:acme?
+    │       (on every start, level report, index, and close)
+capture-ledger API   ◄── Windmill (a token with sub=windmill, orgs=[acme])
+    │
+    └─ 202 when the tuple is there; otherwise 404 {"error":"not found"}
+```
+
+Write that permission (on the capture-ledger side, once; `fga:revoke` takes it back):
+
+```sh
+pnpm run fga:grant submitter windmill acme
+# windmill は acme のクロールを起こせます (書いた: user:windmill submitter organization:acme)
+#   = "windmill may start crawls for acme (wrote: …)"
+```
+
+If you changed `CAPTURE_LEDGER_SUBJECT` / `_ORGANIZATIONS`, use those names. Whether it took is
+what the `can_submit` line of `check:connection` below tells you; when something is missing, it
+prints the command to type, with the names capture-ledger actually saw.
+
+### Hand over the key and check the connection
+
+Back in this repo:
 
 ```sh
 pnpm run windmill:capture-ledger-token   # the token, and the API address as a container sees it
@@ -63,7 +98,9 @@ pnpm run check:connection                # every line ✓ means connected
 The API address (`u/admin/waggle_api_url`) comes from the gateway of the `default` network
 (`container network inspect default`) unless `CAPTURE_LEDGER_API_URL` is set. It changes when the
 network is recreated; re-run `windmill:capture-ledger-token` then. Whichever line of
-`check:connection` shows ✗ names what is missing ([Testing](/testing/)).
+`check:connection` shows ✗ names what is missing ([Testing](/testing/)). `can_submit` asks with the
+very token Windmill holds, so it catches a missing permission and a stale token (the issuer was
+restarted) alike.
 
 Windmill opens at `http://127.0.0.1:8000`.
 
@@ -81,8 +118,8 @@ host                                   │ container
 
 **Keep the dev issuer on loopback.** It mints a token for whoever asks, under
 whatever name they ask for. Put it somewhere a container can reach and everyone
-on the bridge can claim to be `windmill` — which routes around the `submitter`
-grant and undoes the point of using JWTs at all.
+on the bridge can claim to be `windmill` — and so use the crawl permission that `fga:grant`
+gave to windmill alone, which undoes the point of using JWTs at all.
 
 The power to mint keys stays on the host. What crosses the boundary is **one
 finished token**.

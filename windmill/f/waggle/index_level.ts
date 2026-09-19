@@ -44,11 +44,11 @@ export async function main(crawl_id: string): Promise<IndexOutcome> {
   });
 
   if (res.status === 404) {
-    // 上の docstring のとおり。**404 は「索引が無い」とも「権限が無い」とも読める**
+    // 上の docstring のとおり。**404 は「索引が無い」とも「許可が無い」とも読める**
     // ので、log には両方の可能性を残す —— capture-ledger は列挙を避けるために両者を
     // 区別せずに答える設計 (`api/routes.ts`)。
     console.log(
-      "索引の口がありません (この配備に検索が無いか、submitter の付与がありません)。飛ばします",
+      "索引の口がありません (この配備に検索が無いか、トークンの名前にクロールの許可がありません)。飛ばします",
     );
     return { indexed: 0, pages: 0, skipped: true };
   }
