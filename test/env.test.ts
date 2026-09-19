@@ -20,7 +20,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CRAWL_FLOW_PATH,
   ledgerApiUrl,
-  ledgerWebhookEnv,
+  ledgerEnv,
+  ledgerIssuer,
   optional,
   parseGateway,
   repoRoot,
@@ -98,18 +99,53 @@ describe("CRAWL_FLOW_PATH", () => {
   });
 });
 
-describe("ledgerWebhookEnv", () => {
-  it("capture-ledger の変数名で、webhook の URL と token の 2 行を返す", () => {
+/**
+ * capture-ledger の `.env` の末尾に貼る 4 行。以前は webhook の 2 行だけで、残り 2 行 (待ち受けと
+ * issuer) を書き漏らした API で 2 度止まった (2026-09-19・20)。
+ */
+describe("ledgerEnv", () => {
+  it("capture-ledger の変数名で、webhook の URL・token・待ち受け・issuer の 4 行を返す", () => {
     expect(
-      ledgerWebhookEnv({
+      ledgerEnv({
         windmillUrl: "http://127.0.0.1:8000",
         workspace: "crawler",
         token: "tok",
+        issuer: "http://127.0.0.1:9099",
       }),
     ).toEqual([
       "CAPTURE_LEDGER_CRAWL_WEBHOOK_URL=http://127.0.0.1:8000/api/w/crawler/jobs/run/f/f/waggle/crawl_level",
       "CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN=tok",
+      "CAPTURE_LEDGER_API_HOST=0.0.0.0",
+      "CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099",
     ]);
+  });
+});
+
+/**
+ * トークンを取りに行く issuer と、capture-ledger が照合する issuer は同じ値でなければならない。
+ * 別々に既定値を書いていると、片方だけ変えたときに一字一句ずれて、flow の JWT が 401 になる。
+ */
+describe("ledgerIssuer", () => {
+  const original = process.env["CAPTURE_LEDGER_OIDC_ISSUER"];
+  afterEach(() => {
+    if (original === undefined) delete process.env["CAPTURE_LEDGER_OIDC_ISSUER"];
+    else process.env["CAPTURE_LEDGER_OIDC_ISSUER"] = original;
+  });
+
+  it("既定は capture-ledger の dev issuer (http://127.0.0.1:9099)", () => {
+    delete process.env["CAPTURE_LEDGER_OIDC_ISSUER"];
+    expect(ledgerIssuer()).toBe("http://127.0.0.1:9099");
+  });
+
+  it("CAPTURE_LEDGER_OIDC_ISSUER を変えると、capture-ledger に貼る 4 行目もそろって変わる", () => {
+    process.env["CAPTURE_LEDGER_OIDC_ISSUER"] = "http://127.0.0.1:9199";
+    const lines = ledgerEnv({
+      windmillUrl: "http://127.0.0.1:8000",
+      workspace: "crawler",
+      token: "tok",
+      issuer: ledgerIssuer(),
+    });
+    expect(lines.at(-1)).toBe("CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9199");
   });
 });
 

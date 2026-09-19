@@ -80,7 +80,7 @@ export const windmillWorkspace = () => optional("WINDMILL_WORKSPACE", "crawler")
  * クロール 1 段を回す flow のパス。**webhook の URL の一部**で、実体は
  * `windmill/f/waggle/crawl_level.flow/`。
  *
- * capture-ledger に貼る URL はここから組み立てる (`ledgerWebhookEnv`)。人に組み立てさせて
+ * capture-ledger に貼る URL はここから組み立てる (`ledgerEnv`)。人に組み立てさせて
  * いた頃、capture-ledger の `.env.example` の例は `…/f/waggle/crawl` と古くなっていて、
  * そのとおりに設定するとクロールが failed になり `flow not found` の 404 が出た。
  * flow の名前を変えると、`test/env.test.ts` が実体の無いパスとして落とす。
@@ -88,21 +88,43 @@ export const windmillWorkspace = () => optional("WINDMILL_WORKSPACE", "crawler")
 export const CRAWL_FLOW_PATH = "f/waggle/crawl_level";
 
 /**
- * capture-ledger の `.env` に貼る 2 行。**`windmill:bootstrap` が出力する。**
+ * capture-ledger の dev issuer。**トークンを取りに行く先 (`windmill:capture-ledger-token`・doctor) と、
+ * capture-ledger が照合する先 (`ledgerEnv` の 4 行目) は、同じ値でなければならない** ——
+ * 一字一句違うだけで、flow の JWT は 401 になる。だから 1 か所で決める。
+ */
+export const ledgerIssuer = (): string =>
+  optional("CAPTURE_LEDGER_OIDC_ISSUER", "http://127.0.0.1:9099");
+
+/**
+ * capture-ledger の `.env` の**末尾に**貼る 4 行。**`windmill:bootstrap` が出力し、クイックスタートが
+ * 同じ形で載せる** (一致は `check-doc-refs.ts` が見る)。
+ *
+ * 以前は webhook の 2 行だけを出していた。残りの 2 行 (待ち受けと issuer) はクイックスタートと
+ * capture-ledger の `.env.example` に `#` 付きで在るだけで、2026-09-19 と 20 の 2 回とも、止まったのは
+ * その 2 行だった —— 貼ったのは道具が出した 2 行だけ。4 行とも出せば、貼るものは 1 か所になる。
+ *
+ * 末尾に貼らせるのは、node の `--env-file` では同じ名前の後ろの行が効くから。`.env.example` を写した
+ * `.env` には `#CAPTURE_LEDGER_API_HOST=127.0.0.1` のような行が前に在るが、末尾の行が勝つ。
  *
  * token は bootstrap が作った API token そのもの —— capture-ledger はそれで webhook を叩く。
  */
-export const ledgerWebhookEnv = ({
+export const ledgerEnv = ({
   windmillUrl: base,
   workspace,
   token,
+  issuer,
 }: {
   windmillUrl: string;
   workspace: string;
   token: string;
+  issuer: string;
 }): string[] => [
   `CAPTURE_LEDGER_CRAWL_WEBHOOK_URL=${base}/api/w/${workspace}/jobs/run/f/${CRAWL_FLOW_PATH}`,
   `CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN=${token}`,
+  // 段の報告はコンテナ (Windmill の worker) から来る。127.0.0.1 で待つ API には届かない。
+  "CAPTURE_LEDGER_API_HOST=0.0.0.0",
+  // flow は JWT で名乗る。これが無い API は開発用ヘッダで名乗る設定になり、段の報告は 401。
+  `CAPTURE_LEDGER_OIDC_ISSUER=${issuer}`,
 ];
 
 /**

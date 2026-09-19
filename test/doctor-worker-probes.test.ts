@@ -92,6 +92,9 @@ describe("readContainerApi", () => {
     const verdict = readContainerApi({ url: URL, answer: { http: "000", rc: 7 }, expected: URL });
     expect(need(verdict)).toMatch(/API が 127\.0\.0\.1 で待っている/);
     expect(need(verdict)).toMatch(/CAPTURE_LEDGER_API_HOST=0\.0\.0\.0/);
+    expect(need(verdict)).toMatch(
+      /windmill:bootstrap が出した 4 行を capture-ledger の \.env の末尾に貼り/,
+    );
   });
 
   it("gateway が分からなければ、curl の答えだけで読む", () => {
