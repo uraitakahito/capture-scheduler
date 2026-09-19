@@ -47,8 +47,8 @@ export const readJwt = ({ token, header, iss }: JwtProbe): Verdict => {
     return {
       ok: false,
       need:
-        "API はヘッダで名乗る設定で動いている → capture-ledger の .env に " +
-        `CAPTURE_LEDGER_OIDC_ISSUER=${iss} を書いて API を起こし直す。` +
+        `API はヘッダで名乗る設定で動いている (CAPTURE_LEDGER_OIDC_ISSUER=${iss} が効いていない) → ` +
+        "windmill:bootstrap が出した 4 行を capture-ledger の .env の末尾に貼り、API を起こし直す。" +
         "ヘッダの設定の API では、flow の段の報告 (Bearer) が 401 になる",
     };
   }

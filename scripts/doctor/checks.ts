@@ -20,7 +20,14 @@ import { connect } from "node:net";
 import { join, relative } from "node:path";
 import { promisify } from "node:util";
 
-import { ledgerApiUrl, optional, repoRoot, windmillUrl, windmillWorkspace } from "../env.js";
+import {
+  ledgerApiUrl,
+  ledgerIssuer,
+  optional,
+  repoRoot,
+  windmillUrl,
+  windmillWorkspace,
+} from "../env.js";
 import { readCanSubmit } from "./can-submit.js";
 import { readJwt } from "./jwt-check.js";
 import { runChecks, type Check, type Outcome, type Result, type Verdict } from "./run.js";
@@ -45,7 +52,7 @@ import {
 export const API = "http://127.0.0.1:7070";
 /** capture-ledger の開発のスタックの OpenFGA。鍵はクイックスタートの前提と同じ。 */
 const OPENFGA = "http://127.0.0.1:8090";
-const ISSUER = optional("CAPTURE_LEDGER_OIDC_ISSUER", "http://127.0.0.1:9099");
+const ISSUER = ledgerIssuer();
 /** flow が走るコンテナ。段の報告も BrowserHive への呼び出しもここから出る。 */
 const WORKER = "windmill-worker.capture-scheduler";
 /** e2e の試験が名乗る名前 (`test/e2e/crawl-level.e2e.test.ts` と同じ既定)。 */
