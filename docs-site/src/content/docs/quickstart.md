@@ -250,7 +250,8 @@ open http://127.0.0.1:7070/
 
 Paste it into the トークン (Token) field and press 読み込む (Load). When the line above the list says
 you are viewing as your name in `acme`, the API has accepted the token. A token lasts one hour, and
-restarting the issuer invalidates the old ones — when the picker says 401 — このトークンは通らない…
+after the issuer restarts, older tokens stop working once the API has fetched the new key — when
+the picker says 401 — このトークンは通らない…
 ("this token does not get through"), get a new one with the same command and paste it. How to use
 the screen is in capture-ledger's
 [Browsing archives](https://uraitakahito.github.io/capture-ledger/picker/).
