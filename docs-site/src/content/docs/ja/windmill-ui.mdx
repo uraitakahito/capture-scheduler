@@ -200,7 +200,7 @@ windmill-db の volume を消すと、workspace・token・変数が全部消え�
 ```sh
 pnpm run windmill:bootstrap            # workspace を作り直し、新しい token を出す
                                        # → 出た WINDMILL_TOKEN= を .env に貼り直す
-                                       # → capture-ledger の .env の webhook の 2 行も
+                                       # → 続く 4 行を capture-ledger の .env の末尾に
                                        #   貼り直して、あちらの API を起こし直す
 pnpm run windmill:push                 # script / flow / schedule
 pnpm run windmill:push-proto           # ← 忘れると crawl_host が Resource not found
