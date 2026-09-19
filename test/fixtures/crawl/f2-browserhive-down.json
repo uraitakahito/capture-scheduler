@@ -1,0 +1,76 @@
+{
+  "case": "F2: browserhive-1・-2 を container stop した",
+  "recorded": "2026-09-19 capture-ledger develop 9fe6a03 (v0.43.0 の手前) と Windmill CE v1.806.0 で実測",
+  "start": {
+    "status": 202,
+    "body": {
+      "crawlId": "12aac1e1-b4ff-4162-ab68-9e25864f4bb6"
+    }
+  },
+  "crawl": {
+    "crawlId": "12aac1e1-b4ff-4162-ab68-9e25864f4bb6",
+    "seeds": ["https://example.com/"],
+    "scope": "same-origin",
+    "state": "failed",
+    "stopReason": "failed",
+    "maxDepth": 0,
+    "maxPages": 30,
+    "perHostDelayMs": 2000,
+    "hostParallelism": 4,
+    "startedAt": "2026-09-19T14:19:35.751Z",
+    "finishedAt": "2026-09-19T14:20:36.677Z",
+    "pagesDiscovered": 0,
+    "pagesCaptured": 0,
+    "error": "[cap] BrowserHive に届きません: browserhive-1.capture-ledger:50051, browserhive-2.capture-ledger:50051",
+    "lastJob": {
+      "id": "01a0ba09-6fd2-396f-389d-523ae1f028d6",
+      "depth": 0
+    },
+    "failures": []
+  },
+  "run": {
+    "type": "CompletedJob",
+    "success": false,
+    "result": [
+      {
+        "closed": true
+      }
+    ],
+    "flow_status": {
+      "modules": [
+        {
+          "id": "plan",
+          "type": "Success",
+          "job": "01a0ba09-6ffd-219f-7ad8-ede3c16df591"
+        },
+        {
+          "id": "hosts",
+          "type": "Failure",
+          "job": "01a0ba09-70ee-9312-e856-f6b1d0057adc"
+        },
+        {
+          "id": "report",
+          "type": "WaitingForPriorSteps",
+          "job": null
+        },
+        {
+          "id": "index",
+          "type": "WaitingForPriorSteps",
+          "job": null
+        }
+      ],
+      "failure_module": {
+        "type": "WaitingForPriorSteps",
+        "job": null
+      }
+    }
+  },
+  "failedStep": {
+    "type": "CompletedJob",
+    "success": false,
+    "script_path": "f/waggle/crawl_level/forloop-0",
+    "result": {
+      "closed": true
+    }
+  }
+}

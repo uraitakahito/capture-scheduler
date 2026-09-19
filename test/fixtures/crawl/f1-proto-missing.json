@@ -1,0 +1,76 @@
+{
+  "case": "F1: Windmill の resource u/admin/browserhive_proto を消した",
+  "recorded": "2026-09-19 capture-ledger develop 9fe6a03 (v0.43.0 の手前) と Windmill CE v1.806.0 で実測",
+  "start": {
+    "status": 202,
+    "body": {
+      "crawlId": "2317730e-b628-4a35-9373-b964bbabde82"
+    }
+  },
+  "crawl": {
+    "crawlId": "2317730e-b628-4a35-9373-b964bbabde82",
+    "seeds": ["https://example.com/"],
+    "scope": "same-origin",
+    "state": "failed",
+    "stopReason": "failed",
+    "maxDepth": 0,
+    "maxPages": 30,
+    "perHostDelayMs": 2000,
+    "hostParallelism": 4,
+    "startedAt": "2026-09-19T14:18:17.529Z",
+    "finishedAt": "2026-09-19T14:19:24.076Z",
+    "pagesDiscovered": 0,
+    "pagesCaptured": 0,
+    "error": "[cap] Resource not found at u/admin/browserhive_proto or not visible to you: Not found: Resource u/admin/browserhive_proto not found",
+    "lastJob": {
+      "id": "01a0ba08-3e40-d746-423b-f453645e144b",
+      "depth": 0
+    },
+    "failures": []
+  },
+  "run": {
+    "type": "CompletedJob",
+    "success": false,
+    "result": [
+      {
+        "closed": true
+      }
+    ],
+    "flow_status": {
+      "modules": [
+        {
+          "id": "plan",
+          "type": "Success",
+          "job": "01a0ba08-3e5c-ea50-3dde-e083c486a829"
+        },
+        {
+          "id": "hosts",
+          "type": "Failure",
+          "job": "01a0ba08-41c1-9d01-efee-c7ba7828c808"
+        },
+        {
+          "id": "report",
+          "type": "WaitingForPriorSteps",
+          "job": null
+        },
+        {
+          "id": "index",
+          "type": "WaitingForPriorSteps",
+          "job": null
+        }
+      ],
+      "failure_module": {
+        "type": "WaitingForPriorSteps",
+        "job": null
+      }
+    }
+  },
+  "failedStep": {
+    "type": "CompletedJob",
+    "success": false,
+    "script_path": "f/waggle/crawl_level/forloop-0",
+    "result": {
+      "closed": true
+    }
+  }
+}

@@ -232,10 +232,12 @@ that repo's `.env` before granting.
 
 **Recreating containers can change the bridge subnet.** `u/admin/waggle_api_url` holds the
 gateway of the `default` network as it was when `windmill:capture-ledger-token` ran, so re-run it
-when the subnet moves. A stale address makes the report step fail with `ConnectionRefused`, and
-the crawl stays `running`. Reachability is measured by the container→api line of
-`pnpm run check:connection`, which asks the variable's `/healthz` from inside the worker. When
-every line shows ✓, the recovery is done.
+when the subnet moves. A stale address makes the report step fail to connect (`Unable to
+connect. Is the computer able to access the url?`), and the crawl stays `running`. Reachability
+is measured by the container→api line of `pnpm run doctor`, which asks the variable's `/healthz`
+from inside the worker and, when that fails, compares the address with the current gateway to
+tell a stale address from an API listening on 127.0.0.1. When `pnpm run doctor` is all ✓ and
+`pnpm run smoke` says "撮れた" (captured), the recovery is done.
 
 ## The name `f/waggle/`
 

@@ -1,0 +1,79 @@
+{
+  "case": "F6: windmill のクロールの許可を fga:revoke し、e2e の名前で起こした",
+  "recorded": "2026-09-19 capture-ledger develop 9fe6a03 (v0.43.0 の手前) と Windmill CE v1.806.0 で実測",
+  "start": {
+    "status": 202,
+    "body": {
+      "crawlId": "bd246501-916b-4090-b4a0-a11409bb9291"
+    }
+  },
+  "crawl": {
+    "crawlId": "bd246501-916b-4090-b4a0-a11409bb9291",
+    "seeds": ["https://example.com/"],
+    "scope": "same-origin",
+    "state": "running",
+    "stopReason": null,
+    "maxDepth": 0,
+    "maxPages": 30,
+    "perHostDelayMs": 2000,
+    "hostParallelism": 4,
+    "startedAt": "2026-09-19T14:27:48.382Z",
+    "finishedAt": null,
+    "pagesDiscovered": 0,
+    "pagesCaptured": 0,
+    "error": null,
+    "lastJob": {
+      "id": "01a0ba10-f42a-7f95-9c66-c197160b93d1",
+      "depth": 0
+    },
+    "failures": []
+  },
+  "run": {
+    "type": "CompletedJob",
+    "success": false,
+    "result": {
+      "closed": false,
+      "problem": "POST /api/crawls/bd246501-916b-4090-b4a0-a11409bb9291/failed → 404 {\"error\":\"not found\"}"
+    },
+    "flow_status": {
+      "modules": [
+        {
+          "id": "plan",
+          "type": "Success",
+          "job": "01a0ba10-f45c-b0ce-089f-406a7e9f110b"
+        },
+        {
+          "id": "hosts",
+          "type": "Success",
+          "job": "01a0ba10-f527-5445-e4ac-d83b8c174bb0"
+        },
+        {
+          "id": "report",
+          "type": "Failure",
+          "job": "01a0ba11-0a8f-6a77-8489-77ecae1ee428"
+        },
+        {
+          "id": "index",
+          "type": "WaitingForPriorSteps",
+          "job": null
+        }
+      ],
+      "failure_module": {
+        "type": "Success",
+        "job": "01a0ba11-0ae0-b893-1963-5f3df8f2f2d7"
+      }
+    }
+  },
+  "failedStep": {
+    "type": "CompletedJob",
+    "success": false,
+    "script_path": "f/waggle/report_level",
+    "result": {
+      "error": {
+        "name": "Error",
+        "message": "POST /api/crawls/bd246501-916b-4090-b4a0-a11409bb9291/pages → 404 {\"error\":\"not found\"} —— トークンの名前 (sub) に、その組織のクロールの許可がありますか (capture-ledger: pnpm run fga:grant submitter <sub> <org>。既定は windmill acme)",
+        "step_id": "report"
+      }
+    }
+  }
+}

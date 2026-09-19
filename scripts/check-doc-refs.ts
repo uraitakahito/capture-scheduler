@@ -7,7 +7,7 @@
  * 実測して docstring に残している)。ビルドに任せると、ドキュメントは空のコード
  * フェンスのまま出てしまう。
  *
- * 見るのは 5 つ:
+ * 見るのは 6 つ:
  *
  *   1. 訳の欠落 —— 日本語版の無い英語ページ、あるいは英語の原文が無い日本語ページ。
  *      Starlight はページが無いと黙って英語に落とすので、**半分だけ訳したサイトも
@@ -22,6 +22,9 @@
  *   5. スクショの版 —— shots-manifest.json の windmillVersion が docker-compose.yml の
  *      windmill の pin と一致するか。**compose を上げたら撮り直せ** を機械で言う。
  *      UI が変わったのに写真が古い、を緑で出荷させない (pnpm run docs:shots が撮る)。
+ *   6. doctor と smoke が指す節 —— ✗ に添える URL の anchor が、build 後の HTML の見出しの id に
+ *      在るか (`scripts/doctor/sections.ts`)。見出しを書き換えると id が変わり、URL は黙って
+ *      ページの先頭に落ちる。
  *
  * 訳について見るのはページの **存在** だけで、構造は一切見ない。両方の言語に同じ
  * 見出しを強いると日本語が悪くなる。ページの歩調を合わせるのは人の仕事で、
@@ -38,6 +41,7 @@
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
+import { SECTIONS } from "./doctor/sections.js";
 import { repoRoot } from "./env.js";
 
 const ROOT = repoRoot();
@@ -158,6 +162,23 @@ if (existsSync(SHOTS_DIR)) {
   }
 }
 
+// ── 6. doctor と smoke が指す節 ─────────────────────────────────────
+// build 後の HTML を読む (site:check は build の後にこれを走らせる)。id は Starlight が
+// 見出しから作るので、ソースの見出しから計算し直すより、出来上がったものを見るほうが確か。
+for (const section of Object.values(SECTIONS)) {
+  const html = resolve(ROOT, "docs-site/dist/ja", section.page, "index.html");
+  if (!existsSync(html)) {
+    problems.push(
+      `doctor が指す docs-site/dist/ja/${section.page}/ が無い (build の前に走らせた?)`,
+    );
+  } else if (!readFileSync(html, "utf8").includes(`id="${section.anchor}"`)) {
+    problems.push(
+      `doctor が指す節「${section.title}」の #${section.anchor} が ja/${section.page}/ に無い ` +
+        "(見出しを変えたなら scripts/doctor/sections.ts も)",
+    );
+  }
+}
+
 if (problems.length > 0) {
   console.error("doc-ref check failed:");
   for (const p of problems) console.error(`  ${p}`);
@@ -166,5 +187,5 @@ if (problems.length > 0) {
 
 console.log(
   `✓ doc-ref check passed: ${en.length} pages in English and Japanese, ` +
-    `all source paths and screenshots resolve`,
+    `all source paths, screenshots and doctor's sections resolve`,
 );

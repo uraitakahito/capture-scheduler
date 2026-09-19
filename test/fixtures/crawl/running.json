@@ -1,0 +1,65 @@
+{
+  "case": "撮っている最中 (hosts の段が InProgress) の 1 本",
+  "recorded": "2026-09-19 capture-ledger develop 9fe6a03 (v0.43.0 の手前) と Windmill CE v1.806.0 で実測",
+  "start": {
+    "status": 202,
+    "body": {
+      "crawlId": "ef3f64b7-4067-46dd-8a99-3b03996a12d6"
+    }
+  },
+  "crawl": {
+    "crawlId": "ef3f64b7-4067-46dd-8a99-3b03996a12d6",
+    "seeds": ["https://example.com/"],
+    "scope": "same-origin",
+    "state": "running",
+    "stopReason": null,
+    "maxDepth": 0,
+    "maxPages": 30,
+    "perHostDelayMs": 2000,
+    "hostParallelism": 4,
+    "startedAt": "2026-09-19T14:31:13.218Z",
+    "finishedAt": null,
+    "pagesDiscovered": 0,
+    "pagesCaptured": 0,
+    "error": null,
+    "lastJob": {
+      "id": "01a0ba14-1453-7f17-de54-eb9f70ae55b2",
+      "depth": 0
+    },
+    "failures": []
+  },
+  "run": {
+    "type": "QueuedJob",
+    "success": null,
+    "running": true,
+    "result": null,
+    "flow_status": {
+      "modules": [
+        {
+          "id": "plan",
+          "type": "Success",
+          "job": "01a0ba14-1473-3e4c-db83-5444645720bc"
+        },
+        {
+          "id": "hosts",
+          "type": "InProgress",
+          "job": "01a0ba14-1548-e8e2-a2d7-420be3a023c2"
+        },
+        {
+          "id": "report",
+          "type": "WaitingForPriorSteps",
+          "job": null
+        },
+        {
+          "id": "index",
+          "type": "WaitingForPriorSteps",
+          "job": null
+        }
+      ],
+      "failure_module": {
+        "type": "WaitingForPriorSteps",
+        "job": null
+      }
+    }
+  }
+}
