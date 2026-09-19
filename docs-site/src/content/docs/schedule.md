@@ -51,5 +51,5 @@ server does not store comments. Anything explaining _why_ the schedule is what i
 is has to live here, on this page, not in the YAML.
 
 That is also why `windmill/wmill.yaml` sets `includeSchedules: true`: by default
-schedules are not synced at all, and **"when it runs" — the only thing this
-repository decides — would be the one setting missing from git.**
+schedules are not synced at all, and **"when it runs" would be the one setting
+missing from git.**
