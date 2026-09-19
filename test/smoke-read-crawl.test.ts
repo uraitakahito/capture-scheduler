@@ -129,6 +129,15 @@ describe("run が失敗し、クロールが running のまま残ったとき (�
     );
   });
 
+  it("取り消された run は、取り消されたと言う (締める段は走らないので、文は run に在る)", () => {
+    const run = failedRun("canceled");
+    expect(run.canceled).toBe("Job canceled: S5: 取り消しの確かめ by admin");
+    expect(readStuck(run).evidence).toBe(
+      "run が取り消された: Job canceled: S5: 取り消しの確かめ by admin",
+    );
+    expect(crawlOf("canceled").state).toBe("running");
+  });
+
   it("段の文が取れなくても、締められなかった理由で読む (同じトークン・同じ宛先)", () => {
     const reading = readStuck(failedRun("f5-api-loopback"));
     expect(reading.evidence).toMatch(/^run の report の段: Unable to connect/);

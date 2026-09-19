@@ -11,7 +11,8 @@
  *   BrowserHive の口 (HTTP/2 で GET)   415 0   gRPC は POST しか受けないが、答えるのは生きている証拠
  *   名前が引けない                     000 6   **止めたコンテナもこれ** —— 名前ごと消える (refused にならない)
  *   口が閉じている                     000 7
- *   答えない                           000 28  (--max-time の切れ)
+ *   答えない                           000 28  (--max-time の切れ)。**止めた直後の数秒もこれ** ——
+ *                                              名前が消えるまでは、残った名前の先が答えない
  *
  * 入出力を持たない。curl を走らせるのは `checks.ts`。
  */
@@ -41,7 +42,8 @@ const DOWN: Readonly<Record<number, (endpoints: string) => string>> = {
     "変数 u/admin/browserhive_endpoints の綴り (CAPTURE_LEDGER_BROWSERHIVE_ENDPOINTS)",
   7: (endpoints) =>
     `待っていない: ${endpoints} —— BrowserHive が起動中か落ちた (コンテナは動いている)`,
-  28: (endpoints) => `3 秒で答えない: ${endpoints}`,
+  28: (endpoints) =>
+    `3 秒で答えない: ${endpoints} —— 止めた直後 (名前が消えるまでの数秒) か、BrowserHive が詰まっている`,
 };
 
 /**

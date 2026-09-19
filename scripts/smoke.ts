@@ -8,7 +8,8 @@
  * 署名付き URL で先頭 4 バイトを取り、`PK` (WACZ は zip) であることまで見る。
  *
  * 撮れなかったら、落ちた段と直し方を言う (`smoke/read-crawl.ts`)。**自分が起こしたクロールは
- * 必ず締める** —— running のまま残すと、以後の起動が全部 409 になる。
+ * 必ず締める** —— running のまま残すと、以後の起動が全部 409 になる。flow がまだ走っていれば、
+ * Windmill の run を取り消してから締める (`cancelRun`)。
  *
  *   --timeout <秒>     待つ上限 (既定 180)
  *   --no-doctor        先に doctor を走らせない (直した直後の撮り直しと、壊して確かめるとき)
@@ -130,15 +131,36 @@ const ledger = async (
   }
 };
 
-/** 締める。締めたかどうかを 1 行で言う。 */
-const close = async (crawlId: string, reason: string): Promise<void> => {
+/**
+ * Windmill の run を取り消す。**締める前に。** 走っている flow を残して台帳だけ締めると、後から
+ * 届いた段の報告が、締めたクロールを succeeded に書き戻した (2026-09-19 に実測。capture-ledger は
+ * 締めた後の報告を断らない)。取り消した run では締める段が走らないので、締めるのはこちら。
+ * 終わった run の取り消しは、何もせずに 200 を返す。
+ */
+const cancelRun = async (jobId: string, reason: string): Promise<void> => {
+  await windmillFetch(`/api/w/${windmillWorkspace()}/jobs_u/queue/cancel/${jobId}`, {
+    token: process.env["WINDMILL_TOKEN"] ?? "",
+    method: "POST",
+    body: { reason },
+  }).catch(() => undefined);
+};
+
+/** run を取り消してから、クロールを締める。締めたかどうかを 1 行で言う。 */
+const close = async (crawlId: string, reason: string, jobId: string | undefined): Promise<void> => {
+  if (jobId !== undefined) await cancelRun(jobId, reason);
   const { status, body } = await ledger(`/api/crawls/${crawlId}/failed`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ reason }),
   });
   if (status === 200) {
-    say("締めた", `${crawlId} (${reason})`);
+    const { closed } = (parse(body) ?? {}) as { closed?: unknown };
+    say(
+      "締めた",
+      closed === false
+        ? `${crawlId} は、締める前に終わっていた`
+        : `${crawlId}${jobId === undefined ? "" : ` と run ${jobId}`} (${reason})`,
+    );
     return;
   }
   say(
@@ -172,7 +194,8 @@ if (started.status === 409) {
     );
   }
   say("起こす", `409 —— ${who}。--close-running なので締める`);
-  await close(busy.crawlId, "smoke --close-running で締めた");
+  const running = parseCrawl(parse((await ledger(`/api/crawls/${busy.crawlId}`)).body));
+  await close(busy.crawlId, "smoke --close-running で締めた", running?.lastJob?.id);
   started = await start();
 }
 if (started.status !== 202) {
@@ -183,9 +206,12 @@ if (started.status !== 202) {
 const crawlId = String((parse(started.body) as { crawlId?: unknown }).crawlId);
 say("起こす", `POST /api/crawls → 202  crawl ${crawlId}  ${url}`);
 
+/** 待っている間に見た、最後の段の run。Ctrl-C のとき取り消す。 */
+let lastJobId: string | undefined;
+
 // Ctrl-C で抜けても、自分が起こしたクロールは締める。
 process.once("SIGINT", () => {
-  void close(crawlId, "smoke を Ctrl-C で止めた").finally(() => process.exit(130));
+  void close(crawlId, "smoke を Ctrl-C で止めた", lastJobId).finally(() => process.exit(130));
 });
 
 // ── 待つ ──────────────────────────────────────────────────────────────
@@ -227,7 +253,7 @@ for (;;) {
   crawl = parseCrawl(parse(got.body));
   if (crawl === undefined) {
     say("待つ", `GET /api/crawls/${crawlId} → ${String(got.status)} ${got.body.slice(0, 200)}`);
-    await close(crawlId, "smoke: クロールの状態が読めなかった");
+    await close(crawlId, "smoke: クロールの状態が読めなかった", lastJobId);
     process.exit(1);
   }
   if (!("lastJob" in crawl) && !warnedOld) {
@@ -235,6 +261,7 @@ for (;;) {
     say("注意", "capture-ledger が v0.43.0 より古い —— run と、取れなかったページが分からない");
   }
   showRun(crawl);
+  lastJobId = crawl.lastJob?.id ?? lastJobId;
   if (crawl.state !== "running") break;
   // 締める段まで落ちると、クロールは running のまま残る。run が失敗で終わっていれば、待っても変わらない。
   if (crawl.lastJob) {
@@ -244,14 +271,14 @@ for (;;) {
       const message =
         run.stepJob === undefined ? undefined : stepMessage(await windmillJob(run.stepJob));
       const reading = readStuck(run, message);
-      await close(crawlId, "smoke: run が失敗し、クロールが running のまま残った");
+      await close(crawlId, "smoke: run が失敗し、クロールが running のまま残った", undefined);
       report(reading, crawl);
     }
   }
   if (Date.now() >= deadline) {
     say("終わり", `${String(timeoutMs / 1000)} 秒で終わらなかった`);
     const run = crawl.lastJob ? readRun(await windmillJob(crawl.lastJob.id)) : undefined;
-    await close(crawlId, `smoke: ${String(timeoutMs / 1000)} 秒で終わらなかった`);
+    await close(crawlId, `smoke: ${String(timeoutMs / 1000)} 秒で終わらなかった`, lastJobId);
     report(
       {
         evidence:

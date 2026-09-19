@@ -62,6 +62,8 @@ export type Run =
       stepJob?: string;
       /** 締める段が締められなかった理由。 */
       closeProblem?: string;
+      /** 取り消されたときの文。取り消すと締める段は走らない (2026-09-19 に実測)。 */
+      canceled?: string;
     }
   | { state: "unknown"; detail: string };
 
@@ -79,8 +81,12 @@ export const readRun = (job: unknown): Run => {
     (m): m is Record<string, unknown> => isRecord(m) && m["type"] === "Failure",
   );
   const result = isRecord(job["result"]) ? job["result"] : {};
+  const error = isRecord(result["error"]) ? result["error"] : {};
   return {
     state: "failed",
+    ...(job["canceled"] === true && {
+      canceled: typeof error["message"] === "string" ? error["message"] : "取り消された",
+    }),
     ...(typeof failed?.["id"] === "string" && { step: failed["id"] }),
     ...(typeof failed?.["job"] === "string" && { stepJob: failed["job"] }),
     ...(result["closed"] === false &&
@@ -196,6 +202,12 @@ export const readFinished = (crawl: Crawl): Reading | undefined => {
  * 段の文が読めなければ、締められなかった理由で読む (同じトークン・同じ宛先なので、たいてい同じ理由)。
  */
 export const readStuck = (run: Extract<Run, { state: "failed" }>, message?: string): Reading => {
+  if (run.canceled !== undefined) {
+    return {
+      evidence: `run が取り消された: ${run.canceled}`,
+      fix: "Windmill で run を取り消すと、締める段も走らない —— 撮り直すなら pnpm run smoke",
+    };
+  }
   const text = message ?? run.closeProblem;
   if (text === undefined) {
     return {

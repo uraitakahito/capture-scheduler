@@ -1,0 +1,73 @@
+{
+  "case": "撮っている最中に Windmill の run を取り消した (jobs_u/queue/cancel)",
+  "recorded": "2026-09-19 capture-ledger develop 9fe6a03 (v0.43.0 の手前) と Windmill CE v1.806.0 で実測",
+  "start": {
+    "status": 202,
+    "body": {
+      "crawlId": "e422be75-9db7-4f55-b785-131a98a18818"
+    }
+  },
+  "crawl": {
+    "crawlId": "e422be75-9db7-4f55-b785-131a98a18818",
+    "seeds": ["https://example.com/"],
+    "scope": "same-origin",
+    "state": "running",
+    "stopReason": null,
+    "maxDepth": 0,
+    "maxPages": 30,
+    "perHostDelayMs": 2000,
+    "hostParallelism": 4,
+    "startedAt": "2026-09-19T14:53:36.759Z",
+    "finishedAt": null,
+    "pagesDiscovered": 0,
+    "pagesCaptured": 0,
+    "error": null,
+    "lastJob": {
+      "id": "01a0ba28-9483-3a28-8f3b-20aff091f141",
+      "depth": 0
+    },
+    "failures": []
+  },
+  "run": {
+    "type": "CompletedJob",
+    "success": false,
+    "canceled": true,
+    "canceled_reason": "S5: 取り消しの確かめ",
+    "result": {
+      "error": {
+        "name": "Canceled",
+        "reason": "S5: 取り消しの確かめ",
+        "message": "Job canceled: S5: 取り消しの確かめ by admin",
+        "canceler": "admin"
+      }
+    },
+    "flow_status": {
+      "modules": [
+        {
+          "id": "plan",
+          "type": "Success",
+          "job": "01a0ba28-94a1-06b9-3dc3-caadfe35795d"
+        },
+        {
+          "id": "hosts",
+          "type": "Failure",
+          "job": "01a0ba28-95ba-5b9f-1e06-4fa10572327b"
+        },
+        {
+          "id": "report",
+          "type": "WaitingForPriorSteps",
+          "job": null
+        },
+        {
+          "id": "index",
+          "type": "WaitingForPriorSteps",
+          "job": null
+        }
+      ],
+      "failure_module": {
+        "type": "WaitingForPriorSteps",
+        "job": null
+      }
+    }
+  }
+}

@@ -532,7 +532,9 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
         ? { ok: true }
         : {
             ok: false,
-            need: "cd ../capture-ledger && container-compose --profile capture-fixtures up -d -b",
+            need:
+              "capture-fixtures が待っていない → " +
+              "cd ../capture-ledger && container-compose --profile capture-fixtures up -d -b",
           },
     e2eOnly: true,
   },

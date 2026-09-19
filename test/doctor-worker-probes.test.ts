@@ -3,7 +3,7 @@
  *
  * 入力は 2026-09-19 に worker (windmill-worker.capture-scheduler) の中で実測した答え:
  * BrowserHive の口は `415 0`、名前が引けないと `000 6` (container stop した BrowserHive も)、
- * 閉じた口は `000 7`、答えない宛先は `000 28`。
+ * 閉じた口は `000 7`、答えない宛先は `000 28` (止めた直後の数秒の BrowserHive も —— 約 5 秒で 6 に変わった)。
  */
 import { describe, expect, it } from "vitest";
 
@@ -58,7 +58,7 @@ describe("readBrowserhiveProbes", () => {
   it("終わり方が違えば分けて言う (rc 7 は動いているコンテナ、rc 28 は答えない)", () => {
     expect(need(readBrowserhiveProbes([probe(EP1, "000", 7), probe(EP, "000", 28)]))).toBe(
       `待っていない: ${EP1} —— BrowserHive が起動中か落ちた (コンテナは動いている)。` +
-        `3 秒で答えない: ${EP}`,
+        `3 秒で答えない: ${EP} —— 止めた直後 (名前が消えるまでの数秒) か、BrowserHive が詰まっている`,
     );
   });
 
