@@ -7,7 +7,7 @@
  * 実測して docstring に残している)。ビルドに任せると、ドキュメントは空のコード
  * フェンスのまま出てしまう。
  *
- * 見るのは 6 つ:
+ * 見るのは 7 つ:
  *
  *   1. 訳の欠落 —— 日本語版の無い英語ページ、あるいは英語の原文が無い日本語ページ。
  *      Starlight はページが無いと黙って英語に落とすので、**半分だけ訳したサイトも
@@ -25,6 +25,8 @@
  *   6. doctor と smoke が指す節 —— ✗ に添える URL の anchor が、build 後の HTML の見出しの id に
  *      在るか (`scripts/doctor/sections.ts`)。見出しを書き換えると id が変わり、URL は黙って
  *      ページの先頭に落ちる。
+ *   7. capture-ledger に貼る 4 行 —— クイックスタートの dotenv のブロックが、bootstrap の出力
+ *      (`env.ts` の `ledgerEnv`) と名前も値も同じか。
  *
  * 訳について見るのはページの **存在** だけで、構造は一切見ない。両方の言語に同じ
  * 見出しを強いると日本語が悪くなる。ページの歩調を合わせるのは人の仕事で、
@@ -42,7 +44,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { SECTIONS } from "./doctor/sections.js";
-import { repoRoot } from "./env.js";
+import { ledgerEnv, ledgerIssuer, repoRoot, windmillUrl, windmillWorkspace } from "./env.js";
 
 const ROOT = repoRoot();
 const DOCS = resolve(ROOT, "docs-site/src/content/docs");
@@ -179,6 +181,39 @@ for (const section of Object.values(SECTIONS)) {
   }
 }
 
+// ── 7. capture-ledger に貼る 4 行 ────────────────────────────────────
+// クイックスタートの dotenv のブロックは、bootstrap の出力の写し。写しは腐る —— 2026-09-19 と
+// 20 に、写しの中に無かった 2 行で止まった (以前は 4 行を sh のブロックのコメントで並べていた)。
+// 名前と値が一字一句同じかを見る。token の値 (docs では置き場所の説明) と、コメントの行は比べない。
+const LEDGER_BLOCK = /^```dotenv title="capture-ledger\/\.env[^"]*"\n([\s\S]*?)^```$/m;
+const TOKEN_NAME = "CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN";
+const expectedLedger = ledgerEnv({
+  windmillUrl: windmillUrl(),
+  workspace: windmillWorkspace(),
+  issuer: ledgerIssuer(),
+  token: "",
+});
+for (const page of ["quickstart.md", join("ja", "quickstart.md")]) {
+  const block = LEDGER_BLOCK.exec(readFileSync(join(DOCS, page), "utf8"));
+  if (block === null) {
+    problems.push(
+      `${page}: capture-ledger/.env の dotenv のブロックが無い (bootstrap の 4 行を載せる所)`,
+    );
+    continue;
+  }
+  const lines = (block[1] ?? "")
+    .split("\n")
+    .filter((line) => line.trim() !== "" && !line.startsWith("#"))
+    .map((line) => (line.startsWith(`${TOKEN_NAME}=`) ? `${TOKEN_NAME}=` : line));
+  if (lines.join("\n") !== expectedLedger.join("\n")) {
+    problems.push(
+      `${page}: capture-ledger/.env のブロックが bootstrap の 4 行と違う (env.ts の ledgerEnv に合わせる)\n` +
+        `      docs:      ${lines.join(" | ")}\n` +
+        `      bootstrap: ${expectedLedger.join(" | ")}`,
+    );
+  }
+}
+
 if (problems.length > 0) {
   console.error("doc-ref check failed:");
   for (const p of problems) console.error(`  ${p}`);
@@ -187,5 +222,5 @@ if (problems.length > 0) {
 
 console.log(
   `✓ doc-ref check passed: ${en.length} pages in English and Japanese, ` +
-    `all source paths, screenshots and doctor's sections resolve`,
+    `all source paths, screenshots and doctor's sections resolve; the capture-ledger .env block matches bootstrap`,
 );

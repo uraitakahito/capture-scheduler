@@ -18,11 +18,18 @@
  * 再現できる)。**issuer を再起動したら、このスクリプトも実行し直すこと。**
  * 古いトークンは 401 になる。
  */
-import { guardEnv, optional, ledgerApiUrl, windmillFetch, windmillWorkspace } from "./env.js";
+import {
+  guardEnv,
+  ledgerApiUrl,
+  ledgerIssuer,
+  optional,
+  windmillFetch,
+  windmillWorkspace,
+} from "./env.js";
 
 guardEnv();
 
-const ISSUER = optional("CAPTURE_LEDGER_OIDC_ISSUER", "http://127.0.0.1:9099");
+const ISSUER = ledgerIssuer();
 const SUBJECT = optional("CAPTURE_LEDGER_SUBJECT", "windmill");
 /**
  * browserhive の gRPC の宛先。**browser 1 台に口 1 つなので複数**。カンマ区切りで受け、

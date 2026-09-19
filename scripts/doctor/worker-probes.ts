@@ -100,8 +100,9 @@ export const readContainerApi = ({
     return {
       ok: false,
       need:
-        `worker から ${url} に届かない (refused) —— API が 127.0.0.1 で待っている → ` +
-        "capture-ledger の .env に CAPTURE_LEDGER_API_HOST=0.0.0.0 を書いて API を起こし直す",
+        `worker から ${url} に届かない (refused) —— API が 127.0.0.1 で待っている ` +
+        "(CAPTURE_LEDGER_API_HOST=0.0.0.0 が効いていない) → " +
+        "windmill:bootstrap が出した 4 行を capture-ledger の .env の末尾に貼り、API を起こし直す",
     };
   }
   if (answer.rc === 28) return { ok: false, need: `worker から ${url} が 5 秒で答えない` };

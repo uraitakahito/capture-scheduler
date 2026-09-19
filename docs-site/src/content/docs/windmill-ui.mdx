@@ -217,7 +217,7 @@ The recovery order (measured on 2026-09-11):
 ```sh
 pnpm run windmill:bootstrap            # recreates the workspace, prints a fresh token
                                        # → paste the WINDMILL_TOKEN= line into .env
-                                       # → re-paste the two webhook lines into
+                                       # → paste the four lines after it at the end of
                                        #   capture-ledger's .env and restart its API
 pnpm run windmill:push                 # scripts / flow / schedule
 pnpm run windmill:push-proto           # ← forget this and crawl_host dies with Resource not found
