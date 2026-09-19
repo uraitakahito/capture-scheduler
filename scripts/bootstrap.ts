@@ -9,9 +9,19 @@
  * **token は .env に書かず、貼れる形で標準出力に出す。** `fga:deploy` と同じ作法。
  * 書き込む側にすると、`.env` を持つのが人間なのかスクリプトなのかが曖昧になる。
  *
+ * **capture-ledger の `.env` に貼る 2 行も出す**（webhook の URL と token）。どちらも
+ * ここで決まる値で、人に組み立てさせると古くなる (`env.ts` の `CRAWL_FLOW_PATH` を見ること)。
+ *
  * 冪等: workspace も token も、既にあれば作り直さない。
  */
-import { guardEnv, optional, windmillFetch, windmillUrl, windmillWorkspace } from "./env.js";
+import {
+  guardEnv,
+  ledgerWebhookEnv,
+  optional,
+  windmillFetch,
+  windmillUrl,
+  windmillWorkspace,
+} from "./env.js";
 
 guardEnv();
 
@@ -105,7 +115,16 @@ const main = async () => {
   process.stderr.write("\n以下を .env に貼ってください:\n\n");
   // 貼れる形で **標準出力へ**。stderr との分離は意図的で、
   // `pnpm run windmill:bootstrap | tail -1` が使える。
-  process.stdout.write(`WINDMILL_TOKEN=${token}\n`);
+  process.stdout.write(`WINDMILL_TOKEN=${String(token)}\n`);
+
+  // 標準出力は `WINDMILL_TOKEN=` の 1 行のまま (上の約束)。こちらは標準エラーへ出す。
+  process.stderr.write(
+    `\ncapture-ledger の .env にも、次の 2 行を貼ってください:\n\n${ledgerWebhookEnv({
+      windmillUrl: windmillUrl(),
+      workspace,
+      token: String(token),
+    }).join("\n")}\n`,
+  );
 };
 
 main().catch((err) => {

@@ -28,6 +28,10 @@ export interface PageResult {
   submittedAt?: string;
   finishedAt?: string;
   linksLocation?: string;
+  /** `.result.json` を書けた場所。`crawl_host.ts` の同名の欄を見ること。 */
+  manifestLocation?: string;
+  /** 書けなかった理由。taskId を持つ結果はこの 2 つのどちらか一方を持つ。 */
+  manifestError?: string;
 }
 
 export interface NextPage {

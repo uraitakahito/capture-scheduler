@@ -5,6 +5,7 @@
  * 意味で、`??` (`${VAR-word}` 側) は使わない —— `.env` の `NAME=` は既定値を
  * 潰したうえで、名前が一言も出ないエラーになるため。
  */
+import { execFileSync } from "node:child_process";
 
 /**
  * この repo が読む環境変数の全体。**`guardEnv` の検査対象そのもの** なので、
@@ -71,10 +72,89 @@ export const required = (name: string, hint?: string): string => {
  */
 export const repoRoot = (): string => process.cwd();
 
-/** よく使う 3 つ。既定値は `.env.example` のコメントと一致させること。 */
+/** よく使う 2 つ。既定値は `.env.example` のコメントと一致させること。 */
 export const windmillUrl = () => optional("WINDMILL_URL", "http://127.0.0.1:8000");
 export const windmillWorkspace = () => optional("WINDMILL_WORKSPACE", "crawler");
-export const ledgerApiUrl = () => optional("CAPTURE_LEDGER_API_URL", "http://192.168.64.1:7070");
+
+/**
+ * クロール 1 段を回す flow のパス。**webhook の URL の一部**で、実体は
+ * `windmill/f/waggle/crawl_level.flow/`。
+ *
+ * capture-ledger に貼る URL はここから組み立てる (`ledgerWebhookEnv`)。人に組み立てさせて
+ * いた頃、capture-ledger の `.env.example` の例は `…/f/waggle/crawl` と古くなっていて、
+ * そのとおりに設定するとクロールが failed になり `flow not found` の 404 が出た。
+ * flow の名前を変えると、`test/env.test.ts` が実体の無いパスとして落とす。
+ */
+export const CRAWL_FLOW_PATH = "f/waggle/crawl_level";
+
+/**
+ * capture-ledger の `.env` に貼る 2 行。**`windmill:bootstrap` が出力する。**
+ *
+ * token は bootstrap が作った API token そのもの —— capture-ledger はそれで webhook を叩く。
+ */
+export const ledgerWebhookEnv = ({
+  windmillUrl: base,
+  workspace,
+  token,
+}: {
+  windmillUrl: string;
+  workspace: string;
+  token: string;
+}): string[] => [
+  `CAPTURE_LEDGER_CRAWL_WEBHOOK_URL=${base}/api/w/${workspace}/jobs/run/f/${CRAWL_FLOW_PATH}`,
+  `CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN=${token}`,
+];
+
+/**
+ * `container network inspect default` の出力から、default ネットワークの gateway を取り出す。
+ *
+ * **読めなければ投げる。** 以前の決め打ち (`192.168.64.1`) のような既定値へは黙って
+ * 落とさない —— 外れた宛先は、ずっと後の「段の報告が ConnectionRefused」でしか分からない。
+ */
+export const parseGateway = (json: string): string => {
+  let gateway: unknown;
+  try {
+    const parsed = JSON.parse(json) as { status?: { ipv4Gateway?: unknown } }[];
+    gateway = parsed[0]?.status?.ipv4Gateway;
+  } catch {
+    // 読めない出力も、下で同じように名指しして投げる。
+  }
+  if (typeof gateway !== "string" || !/^\d{1,3}(?:\.\d{1,3}){3}$/.test(gateway)) {
+    throw new Error(
+      "default ネットワークの gateway を読めません (container network inspect default の " +
+        "status.ipv4Gateway)。CAPTURE_LEDGER_API_URL を .env に書いてください",
+    );
+  }
+  return gateway;
+};
+
+/** 既定の問い合わせ。試験は `ledgerApiUrl` の引数で差し替える。 */
+const inspectDefaultNetwork = (): string =>
+  execFileSync("container", ["network", "inspect", "default"], { encoding: "utf8" });
+
+/**
+ * **コンテナから見た** capture-ledger API の URL。Windmill の変数 `u/admin/waggle_api_url` に
+ * 入り、flow の段の報告がここへ届く。
+ *
+ * 書いていなければ default ネットワークの gateway から組む。以前は `192.168.64.1` を
+ * 決め打ちしていたが、gateway は network を作り直すと変わる (2026-09-19 のこの Mac は
+ * `192.168.66.1` で、`.64` は別の network が使っていた)。外れると報告が届かず、クロールは
+ * `running` のまま残って、以後の起動を全部 409 で塞ぐ。
+ */
+export const ledgerApiUrl = (inspect: () => string = inspectDefaultNetwork): string => {
+  const explicit = optional("CAPTURE_LEDGER_API_URL", "");
+  if (explicit !== "") return explicit;
+  let json: string;
+  try {
+    json = inspect();
+  } catch (err) {
+    throw new Error(
+      `container network inspect default が失敗しました (${err instanceof Error ? err.message : String(err)})。` +
+        "CAPTURE_LEDGER_API_URL を .env に書いてください",
+    );
+  }
+  return `http://${parseGateway(json)}:7070`;
+};
 
 /**
  * Windmill の API を叩く。

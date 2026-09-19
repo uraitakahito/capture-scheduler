@@ -13,9 +13,19 @@
  * 試験が build に依存すると「ソースが悪いのか古い dist を見ているのか」
  * が分からなくなるため。
  */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { optional, repoRoot, required } from "../scripts/env.js";
+import {
+  CRAWL_FLOW_PATH,
+  ledgerApiUrl,
+  ledgerWebhookEnv,
+  optional,
+  parseGateway,
+  repoRoot,
+  required,
+} from "../scripts/env.js";
 
 const KEY = "CAPTURE_SCHEDULER_TEST_ONLY";
 
@@ -72,5 +82,87 @@ describe("required", () => {
 describe("repoRoot", () => {
   it("cwd を返す —— dist 経由で動いても根を見失わないため", () => {
     expect(repoRoot()).toBe(process.cwd());
+  });
+});
+
+/**
+ * capture-ledger に渡す値。**docs に書き写していた値を、道具が出すようにしたもの。**
+ * 書き写しは 2 度古くなった —— webhook の URL の flow の名前 (`…/f/waggle/crawl`) と、
+ * コンテナから見た host の IP (`192.168.64.1`)。
+ */
+describe("CRAWL_FLOW_PATH", () => {
+  it("flow の実体が windmill/ の下に在る（名前を変えたら webhook の URL が古くなる）", () => {
+    expect(existsSync(join(repoRoot(), "windmill", `${CRAWL_FLOW_PATH}.flow`, "flow.yaml"))).toBe(
+      true,
+    );
+  });
+});
+
+describe("ledgerWebhookEnv", () => {
+  it("capture-ledger の変数名で、webhook の URL と token の 2 行を返す", () => {
+    expect(
+      ledgerWebhookEnv({
+        windmillUrl: "http://127.0.0.1:8000",
+        workspace: "crawler",
+        token: "tok",
+      }),
+    ).toEqual([
+      "CAPTURE_LEDGER_CRAWL_WEBHOOK_URL=http://127.0.0.1:8000/api/w/crawler/jobs/run/f/f/waggle/crawl_level",
+      "CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN=tok",
+    ]);
+  });
+});
+
+/** 2026-09-19 のこの Mac の `container network inspect default` の出力（prettier で空白だけ整えた）。 */
+const INSPECT_DEFAULT = readFileSync(
+  join(repoRoot(), "test/fixtures/container-network-inspect-default.json"),
+  "utf8",
+);
+
+describe("parseGateway", () => {
+  it("default ネットワークの gateway を取り出す（実際の出力で）", () => {
+    expect(parseGateway(INSPECT_DEFAULT)).toBe("192.168.66.1");
+  });
+
+  it.each([
+    ["空の配列", "[]"],
+    ["status が無い", '[{"id":"default"}]'],
+    ["IPv4 でない", '[{"status":{"ipv4Gateway":"fd89::1"}}]'],
+    ["JSON でない", "container: command not found"],
+  ])(
+    "読めなければ、決め打ちへ落とさず CAPTURE_LEDGER_API_URL を名指しして投げる（%s）",
+    (_, json) => {
+      expect(() => parseGateway(json)).toThrow(/CAPTURE_LEDGER_API_URL/);
+    },
+  );
+});
+
+describe("ledgerApiUrl", () => {
+  const KEY_API_URL = "CAPTURE_LEDGER_API_URL";
+  const saved = process.env[KEY_API_URL];
+  beforeEach(() => {
+    delete process.env[KEY_API_URL];
+  });
+  afterEach(() => {
+    if (saved === undefined) delete process.env[KEY_API_URL];
+    else process.env[KEY_API_URL] = saved;
+  });
+
+  it("書いてあれば、それを使う（network は訊かない）", () => {
+    process.env[KEY_API_URL] = "http://10.0.0.1:7070";
+    const inspect = vi.fn(() => INSPECT_DEFAULT);
+    expect(ledgerApiUrl(inspect)).toBe("http://10.0.0.1:7070");
+    expect(inspect).not.toHaveBeenCalled();
+  });
+
+  it("書いていなければ、default ネットワークの gateway から組む", () => {
+    expect(ledgerApiUrl(() => INSPECT_DEFAULT)).toBe("http://192.168.66.1:7070");
+  });
+
+  it("network を訊けなければ、CAPTURE_LEDGER_API_URL を名指しして投げる", () => {
+    const inspect = () => {
+      throw new Error("spawnSync container ENOENT");
+    };
+    expect(() => ledgerApiUrl(inspect)).toThrow(/ENOENT.*CAPTURE_LEDGER_API_URL/);
   });
 });
