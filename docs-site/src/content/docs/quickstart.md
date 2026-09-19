@@ -3,6 +3,21 @@ title: Quickstart
 description: Bring up Windmill, hand it a token for capture-ledger, and open the UI
 ---
 
+## Before you start: capture-ledger's stack is running
+
+Windmill works against capture-ledger's stack: grants go to its OpenFGA, and crawls call its
+BrowserHive. Before you start, finish §1–§5 of capture-ledger's
+[Quickstart](https://uraitakahito.github.io/capture-ledger/quickstart/) (the DNS domain, the
+submodules and `.env`, `stack:up`, the database, the two OpenFGA ids) and check that the stack is up:
+
+```sh
+curl -s -o /dev/null -w '%{http_code}\n' -H 'authorization: Bearer dev-key' http://127.0.0.1:8090/stores
+# 200 means it is up. 000 means it is not → cd ../capture-ledger && pnpm run stack:up
+```
+
+`dev-key` is the development OpenFGA's default key. With the stack down, `fga:grant` below stops
+with "OpenFGA (http://localhost:8090) に届きません" (OpenFGA is not reachable).
+
 ## Bring it up
 
 ```sh
