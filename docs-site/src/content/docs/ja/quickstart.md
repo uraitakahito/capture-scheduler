@@ -11,28 +11,44 @@ sudo container system dns create capture-scheduler   # マシンごとに 1 度�
 container-compose up -d
 pnpm install
 
-pnpm run windmill:bootstrap   # workspace と token を作り、貼れる形で出力する
-                              # → 出た WINDMILL_TOKEN= を .env に貼る
-pnpm run windmill:push        # スクリプトと schedule を投入する
+pnpm run windmill:bootstrap   # workspace と token を作る。出力は 2 か所に貼る:
+                              #   WINDMILL_TOKEN=…          → この repo の .env
+                              #   CAPTURE_LEDGER_CRAWL_WEBHOOK_URL / _TOKEN の 2 行
+                              #                             → capture-ledger の .env
+pnpm run windmill:push        # script・flow・schedule を入れる
+pnpm run windmill:push-proto  # BrowserHive の proto を入れる（crawl_host が読む。push には含まれない）
 ```
 
-capture-ledger 側（別のターミナル）:
+bootstrap を以前に済ませてあるなら、webhook の URL は
+`http://127.0.0.1:8000/api/w/crawler/jobs/run/f/f/waggle/crawl_level`、token はこの repo の
+`.env` の `WINDMILL_TOKEN` と同じ値です。
+
+capture-ledger 側（別のターミナル）。`.env` に 4 行を足してから起こします ——
+**どれが欠けても、クロールは最後まで走りません**:
 
 ```sh
 cd ../capture-ledger
 # .env に:
-#   CAPTURE_LEDGER_API_HOST=0.0.0.0                     コンテナから届くように
-#   CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099    JWT で受けるように
-pnpm run oidc:issuer
-pnpm run api
-pnpm run fga:grant submitter windmill acme      # これが無いと 404
+#   CAPTURE_LEDGER_CRAWL_WEBHOOK_URL=…                bootstrap が出した 2 行
+#   CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN=…              （無いと /api/crawls そのものが無い）
+#   CAPTURE_LEDGER_API_HOST=0.0.0.0                   段の報告はコンテナから来る
+#   CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099  flow は JWT で名乗る
+pnpm run oidc:issuer                         # 動かし続ける
+pnpm run api                                 # 動いていたら起こし直す（設定は起動時に読む）
+pnpm run fga:grant submitter windmill acme   # これが無いと 404
 ```
 
-戻ってきて、鍵を渡す:
+戻ってきて、鍵を渡し、つながったかを見る:
 
 ```sh
-pnpm run windmill:capture-ledger-token
+pnpm run windmill:capture-ledger-token   # トークンと、コンテナから見た API の宛先を入れる
+pnpm run check:connection                # 全部 ✓ なら、つながっている
 ```
+
+API の宛先（`u/admin/waggle_api_url`）は、`CAPTURE_LEDGER_API_URL` を書かなければ default
+ネットワークの gateway から組みます（`container network inspect default`）。network を作り直すと
+変わるので、そのときは `windmill:capture-ledger-token` をやり直します。`check:connection` の
+何が ✗ かで、足りないものが分かります（[試験](/testing/)）。
 
 `http://127.0.0.1:8000` で Windmill が開く。
 
@@ -70,3 +86,8 @@ JWT が dev ヘッダより優先されるのは capture-ledger 側の意図さ�
 使い分けること。picker を触るときは capture-ledger の `.env` の `CAPTURE_LEDGER_OIDC_ISSUER` を
 コメントアウトする。**両立させる仕組みは作っていない** —— それは identity の設計を
 変える話で、別件。
+
+**クロールが走っている間は切り替えないこと。** flow の段の報告は Bearer で来るので、JWT を
+外した API では 401 になり、そのクロールは `running` のまま残って、以後の起動を全部 409 で塞ぐ。
+戻し方は capture-ledger のクイックスタートの
+[「409 が続くとき」](https://uraitakahito.github.io/capture-ledger/ja/quickstart/#409-が続くとき)。
