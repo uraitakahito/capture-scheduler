@@ -236,33 +236,28 @@ kid was fixed and the API kept the old key for up to ten minutes, rejecting new 
 seconds right after the issuer restarts, new tokens may still be refused — the jwt line of
 `doctor` says so.
 
-## The picker returns 401
+## Viewing in the picker (paste a token)
 
-Setting `CAPTURE_LEDGER_OIDC_ISSUER` makes capture-ledger accept **only** JWTs, which means the
-browser picker at `http://127.0.0.1:7070/` starts returning 401.
-
-That precedence is deliberate on capture-ledger's side: when both are configured, it
-must not fall back to the weaker one. So this is not a bug to work around here.
-
-Use one at a time. To use the picker, comment out the `CAPTURE_LEDGER_OIDC_ISSUER` line in
-capture-ledger's `.env` with `#`, and start the API **listening on `127.0.0.1` again**:
+With `CAPTURE_LEDGER_OIDC_ISSUER` set, capture-ledger accepts **only** JWTs. The browser picker at
+`http://127.0.0.1:7070/` follows suit and shows a token field in place of the two name fields (from
+capture-ledger v0.45.0). Leave the API's settings as they are and paste a token:
 
 ```sh
 cd ~/projects/crawler/capture-ledger
-CAPTURE_LEDGER_API_HOST=127.0.0.1 pnpm run api   # only while you use the picker
+pnpm run --silent oidc:token --subject "$(whoami)" --org acme | pbcopy
+open http://127.0.0.1:7070/
 ```
 
-The listening address goes back too because the `.env` line `CAPTURE_LEDGER_API_HOST=0.0.0.0` would
-otherwise stay in effect, and an API that trusts the headers would let anyone on the same network act
-as anyone (a value on the command line wins over `.env`; emptying `CAPTURE_LEDGER_OIDC_ISSUER=`
-instead does not work, because capture-ledger refuses to start with an empty value). **Nothing makes
-both work at once** — that would mean changing capture-ledger's identity design, which is a separate
-question.
+Paste it into the トークン (Token) field and press 読み込む (Load). When the line above the list says
+you are viewing as your name in `acme`, the API has accepted the token. A token lasts one hour, and
+after the issuer restarts, older tokens stop working once the API has fetched the new key — when
+the picker says 401 — このトークンは通らない…
+("this token does not get through"), get a new one with the same command and paste it. How to use
+the screen is in capture-ledger's
+[Browsing archives](https://uraitakahito.github.io/capture-ledger/picker/).
 
-To go back to crawling, remove the `#` and restart with `pnpm run api`. If you forget, the startup
-log says so with warnings and `crawl level reports: blocked`, and doctor's jwt line shows ✗.
-
-**Do not switch while a crawl is running.** The flow reports each level with a Bearer token, so an
-API without JWTs answers 401; that crawl stays `running` and blocks every later start with 409.
-How to clear it is in capture-ledger's quickstart,
+JWT winning over the dev header is deliberate on capture-ledger's side: when both are configured, it
+must not fall back to the weaker one. **Do not comment out `CAPTURE_LEDGER_OIDC_ISSUER` for the
+picker** — an API without it refuses the flow's level reports with 401, and a running crawl stays
+`running` and blocks every later start with 409. How to clear it is in capture-ledger's quickstart,
 ["When every crawl gets 409"](https://uraitakahito.github.io/capture-ledger/quickstart/#when-every-crawl-gets-409).

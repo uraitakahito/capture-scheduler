@@ -231,31 +231,26 @@ API は起こし直さなくてよい。鍵の名前（kid）も一緒に替わ�
 API が古い鍵を最長 10 分覚えたまま、新しいトークンを 401 にしていた）。issuer を起こし直した
 直後の 30 秒は、新しいトークンも通らないことがある —— `doctor` の jwt がそう言う。
 
-## picker が 401 になる
+## picker で見る（トークンを貼る）
 
-`CAPTURE_LEDGER_OIDC_ISSUER` を立てると、capture-ledger は JWT **だけ**を受け付けるようになり、
-ブラウザで開く picker（`http://127.0.0.1:7070/`）が 401 になる。
-
-JWT が dev ヘッダより優先されるのは capture-ledger 側の意図された設計で、「両方設定された
-環境で弱いほうへ落ちない」ため。こちらで回避するものではない。
-
-使い分けること。picker を触るときは、capture-ledger の `.env` の `CAPTURE_LEDGER_OIDC_ISSUER` の行を
-`#` でコメントにし、**待ち受けを `127.0.0.1` に戻して**起こす:
+`CAPTURE_LEDGER_OIDC_ISSUER` を立てた capture-ledger は JWT **だけ**を受け付ける。ブラウザで開く
+picker（`http://127.0.0.1:7070/`）もそれに合わせて、名乗りの 2 欄の代わりにトークンの欄を出す
+（capture-ledger v0.45.0 から）。API の設定は変えずに、トークンを貼って読む:
 
 ```sh
 cd ~/projects/crawler/capture-ledger
-CAPTURE_LEDGER_API_HOST=127.0.0.1 pnpm run api   # picker を使うあいだだけ
+pnpm run --silent oidc:token --subject "$(whoami)" --org acme | pbcopy
+open http://127.0.0.1:7070/
 ```
 
-待ち受けも戻すのは、`.env` の `CAPTURE_LEDGER_API_HOST=0.0.0.0` が残ったままだと、ヘッダを信じる
-API に同じネットワークの誰もが届き、誰にでもなれるから（コマンド行の値は `.env` より勝つ。
-`CAPTURE_LEDGER_OIDC_ISSUER=` と空にして外す手は、capture-ledger が空の値で起動を止めるので使えない）。
-**両立させる仕組みは作っていない** —— それは identity の設計を変える話で、別件。
+「トークン」の欄に貼って「読み込む」を押す。一覧の上に「（名前）（acme）として見ている」と出れば、
+API はそのトークンを受けている。トークンは 1 時間で切れる。issuer を起こし直したときも、
+API が新しい鍵を取り直した時点から、前のトークンは通らない —— 「401 — このトークンは通らない…」と
+出たら、同じコマンドで取り直して貼る。
+画面の使い方は capture-ledger の[アーカイブを見る](https://uraitakahito.github.io/capture-ledger/ja/picker/)。
 
-クロールに戻るときは `#` を外し、`pnpm run api` で起こし直す。戻し忘れていれば、起動ログが warn と
-`crawl level reports: blocked` で言い、doctor の jwt が ✗ になる。
-
-**クロールが走っている間は切り替えないこと。** flow の段の報告は Bearer で来るので、JWT を
-外した API では 401 になり、そのクロールは `running` のまま残って、以後の起動を全部 409 で塞ぐ。
-戻し方は capture-ledger のクイックスタートの
+JWT が dev ヘッダより優先されるのは capture-ledger 側の意図された設計で、「両方設定された
+環境で弱いほうへ落ちない」ため。**picker のために `CAPTURE_LEDGER_OIDC_ISSUER` を外さないこと** ——
+外した API は flow の段の報告を 401 で断り、走っていたクロールは `running` のまま残って、
+以後の起動を全部 409 で塞ぐ。戻し方は capture-ledger のクイックスタートの
 [「409 が続くとき」](https://uraitakahito.github.io/capture-ledger/ja/quickstart/#409-が続くとき)。
