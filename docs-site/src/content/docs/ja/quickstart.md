@@ -5,8 +5,9 @@ description: Windmill を立て、capture-ledger 用のトークンを渡し、U
 
 ## 前提 —— capture-ledger のスタックが動いていること
 
-Windmill は capture-ledger のスタックの 2 つを使う。OpenFGA には、下の `fga:grant` で
-「windmill は acme のクロールを起こしてよい」という許可を書き込む。BrowserHive は、
+Windmill は capture-ledger のスタックの 2 つを使う。OpenFGA には、下の
+[windmill にクロールを許可する](#windmill-にクロールを許可する)で「windmill は acme のクロールを
+起こしてよい」という許可を書き込む。BrowserHive は、
 クロールがページを撮りに呼ぶ。始める前に、capture-ledger の
 [クイックスタート](https://uraitakahito.github.io/capture-ledger/ja/quickstart/)の §1〜§5
 （DNS ドメイン、submodule と `.env`、`stack:up`、データベース、OpenFGA の 2 つの ID）を済ませ、
@@ -52,10 +53,42 @@ cd ../capture-ledger
 #   CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099  flow は JWT で名乗る
 pnpm run oidc:issuer                         # 動かし続ける
 pnpm run api                                 # 動いていたら起こし直す（設定は起動時に読む）
-pnpm run fga:grant submitter windmill acme   # windmill に acme のクロールを許可する（無いと 404）
 ```
 
-戻ってきて、鍵を渡し、つながったかを見る:
+### windmill にクロールを許可する
+
+Windmill は capture-ledger を `windmill` という名前で呼ぶ（トークンの `sub`。組織は `acme`）。
+capture-ledger は、クロールを起こす・段を報告する・索引を渡す・締める、のたびに
+「windmill は acme のクロールを起こしてよいか」を OpenFGA に訊き、許可が無ければ 404 を返す。
+手で起こしたクロールでも、段の報告は windmill の名前で来る。
+
+```
+pnpm run fga:grant submitter windmill acme      （あなたが 1 度だけ）
+    │ 書く
+    ▼
+OpenFGA   user:windmill  submitter  organization:acme
+    ▲
+    │ 訊く: user:windmill は organization:acme で can_submit か
+    │      （クロールを起こす・段の報告・索引・締めのたび）
+capture-ledger API   ◄── Windmill（sub=windmill, orgs=[acme] のトークン）
+    │
+    └─ 行が在れば 202。無ければ 404 {"error":"not found"}
+```
+
+その許可を 1 行書き込む（capture-ledger 側で 1 度だけ。取り消すのは `fga:revoke`）:
+
+```sh
+pnpm run fga:grant submitter windmill acme
+# windmill は acme のクロールを起こせます (書いた: user:windmill submitter organization:acme)
+```
+
+`CAPTURE_LEDGER_SUBJECT` / `_ORGANIZATIONS` を変えたなら、その名前で。書けたかどうかは、下の
+`check:connection` の `can_submit` の行が教える —— 足りなければ、capture-ledger が実際に見た
+名前で、打つべきコマンドを出す。
+
+### 鍵を渡して、つながったかを見る
+
+戻ってきて（この repo で）:
 
 ```sh
 pnpm run windmill:capture-ledger-token   # トークンと、コンテナから見た API の宛先を入れる
@@ -65,7 +98,9 @@ pnpm run check:connection                # 全部 ✓ なら、つながって�
 API の宛先（`u/admin/waggle_api_url`）は、`CAPTURE_LEDGER_API_URL` を書かなければ default
 ネットワークの gateway から組みます（`container network inspect default`）。network を作り直すと
 変わるので、そのときは `windmill:capture-ledger-token` をやり直します。`check:connection` の
-何が ✗ かで、足りないものが分かります（[試験](/testing/)）。
+何が ✗ かで、足りないものが分かります（[試験](/testing/)）。`can_submit` は、Windmill が持っている
+トークンそのもので訊くので、許可が無いことも、トークンが古い（issuer を起こし直した）ことも
+ここで分かります。
 
 `http://127.0.0.1:8000` で Windmill が開く。
 
