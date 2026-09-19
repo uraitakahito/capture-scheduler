@@ -13,14 +13,19 @@
  *
  * ## 立っているか、だけでなく、つながっているか
  *
- * 後ろの 3 つは「クロールが最後まで走る設定か」を見る。どれも外れていると、API に
+ * 後ろの 4 つは「クロールが最後まで走る設定か」を見る。どれも外れていると、API に
  * POST すれば 202 が返り、Windmill の flow も走り、**段の報告のところで初めて落ちる** ——
  * 報告が届かなければクロールは `running` のまま残り、以後の起動は全部 409 になる。
  * docs に書いた手順が 2 か所で古くなっていたのを見つけて足した (webhook の 2 行、宛先の IP)。
  *
  *   crawl route    `/api/crawls` が在るか (webhook の 2 行が無いと route ごと無い)
  *   jwt            API が JWT を受けるか (flow の報告は Bearer だけを持ってくる)
+ *   can_submit     flow のトークンに、クロールの許可があるか (`GET /api/me`)
  *   container→api  Windmill の変数の宛先に、コンテナから届くか (0.0.0.0 と IP)
+ *
+ * can_submit を足す前は、許可が無くても全部 ✓ になっていた —— jwt は自前のトークン
+ * (名前は check-stack) で許可の要らない一覧を読むだけで、flow のトークンが古いことも
+ * 見ていなかった。
  *
  * **どれも、正しい設定と誤った設定で答えが変わる入力を使う。** たとえば jwt を
  * 「ヘッダで名乗ると 401」で見ると、名乗りの口がどちらも無い API も 401 で通ってしまう。
@@ -33,6 +38,7 @@ import { execFile } from "node:child_process";
 import { connect } from "node:net";
 import { promisify } from "node:util";
 
+import { readCanSubmit, type Verdict } from "./can-submit.js";
 import { optional, windmillFetch, windmillWorkspace } from "./env.js";
 
 /** HTTP の答えが返ること自体が待ち受けの証拠。405 でも 401 でもよい。 */
@@ -92,6 +98,43 @@ const acceptsJwt = async (): Promise<boolean> => {
     return status === 200;
   } catch {
     return false;
+  }
+};
+
+/**
+ * flow のトークン (変数 `u/admin/waggle_token`) で、クロールを起こせるかを capture-ledger に訊く。
+ *
+ * **flow が実際に使うトークンで訊く**のが要点 —— 許可が無いことも、トークンが古いことも、
+ * 名前が docs とずれていることも、flow が 404 や 401 を踏む前にここで分かる。
+ * 答えの読み分けは `can-submit.ts`。
+ */
+const canSubmitWithFlowToken = async (): Promise<Verdict> => {
+  const token = process.env["WINDMILL_TOKEN"];
+  const unreadable: Verdict = {
+    ok: false,
+    need:
+      "Windmill の変数 u/admin/waggle_token が読めない → pnpm run windmill:capture-ledger-token" +
+      " (変数を読むので .env の WINDMILL_TOKEN も要る)",
+  };
+  if (token === undefined || token === "") return unreadable;
+  let flowToken: unknown;
+  try {
+    flowToken = await windmillFetch(
+      `/api/w/${windmillWorkspace()}/variables/get_value/u/admin/waggle_token`,
+      { token },
+    );
+  } catch {
+    return unreadable;
+  }
+  if (typeof flowToken !== "string" || flowToken === "") return unreadable;
+  try {
+    const res = await fetch(`${API}/api/me`, {
+      headers: { authorization: `Bearer ${flowToken}` },
+      signal: AbortSignal.timeout(3000),
+    });
+    return readCanSubmit(res.status, await res.text());
+  } catch {
+    return readCanSubmit(undefined, "");
   }
 };
 
@@ -185,6 +228,13 @@ const CHECKS = [
     probe: acceptsJwt,
   },
   {
+    name: "can_submit",
+    where: "Windmill のトークンで GET 127.0.0.1:7070/api/me (クロールを起こせるか)",
+    // 実際に足りないものは答えから組む (`can-submit.ts`)。これは届かなかったときの控え。
+    need: "capture-ledger 側: pnpm run fga:grant submitter windmill acme",
+    probe: canSubmitWithFlowToken,
+  },
+  {
     name: "container→api",
     where: "u/admin/waggle_api_url の /healthz を worker の中から",
     need:
@@ -199,7 +249,12 @@ const connectionOnly = process.argv.includes("--connection");
 const selected = CHECKS.filter((check) => !(connectionOnly && "e2eOnly" in check));
 
 const results = await Promise.all(
-  selected.map(async (check) => ({ ...check, ok: await check.probe() })),
+  selected.map(async (check) => {
+    const answer = await check.probe();
+    // 多くの点検は ✓ か ✗ だけを返す。can_submit は、何が足りないかも返す。
+    if (typeof answer === "boolean") return { ...check, ok: answer };
+    return { ...check, ok: answer.ok, need: answer.ok ? check.need : answer.need };
+  }),
 );
 
 for (const r of results) {

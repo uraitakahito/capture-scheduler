@@ -145,7 +145,7 @@ const main = async () => {
       `${URL_PATH} を${urlAction} (${apiUrl}${apiUrlFrom})\n` +
       `${ENDPOINTS_PATH} を${endpointsAction} (${BROWSERHIVE_ENDPOINTS.join(", ")})\n` +
       `${TLS_CA_PATH} を${tlsAction} (${TLS_CA_PEM === "" ? "空 = 平文" : "CA あり"})\n\n` +
-      `最後に、${SUBJECT} に ${ORGANIZATIONS[0] ?? "acme"} のクロールを許可する (1 度だけ。無いと 404):\n` +
+      `${SUBJECT} には ${ORGANIZATIONS[0] ?? "acme"} のクロールの許可が要る (1 度だけ。済んだかは check:connection の can_submit が言う):\n` +
       `  cd ../capture-ledger && pnpm run fga:grant submitter ${SUBJECT} ${ORGANIZATIONS[0] ?? "acme"}\n`,
   );
 };

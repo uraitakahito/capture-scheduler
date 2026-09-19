@@ -11,8 +11,9 @@ pnpm run check       # audit, format, env, typecheck, unit tests, CI parity, doc
 
 `pretest:e2e` runs `scripts/check-stack.ts` first and names **everything**
 missing at once. It checks not just that things are up but that a crawl can run to the end —
-whether `/api/crawls` exists (the two webhook lines), whether the API accepts JWTs, and whether
-the address in Windmill's variable is reachable from a container. Miss any of these and a crawl
+whether `/api/crawls` exists (the two webhook lines), whether the API accepts JWTs, whether the
+token Windmill holds may start crawls (`GET /api/me`), and whether the address in Windmill's
+variable is reachable from a container. Miss any of these and a crawl
 fails only at its level report, staying `running`. To check just the connection, run
 `pnpm run check:connection` (it skips capture-fixtures). It lives outside vitest deliberately: vitest prints
 "No test files found, exiting with code 1" whenever a global setup throws, and no
