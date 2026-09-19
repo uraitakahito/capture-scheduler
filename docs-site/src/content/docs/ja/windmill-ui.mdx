@@ -215,9 +215,11 @@ capture-ledger 側の OpenFGA も同時に消えていたら、許可を書く�
 
 **コンテナを作り直すと bridge の subnet が変わりうる。** `u/admin/waggle_api_url` に入るのは、
 `windmill:capture-ledger-token` を叩いた時点の default ネットワークの gateway なので、subnet が
-変わったらやり直す。外れていると report の段が `ConnectionRefused` になり、クロールは `running` の
-まま残る。届いているかは `pnpm run check:connection` の container→api が見る —— 変数の宛先の
-`/healthz` に、worker の中から問い合わせる。最後にこれが全部 ✓ になれば、復旧は終わり。
+変わったらやり直す。外れていると report の段が届かずに落ち（`Unable to connect. Is the computer
+able to access the url?`）、クロールは `running` のまま残る。届いているかは `pnpm run doctor` の
+container→api が見る —— 変数の宛先の `/healthz` に、worker の中から問い合わせ、届かなければ
+宛先をいまの gateway と比べて、古いのか API が 127.0.0.1 で待っているのかを言う。最後に
+`pnpm run doctor` が全部 ✓ になり、`pnpm run smoke` が「撮れた」と言えば、復旧は終わり。
 
 ## `f/waggle/` という名前
 

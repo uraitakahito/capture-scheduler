@@ -1,6 +1,6 @@
 ---
 title: Quickstart
-description: Bring up Windmill, hand it a token for capture-ledger, and open the UI
+description: Bring up Windmill and take your first capture
 ---
 
 ## Before you start: capture-ledger's stack is running
@@ -14,15 +14,20 @@ submodules and `.env`, `stack:up`, the database, the two OpenFGA ids) and check 
 
 ```sh
 curl -s -o /dev/null -w '%{http_code}\n' -H 'authorization: Bearer dev-key' http://127.0.0.1:8090/stores
-# 200 means it is up. 000 means it is not → cd ../capture-ledger && pnpm run stack:up
+# 200 means it is up. 000 means it is not → cd ~/projects/crawler/capture-ledger && pnpm run stack:up
 ```
 
 `dev-key` is the development OpenFGA's default key. With the stack down, `fga:grant` below stops
 with "OpenFGA (http://localhost:8090) に届きません" (OpenFGA is not reachable).
 
+Every code block below starts with a `cd` that says which repo it runs in (this assumes both repos
+are cloned side by side under `~/projects/crawler/`; adjust if yours live elsewhere). Run a
+capture-scheduler command inside capture-ledger and pnpm only says `Missing script`.
+
 ## Bring it up
 
 ```sh
+cd ~/projects/crawler/capture-scheduler
 sudo container system dns create capture-scheduler   # once per machine
 ./setup.sh
 container-compose up -d
@@ -44,7 +49,7 @@ On the capture-ledger side, in another terminal. Add four lines to its `.env` fi
 **miss any one and no crawl runs to the end**:
 
 ```sh
-cd ../capture-ledger
+cd ~/projects/crawler/capture-ledger
 # in .env:
 #   CAPTURE_LEDGER_CRAWL_WEBHOOK_URL=…                the two lines bootstrap printed
 #   CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN=…              (without them /api/crawls does not exist)
@@ -53,6 +58,23 @@ cd ../capture-ledger
 pnpm run oidc:issuer                         # keep it running
 pnpm run api                                 # restart it if running (settings are read at startup)
 ```
+
+Windmill opens at `http://127.0.0.1:8000`.
+
+### Hand over the key
+
+Put the token the Windmill flow calls capture-ledger with, and the address it calls, into
+Windmill's variables:
+
+```sh
+cd ~/projects/crawler/capture-scheduler
+pnpm run windmill:capture-ledger-token   # the token, and the API address as a container sees it
+```
+
+The API address (`u/admin/waggle_api_url`) comes from the gateway of the `default` network
+(`container network inspect default`) unless `CAPTURE_LEDGER_API_URL` is set. It changes when the
+network is recreated; re-run `windmill:capture-ledger-token` then. Do the same after restarting the
+issuer ([How the token gets there](#how-the-token-gets-there)).
 
 ### Let windmill start crawls
 
@@ -77,32 +99,93 @@ capture-ledger API   ◄── Windmill (a token with sub=windmill, orgs=[acme])
 Write that permission (on the capture-ledger side, once; `fga:revoke` takes it back):
 
 ```sh
+cd ~/projects/crawler/capture-ledger
 pnpm run fga:grant submitter windmill acme
 # windmill は acme のクロールを起こせます (書いた: user:windmill submitter organization:acme)
 #   = "windmill may start crawls for acme (wrote: …)"
 ```
 
 If you changed `CAPTURE_LEDGER_SUBJECT` / `_ORGANIZATIONS`, use those names. Whether it took is
-what the `can_submit` line of `check:connection` below tells you; when something is missing, it
-prints the command to type, with the names capture-ledger actually saw.
+what the `can_submit` line of `doctor` below tells you; when something is missing, it prints the
+command to type, with the names capture-ledger actually saw.
 
-### Hand over the key and check the connection
-
-Back in this repo:
+## Check it: take one capture
 
 ```sh
-pnpm run windmill:capture-ledger-token   # the token, and the API address as a container sees it
-pnpm run check:connection                # every line ✓ means connected
+cd ~/projects/crawler/capture-scheduler
+pnpm run doctor   # 13 checks; all ✓ means a crawl is set up to run to the end
+pnpm run smoke    # captures https://example.com/ once; "撮れた" (captured) once the WACZ comes back
 ```
 
-The API address (`u/admin/waggle_api_url`) comes from the gateway of the `default` network
-(`container network inspect default`) unless `CAPTURE_LEDGER_API_URL` is set. It changes when the
-network is recreated; re-run `windmill:capture-ledger-token` then. Whichever line of
-`check:connection` shows ✗ names what is missing ([Testing](/testing/)). `can_submit` asks with the
-very token Windmill holds, so it catches a missing permission and a stale token (the issuer was
-restarted) alike.
+**doctor** asks, for each heading of this page, whether that step is done — by asking the things
+the step created. It goes past "is it up": whether the scripts match the repo, whether the proto
+is stale, whether the token Windmill holds may start crawls, whether the API and BrowserHive are
+reachable from inside the worker. A ✗ says what to fix and which section of this page the step
+lives in. Checks that depend on a ✗ do not run and only say "先に … を" (… first) — one thing to
+fix means one ✗.
 
-Windmill opens at `http://127.0.0.1:8000`.
+```
+立ち上げる
+  ✓ windmill            http://127.0.0.1:8000/api/version
+  …
+  ✗ capture-ledger api  http://127.0.0.1:7070/healthz
+  ✗ oidc issuer         http://127.0.0.1:9099/.well-known/openid-configuration
+  ・crawl route         先に capture-ledger api を
+  ・jwt                 先に capture-ledger api・oidc issuer を
+
+直すもの (2):
+  capture-ledger api —— capture-ledger の API が答えない → cd ../capture-ledger && pnpm run api
+    手順: https://uraitakahito.github.io/capture-scheduler/ja/quickstart/#立ち上げる
+  …
+```
+
+**smoke** captures one page, and only when doctor is all ✓. It takes the production path —
+asks capture-ledger's `POST /api/crawls` with the flow's own token, lets the Windmill flow capture,
+waits for the level report — then fetches the archive the ledger recorded through a signed URL
+and checks that it starts with `PK` (a WACZ is a zip):
+
+```
+点検     doctor の 13 本とも ✓
+起こす   POST /api/crawls → 202  crawl 545e912c-…  https://example.com/
+待つ     running
+run      http://127.0.0.1:8000/run/01a0ba19-…?workspace=crawler
+終わり   succeeded (max_depth) —— 撮ったページ 1・6 秒
+取り出す archive 928d640f-… の先頭が PK (WACZ = zip)
+撮れた   https://example.com/
+```
+
+**When it fails**, smoke names the step that failed and how to fix it (the `原因` cause and
+`直す` fix lines). Fix that and run smoke again. It closes the crawl it started — on failure, on
+timeout, on Ctrl-C — so the next run is never blocked by a 409. To follow it in Windmill, open the
+`run` URL smoke prints ([Windmill UI: "Digging into failures"](/windmill-ui/#digging-into-failures--two-real-ones)).
+
+```sh
+cd ~/projects/crawler/capture-scheduler
+pnpm run smoke https://example.org/   # capture a different URL
+pnpm run smoke --timeout 300          # how long to wait (seconds, default 180)
+pnpm run smoke --no-doctor            # skip the checks (re-running right after a fix)
+pnpm run smoke --close-running        # on 409, close the running crawl first, then capture
+```
+
+smoke needs capture-ledger v0.43.0 or later (that is when the ledger started returning the last
+level's run and why pages failed).
+
+### From symptom to fix
+
+Every row was produced for real and checked (2026-09-19).
+
+| What you see                                                                                                  | Meaning                                                                         | Fix                                                                                       |
+| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| doctor: windmill ✗, and the checks below say "先に windmill を"                                               | Windmill is down                                                                | `container-compose up -d` (in this repo)                                                  |
+| doctor: proto ✗ "Windmill に proto が無い" / smoke: `[cap] Resource not found at u/admin/browserhive_proto …` | the proto was never uploaded                                                    | `pnpm run windmill:push-proto`                                                            |
+| doctor: proto ✗ "repo の capture.proto と違う"                                                                | BrowserHive was upgraded and the proto re-fetched, but Windmill's copy is stale | `pnpm run windmill:push-proto`                                                            |
+| doctor: push ✗ "repo と中身が違う"                                                                            | a script was changed but not pushed (or was edited in the Windmill UI)          | `pnpm run windmill:push` (`windmill:diff` to just look)                                   |
+| doctor: worker→browserhive ✗ "名前が引けない" / smoke: `[cap] BrowserHive に届きません: …`                    | a BrowserHive container is stopped (a stopped container loses its DNS name too) | `pnpm run stack:up` in capture-ledger                                                     |
+| smoke: `succeeded` with 0 pages, cause `… net::ERR_NAME_NOT_RESOLVED …`                                       | the URL's host does not resolve                                                 | check the URL; if it is right, whether BrowserHive's containers can resolve outside names |
+| doctor: can_submit ✗ "… のクロールの許可が無い" / smoke: `… /pages → 404`                                     | windmill may not start crawls                                                   | `pnpm run fga:grant submitter windmill acme` in capture-ledger                            |
+| doctor: can_submit ✗ "トークンが通らない" / smoke: `… /pages → 401`                                           | the issuer was restarted and Windmill's token is stale                          | `pnpm run windmill:capture-ledger-token`                                                  |
+| doctor: container→api ✗ "API が 127.0.0.1 で待っている" / smoke: `Unable to connect`                          | level reports cannot reach the API from a container                             | add `CAPTURE_LEDGER_API_HOST=0.0.0.0` to capture-ledger's `.env` and restart the API      |
+| smoke: 409 "走行中のクロールがある: …"                                                                        | an earlier crawl is still `running`                                             | wait for it, or `pnpm run smoke --close-running`                                          |
 
 ## How the token gets there
 
@@ -133,7 +216,7 @@ The API does not need a restart. The key's name (kid) changes along with the key
 refetches the keys as soon as it sees one new token (from capture-ledger v0.42.1; before that the
 kid was fixed and the API kept the old key for up to ten minutes, rejecting new tokens). For 30
 seconds right after the issuer restarts, new tokens may still be refused — the jwt line of
-`check:connection` says so.
+`doctor` says so.
 
 ## The picker returns 401
 

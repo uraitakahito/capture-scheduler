@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { readCanSubmit } from "../scripts/can-submit.js";
+import { readCanSubmit } from "../scripts/doctor/can-submit.js";
 
 const me = (body: Record<string, unknown>): string => JSON.stringify(body);
 
