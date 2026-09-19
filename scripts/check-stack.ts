@@ -29,7 +29,13 @@
  *
  * **どれも、正しい設定と誤った設定で答えが変わる入力を使う。** たとえば jwt を
  * 「ヘッダで名乗ると 401」で見ると、名乗りの口がどちらも無い API も 401 で通ってしまう。
- * だから issuer から token を取り、それが 200 になることを見る。
+ * だから issuer から token を取り、それが 200 になることを見る。拒まれたときの名指しは
+ * `jwt-check.ts` —— ヘッダでも訊いて、ヘッダの設定か、トークンを拒んだのかを分ける。
+ *
+ * **can_submit は jwt の後に走らせる。** dev issuer の kid は鍵ごとに変わる (capture-ledger
+ * v0.42.1 から) ので、issuer を起こし直した後は、jwt の新しいトークンが API に JWKS を
+ * 取り直させる。並べて走らせると、flow の古いトークンが取り直しの前に着けば ✓、後なら ✗ ——
+ * 同じ状態で答えが入れ替わる (古いトークンは、API が取り直すまで通る)。
  *
  * `--connection` を付けると、つながりだけを見る (capture-fixtures を見ない)。
  * `pnpm run check:connection` がそれで、docs の手順の最後に叩く。
@@ -39,6 +45,7 @@ import { connect } from "node:net";
 import { promisify } from "node:util";
 
 import { readCanSubmit, type Verdict } from "./can-submit.js";
+import { readJwt } from "./jwt-check.js";
 import { optional, windmillFetch, windmillWorkspace } from "./env.js";
 
 /** HTTP の答えが返ること自体が待ち受けの証拠。405 でも 401 でもよい。 */
@@ -77,11 +84,37 @@ const ISSUER = optional("CAPTURE_LEDGER_OIDC_ISSUER", "http://127.0.0.1:9099");
 /** 段の報告を送るのは worker。宛先に届くかは、そのコンテナの中から見る。 */
 const WORKER = "windmill-worker.capture-scheduler";
 
+/** 応答の status と本文。届かなければ status は undefined。 */
+const answerOf = async (
+  url: string,
+  init: RequestInit = {},
+): Promise<{ status: number | undefined; body: string }> => {
+  try {
+    const res = await fetch(url, { ...init, signal: AbortSignal.timeout(3000) });
+    return { status: res.status, body: await res.text() };
+  } catch {
+    return { status: undefined, body: "" };
+  }
+};
+
+/** issuer が名乗る iss。discovery から読む —— need に出す値を決め打ちしない。 */
+const issuerName = async (): Promise<string> => {
+  const { status, body } = await answerOf(`${ISSUER}/.well-known/openid-configuration`);
+  try {
+    const { issuer } = JSON.parse(body) as { issuer?: unknown };
+    return status === 200 && typeof issuer === "string" ? issuer : ISSUER;
+  } catch {
+    return ISSUER;
+  }
+};
+
 /**
  * issuer から token を取り、Bearer で一覧を読む。**200 になるのは JWT を受ける API だけ** ——
- * ヘッダの設定の API も、どちらの口も無い API も 401 を返す。
+ * ヘッダの設定の API も、どちらの口も無い API も 401 を返す。拒まれたら、同じ API にヘッダで
+ * `GET /api/me` を訊き、どちらなのかを `jwt-check.ts` が読み分ける。
  */
-const acceptsJwt = async (): Promise<boolean> => {
+const acceptsJwt = async (): Promise<Verdict> => {
+  let token: string;
   try {
     const res = await fetch(`${ISSUER}/token`, {
       method: "POST",
@@ -89,16 +122,25 @@ const acceptsJwt = async (): Promise<boolean> => {
       body: JSON.stringify({ subject: "check-stack", organizations: ["acme"], expiresIn: "5m" }),
       signal: AbortSignal.timeout(3000),
     });
-    if (!res.ok) return false;
     const body = (await res.json()) as { access_token?: unknown };
-    if (typeof body.access_token !== "string") return false;
-    const status = await statusOf(`${API}/api/archives`, {
-      headers: { authorization: `Bearer ${body.access_token}` },
-    });
-    return status === 200;
+    if (!res.ok || typeof body.access_token !== "string") {
+      return readJwt({ token: "no-token", iss: ISSUER });
+    }
+    token = body.access_token;
   } catch {
-    return false;
+    return readJwt({ token: "no-token", iss: ISSUER });
   }
+  const status = await statusOf(`${API}/api/archives`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (status !== 401) return readJwt({ token: status, iss: ISSUER });
+  const header = await answerOf(`${API}/api/me`, {
+    headers: {
+      "x-capture-ledger-subject": "check-stack",
+      "x-capture-ledger-organizations": "acme",
+    },
+  });
+  return readJwt({ token: status, header, iss: await issuerName() });
 };
 
 /**
@@ -222,9 +264,8 @@ const CHECKS = [
   {
     name: "jwt",
     where: "issuer の token で GET 127.0.0.1:7070/api/archives",
-    need:
-      "capture-ledger の .env に CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099 を書いて API を" +
-      "起こし直す。ヘッダの設定の API では、flow の段の報告 (Bearer) が 401 になる",
+    // 実際に足りないものは答えから組む (`jwt-check.ts`)。これは届かなかったときの控え。
+    need: "capture-ledger の .env に CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099",
     probe: acceptsJwt,
   },
   {
@@ -248,14 +289,19 @@ const CHECKS = [
 const connectionOnly = process.argv.includes("--connection");
 const selected = CHECKS.filter((check) => !(connectionOnly && "e2eOnly" in check));
 
-const results = await Promise.all(
-  selected.map(async (check) => {
-    const answer = await check.probe();
-    // 多くの点検は ✓ か ✗ だけを返す。can_submit は、何が足りないかも返す。
-    if (typeof answer === "boolean") return { ...check, ok: answer };
-    return { ...check, ok: answer.ok, need: answer.ok ? check.need : answer.need };
-  }),
-);
+const run = async (check: (typeof selected)[number]) => {
+  const answer = await check.probe();
+  // 多くの点検は ✓ か ✗ だけを返す。jwt と can_submit は、何が足りないかも返す。
+  if (typeof answer === "boolean") return { ...check, ok: answer };
+  return { ...check, ok: answer.ok, need: answer.ok ? check.need : answer.need };
+};
+
+// can_submit は jwt の後に (上の注記)。ほかは並べて走らせる。
+const AFTER_JWT = new Set(["can_submit"]);
+const firstRound = await Promise.all(selected.filter((c) => !AFTER_JWT.has(c.name)).map(run));
+const secondRound = await Promise.all(selected.filter((c) => AFTER_JWT.has(c.name)).map(run));
+const order = (name: string): number => selected.findIndex((c) => c.name === name);
+const results = [...firstRound, ...secondRound].sort((a, b) => order(a.name) - order(b.name));
 
 for (const r of results) {
   console.log(`  ${r.ok ? "✓" : "✗"} ${r.name.padEnd(18)} ${r.where}`);

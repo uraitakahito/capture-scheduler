@@ -128,6 +128,11 @@ issuer は起動のたびに鍵をメモリ上で作り直すので（意図さ�
 401 になる。`report_level.ts` と `trigger_crawl.ts` の失敗メッセージがそう書いてあるのは、
 踏みやすく、かつ status だけからは辿れないため。
 
+API は起こし直さなくてよい。鍵の名前（kid）も一緒に替わるので、API は新しいトークンを
+1 本見た時点で鍵を取り直す（capture-ledger v0.42.1 から。それより前は kid が固定で、
+API が古い鍵を最長 10 分覚えたまま、新しいトークンを 401 にしていた）。issuer を起こし直した
+直後の 30 秒は、新しいトークンも通らないことがある —— `check:connection` の jwt がそう言う。
+
 ## picker が 401 になる
 
 `CAPTURE_LEDGER_OIDC_ISSUER` を立てると、capture-ledger は JWT **だけ**を受け付けるようになり、
