@@ -11,28 +11,44 @@ sudo container system dns create capture-scheduler   # once per machine
 container-compose up -d
 pnpm install
 
-pnpm run windmill:bootstrap   # creates the workspace and a token, printed ready to paste
-                              # → paste the WINDMILL_TOKEN= line into .env
-pnpm run windmill:push        # upload the scripts and the schedule
+pnpm run windmill:bootstrap   # creates the workspace and a token; paste the output in two places:
+                              #   WINDMILL_TOKEN=…           → this repo's .env
+                              #   the CAPTURE_LEDGER_CRAWL_WEBHOOK_URL / _TOKEN lines
+                              #                              → capture-ledger's .env
+pnpm run windmill:push        # upload the scripts, the flow and the schedule
+pnpm run windmill:push-proto  # upload BrowserHive's proto (crawl_host reads it; push does not include it)
 ```
 
-On the capture-ledger side, in another terminal:
+If you bootstrapped earlier, the webhook URL is
+`http://127.0.0.1:8000/api/w/crawler/jobs/run/f/f/waggle/crawl_level` and the token is the same
+value as `WINDMILL_TOKEN` in this repo's `.env`.
+
+On the capture-ledger side, in another terminal. Add four lines to its `.env` first —
+**miss any one and no crawl runs to the end**:
 
 ```sh
 cd ../capture-ledger
 # in .env:
-#   CAPTURE_LEDGER_API_HOST=0.0.0.0                     so containers can reach it
-#   CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099    so it accepts JWTs
-pnpm run oidc:issuer
-pnpm run api
-pnpm run fga:grant submitter windmill acme      # without this you get 404
+#   CAPTURE_LEDGER_CRAWL_WEBHOOK_URL=…                the two lines bootstrap printed
+#   CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN=…              (without them /api/crawls does not exist)
+#   CAPTURE_LEDGER_API_HOST=0.0.0.0                   level reports come from a container
+#   CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099  the flow identifies itself with a JWT
+pnpm run oidc:issuer                         # keep it running
+pnpm run api                                 # restart it if running (settings are read at startup)
+pnpm run fga:grant submitter windmill acme   # without this you get 404
 ```
 
-Back here, hand over the key:
+Back here, hand over the key and check the connection:
 
 ```sh
-pnpm run windmill:capture-ledger-token
+pnpm run windmill:capture-ledger-token   # the token, and the API address as a container sees it
+pnpm run check:connection                # every line ✓ means connected
 ```
+
+The API address (`u/admin/waggle_api_url`) comes from the gateway of the `default` network
+(`container network inspect default`) unless `CAPTURE_LEDGER_API_URL` is set. It changes when the
+network is recreated; re-run `windmill:capture-ledger-token` then. Whichever line of
+`check:connection` shows ✗ names what is missing ([Testing](/testing/)).
 
 Windmill opens at `http://127.0.0.1:8000`.
 
@@ -72,3 +88,8 @@ must not fall back to the weaker one. So this is not a bug to work around here.
 Use one at a time. To use the picker, comment out `CAPTURE_LEDGER_OIDC_ISSUER` in
 capture-ledger's `.env`. **Nothing makes both work at once** — that would mean changing
 capture-ledger's identity design, which is a separate question.
+
+**Do not switch while a crawl is running.** The flow reports each level with a Bearer token, so an
+API without JWTs answers 401; that crawl stays `running` and blocks every later start with 409.
+How to clear it is in capture-ledger's quickstart,
+["When every crawl gets 409"](https://uraitakahito.github.io/capture-ledger/quickstart/#when-every-crawl-gets-409).

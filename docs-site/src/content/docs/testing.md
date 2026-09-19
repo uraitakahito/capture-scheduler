@@ -1,16 +1,20 @@
 ---
 title: Testing
-description: 61 unit tests that need nothing, one end-to-end test that needs the whole stack, and why both layers are required
+description: Unit tests that need nothing, one end-to-end test that needs the whole stack, and why both layers are required
 ---
 
 ```sh
-pnpm run test        # 61 unit tests, no stack, a few seconds
+pnpm run test        # unit tests, no stack, a few seconds
 pnpm run test:e2e    # 1 end-to-end test, needs the stack
 pnpm run check       # audit, format, env, typecheck, unit tests, CI parity, docs site
 ```
 
 `pretest:e2e` runs `scripts/check-stack.ts` first and names **everything**
-missing at once. It lives outside vitest deliberately: vitest prints
+missing at once. It checks not just that things are up but that a crawl can run to the end —
+whether `/api/crawls` exists (the two webhook lines), whether the API accepts JWTs, and whether
+the address in Windmill's variable is reachable from a container. Miss any of these and a crawl
+fails only at its level report, staying `running`. To check just the connection, run
+`pnpm run check:connection` (it skips capture-fixtures). It lives outside vitest deliberately: vitest prints
 "No test files found, exiting with code 1" whenever a global setup throws, and no
 message written inside can survive that.
 

@@ -196,7 +196,7 @@ Confuse the two and push stays green while the flow dies with
 | Path                            | Contents                                                                                                                                | Provisioned by                  |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
 | `u/admin/waggle_token`          | JWT for capture-ledger (secret)                                                                                                         | `windmill:capture-ledger-token` |
-| `u/admin/waggle_api_url`        | Where the capture-ledger API is (default `http://192.168.64.1:7070`)                                                                    | same                            |
+| `u/admin/waggle_api_url`        | Where the capture-ledger API is (default: the gateway of the `default` network)                                                         | same                            |
 | `u/admin/browserhive_endpoints` | JSON array of gRPC targets, one per BrowserHive (default `["browserhive-1.capture-ledger:50051","browserhive-2.capture-ledger:50051"]`) | same                            |
 | `u/admin/browserhive_tls_ca`    | TLS CA (empty = plaintext)                                                                                                              | same                            |
 | `u/admin/browserhive_proto`     | Copy of `capture.proto` (read by `crawl_host`)                                                                                          | `windmill:push-proto`           |
@@ -217,6 +217,8 @@ The recovery order (measured on 2026-09-11):
 ```sh
 pnpm run windmill:bootstrap            # recreates the workspace, prints a fresh token
                                        # → paste the WINDMILL_TOKEN= line into .env
+                                       # → re-paste the two webhook lines into
+                                       #   capture-ledger's .env and restart its API
 pnpm run windmill:push                 # scripts / flow / schedule
 pnpm run windmill:push-proto           # ← forget this and crawl_host dies with Resource not found
 pnpm run windmill:capture-ledger-token # the four variables
@@ -228,18 +230,12 @@ If capture-ledger's OpenFGA store was wiped at the same time, run
 `fga:migrate` → `fga:deploy` there first and paste the two printed IDs into
 that repo's `.env` before granting.
 
-**Recreating containers can change the bridge subnet.** The default
-`u/admin/waggle_api_url` points at `192.168.64.1`; when the subnet moves,
-the report step fails with `ConnectionRefused`. The current gateway is the
-`bridge100` entry in `ifconfig`. The fix is setting `CAPTURE_LEDGER_API_URL`
-in `.env` and re-running `windmill:capture-ledger-token`. Reachability can be
-measured, not guessed:
-
-```sh
-container exec windmill.capture-scheduler \
-  curl -s -o /dev/null -w '%{http_code}\n' -X POST http://192.168.66.1:7070/api/crawls
-# 401 means reachable (waiting for auth). 000 means not reachable
-```
+**Recreating containers can change the bridge subnet.** `u/admin/waggle_api_url` holds the
+gateway of the `default` network as it was when `windmill:capture-ledger-token` ran, so re-run it
+when the subnet moves. A stale address makes the report step fail with `ConnectionRefused`, and
+the crawl stays `running`. Reachability is measured by the container→api line of
+`pnpm run check:connection`, which asks the variable's `/healthz` from inside the worker. When
+every line shows ✓, the recovery is done.
 
 ## The name `f/waggle/`
 

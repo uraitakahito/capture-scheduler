@@ -179,7 +179,7 @@ flow が `Resource not found` で落ちる（上の失敗①）。
 | 置き場                          | 中身                                                                                                                                     | 入れる script                   |
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
 | `u/admin/waggle_token`          | capture-ledger への JWT (secret)                                                                                                         | `windmill:capture-ledger-token` |
-| `u/admin/waggle_api_url`        | capture-ledger API の宛先（既定 `http://192.168.64.1:7070`）                                                                             | 同上                            |
+| `u/admin/waggle_api_url`        | capture-ledger API の宛先（既定は default ネットワークの gateway）                                                                       | 同上                            |
 | `u/admin/browserhive_endpoints` | gRPC の宛先の JSON 配列。BrowserHive 1 つに 1 要素（既定 `["browserhive-1.capture-ledger:50051","browserhive-2.capture-ledger:50051"]`） | 同上                            |
 | `u/admin/browserhive_tls_ca`    | TLS の CA（空 = 平文）                                                                                                                   | 同上                            |
 | `u/admin/browserhive_proto`     | `capture.proto` の写し（`crawl_host` が読む）                                                                                            | `windmill:push-proto`           |
@@ -200,6 +200,8 @@ windmill-db の volume を消すと、workspace・token・変数が全部消え�
 ```sh
 pnpm run windmill:bootstrap            # workspace を作り直し、新しい token を出す
                                        # → 出た WINDMILL_TOKEN= を .env に貼り直す
+                                       # → capture-ledger の .env の webhook の 2 行も
+                                       #   貼り直して、あちらの API を起こし直す
 pnpm run windmill:push                 # script / flow / schedule
 pnpm run windmill:push-proto           # ← 忘れると crawl_host が Resource not found
 pnpm run windmill:capture-ledger-token # 変数 4 つ
@@ -211,17 +213,11 @@ capture-ledger 側の OpenFGA も同時に消えていたら、grant の前に
 `fga:migrate` → `fga:deploy` で store を作り直し、出てきた 2 つの ID を
 あちらの `.env` に貼る。
 
-**コンテナを作り直すと bridge の subnet が変わりうる。**
-`u/admin/waggle_api_url` の既定は `192.168.64.1` で、subnet が変わると
-report の段が `ConnectionRefused` になる。いまの gateway は `ifconfig` の
-`bridge100` で分かる。直すのは `.env` の `CAPTURE_LEDGER_API_URL` を書いて
-`windmill:capture-ledger-token` を再実行。届いているかは実測できる:
-
-```sh
-container exec windmill.capture-scheduler \
-  curl -s -o /dev/null -w '%{http_code}\n' -X POST http://192.168.66.1:7070/api/crawls
-# 401 なら届いている（認証待ち）。000 なら届いていない
-```
+**コンテナを作り直すと bridge の subnet が変わりうる。** `u/admin/waggle_api_url` に入るのは、
+`windmill:capture-ledger-token` を叩いた時点の default ネットワークの gateway なので、subnet が
+変わったらやり直す。外れていると report の段が `ConnectionRefused` になり、クロールは `running` の
+まま残る。届いているかは `pnpm run check:connection` の container→api が見る —— 変数の宛先の
+`/healthz` に、worker の中から問い合わせる。最後にこれが全部 ✓ になれば、復旧は終わり。
 
 ## `f/waggle/` という名前
 
