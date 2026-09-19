@@ -34,31 +34,47 @@ sudo container system dns create capture-scheduler   # マシンごとに 1 度�
 container-compose up -d
 pnpm install
 
-pnpm run windmill:bootstrap   # workspace と token を作る。出力は 2 か所に貼る:
-                              #   WINDMILL_TOKEN=…          → この repo の .env
-                              #   CAPTURE_LEDGER_CRAWL_WEBHOOK_URL / _TOKEN の 2 行
-                              #                             → capture-ledger の .env
+pnpm run windmill:bootstrap   # workspace と token を作り、2 か所に貼る行を出す（下）
 pnpm run windmill:push        # script・flow・schedule を入れる
 pnpm run windmill:push-proto  # BrowserHive の proto を入れる（crawl_host が読む。push には含まれない）
 ```
 
-bootstrap を以前に済ませてあるなら、webhook の URL は
-`http://127.0.0.1:8000/api/w/crawler/jobs/run/f/f/waggle/crawl_level`、token はこの repo の
-`.env` の `WINDMILL_TOKEN` と同じ値です。
+bootstrap の出力は 2 か所に貼ります。`WINDMILL_TOKEN=…` はこの repo の `.env` へ。続く 4 行は、
+capture-ledger の `.env` の**末尾に**そのまま貼ります（同じ名前の行が前にあっても、後ろの行が
+効きます）。**4 行のどれが欠けても、クロールは最後まで走りません**:
 
-capture-ledger 側（別のターミナル）。`.env` に 4 行を足してから起こします ——
-**どれが欠けても、クロールは最後まで走りません**:
+```dotenv title="capture-ledger/.env（末尾に）"
+# capture-scheduler の pnpm run windmill:bootstrap が出した 4 行
+CAPTURE_LEDGER_CRAWL_WEBHOOK_URL=http://127.0.0.1:8000/api/w/crawler/jobs/run/f/f/waggle/crawl_level
+CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN=<bootstrap が出した値>
+CAPTURE_LEDGER_API_HOST=0.0.0.0
+CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099
+```
+
+| 行                                             | なぜ要るか                                                                         |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `…_CRAWL_WEBHOOK_URL`・`…_CRAWL_WEBHOOK_TOKEN` | クロールを Windmill に投げる先。無いと `/api/crawls` そのものが無い（`404`）       |
+| `CAPTURE_LEDGER_API_HOST=0.0.0.0`              | 段の報告はコンテナから来る。`127.0.0.1` で待つ API には届かない                    |
+| `CAPTURE_LEDGER_OIDC_ISSUER`                   | flow は JWT で名乗る。無い API は開発用ヘッダの設定になり、段の報告は `401` になる |
+
+bootstrap は打つたびに新しい token を作ります（前に作ったものも、使えるまま残ります）。打ち直さずに
+済ませるなら、`<bootstrap が出した値>` にはこの repo の `.env` の `WINDMILL_TOKEN` と同じ値を入れます。
+
+貼ったら、capture-ledger 側で issuer を起こし、API を起こし直します:
 
 ```sh
 cd ~/projects/crawler/capture-ledger
-# .env に:
-#   CAPTURE_LEDGER_CRAWL_WEBHOOK_URL=…                bootstrap が出した 2 行
-#   CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN=…              （無いと /api/crawls そのものが無い）
-#   CAPTURE_LEDGER_API_HOST=0.0.0.0                   段の報告はコンテナから来る
-#   CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099  flow は JWT で名乗る
-pnpm run oidc:issuer                         # 動かし続ける
-pnpm run api                                 # 動いていたら起こし直す（設定は起動時に読む）
+pnpm run oidc:issuer   # 動かし続ける
+pnpm run api           # 別のターミナルで。動いていたら起こし直す（設定は起動のときに 1 回だけ読む）
 ```
+
+4 行が効いたかは、API の起動ログの**最後の行**が言います:
+
+```text
+Archive API listening on 0.0.0.0:7070 — identity: JWT (http://127.0.0.1:9099); crawl level reports: ready
+```
+
+`blocked` なら、その上の warn が足りない行を名指しします（capture-ledger v0.44.0 から）。
 
 `http://127.0.0.1:8000` で Windmill が開く。
 
@@ -172,18 +188,19 @@ smoke は capture-ledger v0.43.0 以上を前提にする（最後の段の run 
 
 どれも実物で起こして確かめた見え方（2026-09-19）。
 
-| 見えたもの                                                                                                                                      | 意味                                                                   | 直す                                                                                    |
-| ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| doctor の windmill が ✗ で、下の点検が「先に windmill を」                                                                                      | Windmill が落ちている                                                  | `container-compose up -d`（この repo で）                                               |
-| doctor の proto が ✗「Windmill に proto が無い」／smoke の原因が `[cap] Resource not found at u/admin/browserhive_proto …`                      | proto を入れていない                                                   | `pnpm run windmill:push-proto`                                                          |
-| doctor の proto が ✗「repo の capture.proto と違う」                                                                                            | BrowserHive の版を上げて proto を取り直したが、Windmill の写しが古い   | `pnpm run windmill:push-proto`                                                          |
-| doctor の push が ✗「repo と中身が違う」                                                                                                        | script を直したが push していない（または Windmill の UI で直した）    | `pnpm run windmill:push`（違いを見るだけなら `windmill:diff`）                          |
-| doctor の worker→browserhive が ✗「名前が引けない」（止めた直後の数秒は「3 秒で答えない」）／smoke の原因が `[cap] BrowserHive に届きません: …` | BrowserHive のコンテナが止まっている（止めたコンテナは名前ごと消える） | capture-ledger で `pnpm run stack:up`                                                   |
-| smoke が `succeeded`・撮ったページ 0 で、原因が `… net::ERR_NAME_NOT_RESOLVED …`                                                                | 撮る URL の名前が引けない                                              | URL の綴り。正しければ、BrowserHive のコンテナから外の名前を引けるか                    |
-| doctor の can_submit が ✗「… のクロールの許可が無い」／smoke の原因が `… /pages → 404`                                                          | windmill にクロールの許可が無い                                        | capture-ledger で `pnpm run fga:grant submitter windmill acme`                          |
-| doctor の can_submit が ✗「トークンが通らない」／smoke の原因が `… /pages → 401`                                                                | issuer を起こし直し、Windmill のトークンが古い                         | `pnpm run windmill:capture-ledger-token`                                                |
-| doctor の container→api が ✗「API が 127.0.0.1 で待っている」／smoke の原因が `Unable to connect`                                               | 段の報告がコンテナから API に届かない                                  | capture-ledger の `.env` に `CAPTURE_LEDGER_API_HOST=0.0.0.0` を書いて API を起こし直す |
-| smoke が 409「走行中のクロールがある: …」                                                                                                       | 前の 1 本が running のまま                                             | 終わるのを待つか `pnpm run smoke --close-running`                                       |
+| 見えたもの                                                                                                                                      | 意味                                                                                      | 直す                                                                        |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| doctor の windmill が ✗ で、下の点検が「先に windmill を」                                                                                      | Windmill が落ちている                                                                     | `container-compose up -d`（この repo で）                                   |
+| doctor の proto が ✗「Windmill に proto が無い」／smoke の原因が `[cap] Resource not found at u/admin/browserhive_proto …`                      | proto を入れていない                                                                      | `pnpm run windmill:push-proto`                                              |
+| doctor の proto が ✗「repo の capture.proto と違う」                                                                                            | BrowserHive の版を上げて proto を取り直したが、Windmill の写しが古い                      | `pnpm run windmill:push-proto`                                              |
+| doctor の push が ✗「repo と中身が違う」                                                                                                        | script を直したが push していない（または Windmill の UI で直した）                       | `pnpm run windmill:push`（違いを見るだけなら `windmill:diff`）              |
+| doctor の worker→browserhive が ✗「名前が引けない」（止めた直後の数秒は「3 秒で答えない」）／smoke の原因が `[cap] BrowserHive に届きません: …` | BrowserHive のコンテナが止まっている（止めたコンテナは名前ごと消える）                    | capture-ledger で `pnpm run stack:up`                                       |
+| smoke が `succeeded`・撮ったページ 0 で、原因が `… net::ERR_NAME_NOT_RESOLVED …`                                                                | 撮る URL の名前が引けない                                                                 | URL の綴り。正しければ、BrowserHive のコンテナから外の名前を引けるか        |
+| doctor の can_submit が ✗「… のクロールの許可が無い」／smoke の原因が `… /pages → 404`                                                          | windmill にクロールの許可が無い                                                           | capture-ledger で `pnpm run fga:grant submitter windmill acme`              |
+| doctor の can_submit が ✗「トークンが通らない」／smoke の原因が `… /pages → 401`                                                                | issuer を起こし直し、Windmill のトークンが古い                                            | `pnpm run windmill:capture-ledger-token`                                    |
+| doctor の jwt が ✗「ヘッダで名乗る設定で動いている」（起動ログの最後の行は `crawl level reports: blocked`）                                     | capture-ledger の API が JWT を受けない（`CAPTURE_LEDGER_OIDC_ISSUER` が効いていない）    | bootstrap の 4 行を capture-ledger の `.env` の末尾に貼り、API を起こし直す |
+| doctor の container→api が ✗「API が 127.0.0.1 で待っている」／smoke の原因が `Unable to connect`                                               | 段の報告がコンテナから API に届かない（`CAPTURE_LEDGER_API_HOST=0.0.0.0` が効いていない） | bootstrap の 4 行を capture-ledger の `.env` の末尾に貼り、API を起こし直す |
+| smoke が 409「走行中のクロールがある: …」                                                                                                       | 前の 1 本が running のまま                                                                | 終わるのを待つか `pnpm run smoke --close-running`                           |
 
 ## トークンの経路
 
@@ -222,9 +239,21 @@ API が古い鍵を最長 10 分覚えたまま、新しいトークンを 401 �
 JWT が dev ヘッダより優先されるのは capture-ledger 側の意図された設計で、「両方設定された
 環境で弱いほうへ落ちない」ため。こちらで回避するものではない。
 
-使い分けること。picker を触るときは capture-ledger の `.env` の `CAPTURE_LEDGER_OIDC_ISSUER` を
-コメントアウトする。**両立させる仕組みは作っていない** —— それは identity の設計を
-変える話で、別件。
+使い分けること。picker を触るときは、capture-ledger の `.env` の `CAPTURE_LEDGER_OIDC_ISSUER` の行を
+`#` でコメントにし、**待ち受けを `127.0.0.1` に戻して**起こす:
+
+```sh
+cd ~/projects/crawler/capture-ledger
+CAPTURE_LEDGER_API_HOST=127.0.0.1 pnpm run api   # picker を使うあいだだけ
+```
+
+待ち受けも戻すのは、`.env` の `CAPTURE_LEDGER_API_HOST=0.0.0.0` が残ったままだと、ヘッダを信じる
+API に同じネットワークの誰もが届き、誰にでもなれるから（コマンド行の値は `.env` より勝つ。
+`CAPTURE_LEDGER_OIDC_ISSUER=` と空にして外す手は、capture-ledger が空の値で起動を止めるので使えない）。
+**両立させる仕組みは作っていない** —— それは identity の設計を変える話で、別件。
+
+クロールに戻るときは `#` を外し、`pnpm run api` で起こし直す。戻し忘れていれば、起動ログが warn と
+`crawl level reports: blocked` で言い、doctor の jwt が ✗ になる。
 
 **クロールが走っている間は切り替えないこと。** flow の段の報告は Bearer で来るので、JWT を
 外した API では 401 になり、そのクロールは `running` のまま残って、以後の起動を全部 409 で塞ぐ。

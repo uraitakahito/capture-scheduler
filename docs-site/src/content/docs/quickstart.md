@@ -33,31 +33,48 @@ sudo container system dns create capture-scheduler   # once per machine
 container-compose up -d
 pnpm install
 
-pnpm run windmill:bootstrap   # creates the workspace and a token; paste the output in two places:
-                              #   WINDMILL_TOKEN=…           → this repo's .env
-                              #   the CAPTURE_LEDGER_CRAWL_WEBHOOK_URL / _TOKEN lines
-                              #                              → capture-ledger's .env
+pnpm run windmill:bootstrap   # creates the workspace and a token, and prints lines for two places (below)
 pnpm run windmill:push        # upload the scripts, the flow and the schedule
 pnpm run windmill:push-proto  # upload BrowserHive's proto (crawl_host reads it; push does not include it)
 ```
 
-If you bootstrapped earlier, the webhook URL is
-`http://127.0.0.1:8000/api/w/crawler/jobs/run/f/f/waggle/crawl_level` and the token is the same
-value as `WINDMILL_TOKEN` in this repo's `.env`.
+Paste bootstrap's output in two places. `WINDMILL_TOKEN=…` goes into this repo's `.env`. The four
+lines after it go, as they are, **at the end of** capture-ledger's `.env` (a later line wins over an
+earlier one with the same name). **Miss any of the four and no crawl runs to the end**:
 
-On the capture-ledger side, in another terminal. Add four lines to its `.env` first —
-**miss any one and no crawl runs to the end**:
+```dotenv title="capture-ledger/.env (at the end)"
+# the four lines capture-scheduler's pnpm run windmill:bootstrap printed
+CAPTURE_LEDGER_CRAWL_WEBHOOK_URL=http://127.0.0.1:8000/api/w/crawler/jobs/run/f/f/waggle/crawl_level
+CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN=<the value bootstrap printed>
+CAPTURE_LEDGER_API_HOST=0.0.0.0
+CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099
+```
+
+| Line                                           | Why                                                                                                 |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `…_CRAWL_WEBHOOK_URL`, `…_CRAWL_WEBHOOK_TOKEN` | Where crawls are sent to Windmill. Without them `/api/crawls` does not exist (`404`)                |
+| `CAPTURE_LEDGER_API_HOST=0.0.0.0`              | Level reports come from a container, and an API listening on `127.0.0.1` never receives them        |
+| `CAPTURE_LEDGER_OIDC_ISSUER`                   | The flow identifies itself with a JWT. Without it the API trusts dev headers, and reports get `401` |
+
+bootstrap creates a new token every time you run it (the earlier ones stay valid). To skip running it
+again, put the same value as `WINDMILL_TOKEN` in this repo's `.env` where it says
+`<the value bootstrap printed>`.
+
+Then start the issuer on the capture-ledger side and restart the API:
 
 ```sh
 cd ~/projects/crawler/capture-ledger
-# in .env:
-#   CAPTURE_LEDGER_CRAWL_WEBHOOK_URL=…                the two lines bootstrap printed
-#   CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN=…              (without them /api/crawls does not exist)
-#   CAPTURE_LEDGER_API_HOST=0.0.0.0                   level reports come from a container
-#   CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099  the flow identifies itself with a JWT
-pnpm run oidc:issuer                         # keep it running
-pnpm run api                                 # restart it if running (settings are read at startup)
+pnpm run oidc:issuer   # keep it running
+pnpm run api           # in another terminal; restart it if running (settings are read once, at startup)
 ```
+
+The **last line** of the API's startup log says whether the four lines took:
+
+```text
+Archive API listening on 0.0.0.0:7070 — identity: JWT (http://127.0.0.1:9099); crawl level reports: ready
+```
+
+With `blocked`, the warnings above it name the missing lines (from capture-ledger v0.44.0).
 
 Windmill opens at `http://127.0.0.1:8000`.
 
@@ -174,18 +191,19 @@ level's run and why pages failed).
 
 Every row was produced for real and checked (2026-09-19).
 
-| What you see                                                                                                                                         | Meaning                                                                         | Fix                                                                                       |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| doctor: windmill ✗, and the checks below say "先に windmill を"                                                                                      | Windmill is down                                                                | `container-compose up -d` (in this repo)                                                  |
-| doctor: proto ✗ "Windmill に proto が無い" / smoke: `[cap] Resource not found at u/admin/browserhive_proto …`                                        | the proto was never uploaded                                                    | `pnpm run windmill:push-proto`                                                            |
-| doctor: proto ✗ "repo の capture.proto と違う"                                                                                                       | BrowserHive was upgraded and the proto re-fetched, but Windmill's copy is stale | `pnpm run windmill:push-proto`                                                            |
-| doctor: push ✗ "repo と中身が違う"                                                                                                                   | a script was changed but not pushed (or was edited in the Windmill UI)          | `pnpm run windmill:push` (`windmill:diff` to just look)                                   |
-| doctor: worker→browserhive ✗ "名前が引けない" ("3 秒で答えない" for a few seconds right after the stop) / smoke: `[cap] BrowserHive に届きません: …` | a BrowserHive container is stopped (a stopped container loses its DNS name too) | `pnpm run stack:up` in capture-ledger                                                     |
-| smoke: `succeeded` with 0 pages, cause `… net::ERR_NAME_NOT_RESOLVED …`                                                                              | the URL's host does not resolve                                                 | check the URL; if it is right, whether BrowserHive's containers can resolve outside names |
-| doctor: can_submit ✗ "… のクロールの許可が無い" / smoke: `… /pages → 404`                                                                            | windmill may not start crawls                                                   | `pnpm run fga:grant submitter windmill acme` in capture-ledger                            |
-| doctor: can_submit ✗ "トークンが通らない" / smoke: `… /pages → 401`                                                                                  | the issuer was restarted and Windmill's token is stale                          | `pnpm run windmill:capture-ledger-token`                                                  |
-| doctor: container→api ✗ "API が 127.0.0.1 で待っている" / smoke: `Unable to connect`                                                                 | level reports cannot reach the API from a container                             | add `CAPTURE_LEDGER_API_HOST=0.0.0.0` to capture-ledger's `.env` and restart the API      |
-| smoke: 409 "走行中のクロールがある: …"                                                                                                               | an earlier crawl is still `running`                                             | wait for it, or `pnpm run smoke --close-running`                                          |
+| What you see                                                                                                                                         | Meaning                                                                                                  | Fix                                                                                       |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| doctor: windmill ✗, and the checks below say "先に windmill を"                                                                                      | Windmill is down                                                                                         | `container-compose up -d` (in this repo)                                                  |
+| doctor: proto ✗ "Windmill に proto が無い" / smoke: `[cap] Resource not found at u/admin/browserhive_proto …`                                        | the proto was never uploaded                                                                             | `pnpm run windmill:push-proto`                                                            |
+| doctor: proto ✗ "repo の capture.proto と違う"                                                                                                       | BrowserHive was upgraded and the proto re-fetched, but Windmill's copy is stale                          | `pnpm run windmill:push-proto`                                                            |
+| doctor: push ✗ "repo と中身が違う"                                                                                                                   | a script was changed but not pushed (or was edited in the Windmill UI)                                   | `pnpm run windmill:push` (`windmill:diff` to just look)                                   |
+| doctor: worker→browserhive ✗ "名前が引けない" ("3 秒で答えない" for a few seconds right after the stop) / smoke: `[cap] BrowserHive に届きません: …` | a BrowserHive container is stopped (a stopped container loses its DNS name too)                          | `pnpm run stack:up` in capture-ledger                                                     |
+| smoke: `succeeded` with 0 pages, cause `… net::ERR_NAME_NOT_RESOLVED …`                                                                              | the URL's host does not resolve                                                                          | check the URL; if it is right, whether BrowserHive's containers can resolve outside names |
+| doctor: can_submit ✗ "… のクロールの許可が無い" / smoke: `… /pages → 404`                                                                            | windmill may not start crawls                                                                            | `pnpm run fga:grant submitter windmill acme` in capture-ledger                            |
+| doctor: can_submit ✗ "トークンが通らない" / smoke: `… /pages → 401`                                                                                  | the issuer was restarted and Windmill's token is stale                                                   | `pnpm run windmill:capture-ledger-token`                                                  |
+| doctor: jwt ✗ "ヘッダで名乗る設定で動いている" (the startup log's last line says `crawl level reports: blocked`)                                     | capture-ledger's API does not accept JWTs (`CAPTURE_LEDGER_OIDC_ISSUER` is not in effect)                | paste bootstrap's four lines at the end of capture-ledger's `.env` and restart the API    |
+| doctor: container→api ✗ "API が 127.0.0.1 で待っている" / smoke: `Unable to connect`                                                                 | level reports cannot reach the API from a container (`CAPTURE_LEDGER_API_HOST=0.0.0.0` is not in effect) | paste bootstrap's four lines at the end of capture-ledger's `.env` and restart the API    |
+| smoke: 409 "走行中のクロールがある: …"                                                                                                               | an earlier crawl is still `running`                                                                      | wait for it, or `pnpm run smoke --close-running`                                          |
 
 ## How the token gets there
 
@@ -226,9 +244,23 @@ browser picker at `http://127.0.0.1:7070/` starts returning 401.
 That precedence is deliberate on capture-ledger's side: when both are configured, it
 must not fall back to the weaker one. So this is not a bug to work around here.
 
-Use one at a time. To use the picker, comment out `CAPTURE_LEDGER_OIDC_ISSUER` in
-capture-ledger's `.env`. **Nothing makes both work at once** — that would mean changing
-capture-ledger's identity design, which is a separate question.
+Use one at a time. To use the picker, comment out the `CAPTURE_LEDGER_OIDC_ISSUER` line in
+capture-ledger's `.env` with `#`, and start the API **listening on `127.0.0.1` again**:
+
+```sh
+cd ~/projects/crawler/capture-ledger
+CAPTURE_LEDGER_API_HOST=127.0.0.1 pnpm run api   # only while you use the picker
+```
+
+The listening address goes back too because the `.env` line `CAPTURE_LEDGER_API_HOST=0.0.0.0` would
+otherwise stay in effect, and an API that trusts the headers would let anyone on the same network act
+as anyone (a value on the command line wins over `.env`; emptying `CAPTURE_LEDGER_OIDC_ISSUER=`
+instead does not work, because capture-ledger refuses to start with an empty value). **Nothing makes
+both work at once** — that would mean changing capture-ledger's identity design, which is a separate
+question.
+
+To go back to crawling, remove the `#` and restart with `pnpm run api`. If you forget, the startup
+log says so with warnings and `crawl level reports: blocked`, and doctor's jwt line shows ✗.
 
 **Do not switch while a crawl is running.** The flow reports each level with a Bearer token, so an
 API without JWTs answers 401; that crawl stays `running` and blocks every later start with 409.
