@@ -1,0 +1,68 @@
+{
+  "case": "何も壊さず https://example.com/ を 1 本",
+  "recorded": "2026-09-19 capture-ledger develop 9fe6a03 (v0.43.0 の手前) と Windmill CE v1.806.0 で実測",
+  "start": {
+    "status": 202,
+    "body": {
+      "crawlId": "7269f0fb-486c-4c87-8ba2-37e01f772c17"
+    }
+  },
+  "crawl": {
+    "crawlId": "7269f0fb-486c-4c87-8ba2-37e01f772c17",
+    "seeds": ["https://example.com/"],
+    "scope": "same-origin",
+    "state": "succeeded",
+    "stopReason": "max_depth",
+    "maxDepth": 0,
+    "maxPages": 30,
+    "perHostDelayMs": 2000,
+    "hostParallelism": 4,
+    "startedAt": "2026-09-19T14:17:50.399Z",
+    "finishedAt": "2026-09-19T14:18:04.657Z",
+    "pagesDiscovered": 0,
+    "pagesCaptured": 1,
+    "error": null,
+    "lastJob": {
+      "id": "01a0ba07-d48d-0ecb-9edb-6f3a6b6ca5f2",
+      "depth": 0
+    },
+    "failures": []
+  },
+  "run": {
+    "type": "CompletedJob",
+    "success": true,
+    "result": {
+      "pages": 0,
+      "indexed": 0,
+      "skipped": true
+    },
+    "flow_status": {
+      "modules": [
+        {
+          "id": "plan",
+          "type": "Success",
+          "job": "01a0ba07-d4ef-5e8a-4b7a-82c982639998"
+        },
+        {
+          "id": "hosts",
+          "type": "Success",
+          "job": "01a0ba07-e0dc-f240-f72f-5beca0c54f42"
+        },
+        {
+          "id": "report",
+          "type": "Success",
+          "job": "01a0ba08-09e6-4373-d08a-737cbda42b34"
+        },
+        {
+          "id": "index",
+          "type": "Success",
+          "job": "01a0ba08-0c1e-3f73-e640-78589afe96f2"
+        }
+      ],
+      "failure_module": {
+        "type": "WaitingForPriorSteps",
+        "job": null
+      }
+    }
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "case": "F5: API を CAPTURE_LEDGER_API_HOST=127.0.0.1 で起こした",
+  "recorded": "2026-09-19 capture-ledger develop 9fe6a03 (v0.43.0 の手前) と Windmill CE v1.806.0 で実測",
+  "start": {
+    "status": 202,
+    "body": {
+      "crawlId": "2b6581c0-2e44-4393-ba86-a70aa1346cf3"
+    }
+  },
+  "crawl": {
+    "crawlId": "2b6581c0-2e44-4393-ba86-a70aa1346cf3",
+    "seeds": ["https://example.com/"],
+    "scope": "same-origin",
+    "state": "running",
+    "stopReason": null,
+    "maxDepth": 0,
+    "maxPages": 30,
+    "perHostDelayMs": 2000,
+    "hostParallelism": 4,
+    "startedAt": "2026-09-19T14:25:53.376Z",
+    "finishedAt": null,
+    "pagesDiscovered": 0,
+    "pagesCaptured": 0,
+    "error": null,
+    "lastJob": {
+      "id": "01a0ba0f-32f4-30e4-ce30-d650bf467822",
+      "depth": 0
+    },
+    "failures": []
+  },
+  "run": {
+    "type": "CompletedJob",
+    "success": false,
+    "result": {
+      "closed": false,
+      "problem": "Unable to connect. Is the computer able to access the url?"
+    },
+    "flow_status": {
+      "modules": [
+        {
+          "id": "plan",
+          "type": "Success",
+          "job": "01a0ba0f-3304-da08-f7c7-80a7d2085758"
+        },
+        {
+          "id": "hosts",
+          "type": "Success",
+          "job": "01a0ba0f-33db-d68f-2840-2e0edb86b32f"
+        },
+        {
+          "id": "report",
+          "type": "Failure",
+          "job": "01a0ba0f-496b-5e7d-87a0-af2c9586163c"
+        },
+        {
+          "id": "index",
+          "type": "WaitingForPriorSteps",
+          "job": null
+        }
+      ],
+      "failure_module": {
+        "type": "Success",
+        "job": "01a0ba0f-49d6-99af-5f95-33b176f5b468"
+      }
+    }
+  },
+  "failedStep": {
+    "type": "CompletedJob",
+    "success": false,
+    "script_path": "f/waggle/report_level",
+    "result": {
+      "error": {
+        "name": "TypeError",
+        "message": "Unable to connect. Is the computer able to access the url?",
+        "step_id": "report"
+      }
+    }
+  }
+}

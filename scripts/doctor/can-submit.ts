@@ -1,5 +1,5 @@
 /**
- * capture-ledger の `GET /api/me` の答えを、`check:connection` の 1 行に読む。
+ * capture-ledger の `GET /api/me` の答えを、doctor の can_submit の 1 行に読む。
  *
  * 訊くのは **flow が使うのと同じトークン** (Windmill の変数 `u/admin/waggle_token`)。
  * capture-ledger は、そのトークンから解いた名前と組織をそのまま返すので、足りない許可を
@@ -15,10 +15,9 @@
  *   404 Route GET:/api/me   capture-ledger が古い (`GET /api/me` は v0.42.0 から)
  *   届かない・それ以外       そのまま出す
  *
- * 別の module にしてあるのは、`check-stack.ts` が import した時点で点検を走らせるから ——
- * 読み分けだけを単体で試せるように、ここは入出力を持たない。
+ * 入出力を持たない。訊くのは `checks.ts`。
  */
-export type Verdict = { ok: true } | { ok: false; need: string };
+import type { Verdict } from "./run.js";
 
 /** Fastify が route の無いときに返す本文。capture-ledger の 404 (`{"error":"not found"}`) と分ける。 */
 const ROUTE_MISSING = /Route GET:\/api\/me not found/;

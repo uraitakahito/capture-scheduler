@@ -1,0 +1,12 @@
+{
+  "case": "F7: 走行中のクロール (F4) を残したまま、もう 1 本",
+  "recorded": "2026-09-19 capture-ledger develop 9fe6a03 (v0.43.0 の手前) と Windmill CE v1.806.0 で実測",
+  "start": {
+    "status": 409,
+    "body": {
+      "error": "a crawl is already in progress",
+      "crawlId": "0309613d-86c2-4bf3-980c-cc8293f86aa5",
+      "startedAt": "2026-09-19T14:23:33.922Z"
+    }
+  }
+}

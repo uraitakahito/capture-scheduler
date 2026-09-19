@@ -1,0 +1,79 @@
+{
+  "case": "F4: issuer だけ起こし直し、Windmill の waggle_token を古いままにした",
+  "recorded": "2026-09-19 capture-ledger develop 9fe6a03 (v0.43.0 の手前) と Windmill CE v1.806.0 で実測",
+  "start": {
+    "status": 202,
+    "body": {
+      "crawlId": "0309613d-86c2-4bf3-980c-cc8293f86aa5"
+    }
+  },
+  "crawl": {
+    "crawlId": "0309613d-86c2-4bf3-980c-cc8293f86aa5",
+    "seeds": ["https://example.com/"],
+    "scope": "same-origin",
+    "state": "running",
+    "stopReason": null,
+    "maxDepth": 0,
+    "maxPages": 30,
+    "perHostDelayMs": 2000,
+    "hostParallelism": 4,
+    "startedAt": "2026-09-19T14:23:33.922Z",
+    "finishedAt": null,
+    "pagesDiscovered": 0,
+    "pagesCaptured": 0,
+    "error": null,
+    "lastJob": {
+      "id": "01a0ba0d-122e-2899-811b-80e7269559e0",
+      "depth": 0
+    },
+    "failures": []
+  },
+  "run": {
+    "type": "CompletedJob",
+    "success": false,
+    "result": {
+      "closed": false,
+      "problem": "POST /api/crawls/0309613d-86c2-4bf3-980c-cc8293f86aa5/failed → 401 {\"error\":\"unauthenticated\"}"
+    },
+    "flow_status": {
+      "modules": [
+        {
+          "id": "plan",
+          "type": "Success",
+          "job": "01a0ba0d-1251-1014-0069-5e4551f43b23"
+        },
+        {
+          "id": "hosts",
+          "type": "Success",
+          "job": "01a0ba0d-1335-6d12-da4b-70df2d6a9f88"
+        },
+        {
+          "id": "report",
+          "type": "Failure",
+          "job": "01a0ba0d-28e0-030a-de70-19d3a0ca4a6d"
+        },
+        {
+          "id": "index",
+          "type": "WaitingForPriorSteps",
+          "job": null
+        }
+      ],
+      "failure_module": {
+        "type": "Success",
+        "job": "01a0ba0d-2938-3c52-22ba-9eeeefdb12e3"
+      }
+    }
+  },
+  "failedStep": {
+    "type": "CompletedJob",
+    "success": false,
+    "script_path": "f/waggle/report_level",
+    "result": {
+      "error": {
+        "name": "Error",
+        "message": "POST /api/crawls/0309613d-86c2-4bf3-980c-cc8293f86aa5/pages → 401 {\"error\":\"unauthenticated\"} —— トークンが古いかもしれません (issuer を再起動しましたか)",
+        "step_id": "report"
+      }
+    }
+  }
+}

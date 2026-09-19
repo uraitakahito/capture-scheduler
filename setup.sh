@@ -51,7 +51,7 @@ else
 fi
 
 # 次の手順は docs にだけ置く。以前はここに写しを持っていて、docs を直したときに直し漏らし、
-# 古い手順 (webhook の 2 行も push-proto も check:connection も無い) を印字していた。
+# 古い手順 (webhook の 2 行も push-proto も、つながりの点検も無い) を印字していた。
 cat <<'MSG'
 
 次は docs のクイックスタートどおりに進めてください:

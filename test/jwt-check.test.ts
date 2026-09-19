@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { readJwt } from "../scripts/jwt-check.js";
+import { readJwt } from "../scripts/doctor/jwt-check.js";
 
 const ISS = "http://127.0.0.1:9099";
 const need = (verdict: ReturnType<typeof readJwt>): string => (verdict.ok ? "" : verdict.need);

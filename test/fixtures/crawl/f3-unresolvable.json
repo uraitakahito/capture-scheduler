@@ -1,0 +1,74 @@
+{
+  "case": "F3: 名前の引けない URL (http://nonexistent.invalid/)",
+  "recorded": "2026-09-19 capture-ledger develop 9fe6a03 (v0.43.0 の手前) と Windmill CE v1.806.0 で実測",
+  "start": {
+    "status": 202,
+    "body": {
+      "crawlId": "bba6b700-b226-45a3-bb81-5ef1172c380d"
+    }
+  },
+  "crawl": {
+    "crawlId": "bba6b700-b226-45a3-bb81-5ef1172c380d",
+    "seeds": ["http://nonexistent.invalid/"],
+    "scope": "same-origin",
+    "state": "succeeded",
+    "stopReason": "max_depth",
+    "maxDepth": 0,
+    "maxPages": 30,
+    "perHostDelayMs": 2000,
+    "hostParallelism": 4,
+    "startedAt": "2026-09-19T14:23:18.512Z",
+    "finishedAt": "2026-09-19T14:23:21.666Z",
+    "pagesDiscovered": 0,
+    "pagesCaptured": 0,
+    "error": null,
+    "lastJob": {
+      "id": "01a0ba0c-d609-5280-0008-08a22dc56fd6",
+      "depth": 0
+    },
+    "failures": [
+      {
+        "url": "http://nonexistent.invalid/",
+        "depth": 0,
+        "reason": "CAPTURE_STATUS_FAILED: net::ERR_NAME_NOT_RESOLVED at http://nonexistent.invalid/"
+      }
+    ]
+  },
+  "run": {
+    "type": "CompletedJob",
+    "success": true,
+    "result": {
+      "pages": 0,
+      "indexed": 0,
+      "skipped": true
+    },
+    "flow_status": {
+      "modules": [
+        {
+          "id": "plan",
+          "type": "Success",
+          "job": "01a0ba0c-d636-1649-5409-a006ea078a01"
+        },
+        {
+          "id": "hosts",
+          "type": "Success",
+          "job": "01a0ba0c-d682-92b5-765a-8f42914b3954"
+        },
+        {
+          "id": "report",
+          "type": "Success",
+          "job": "01a0ba0c-e1d6-7aeb-eaf5-350935f21a3e"
+        },
+        {
+          "id": "index",
+          "type": "Success",
+          "job": "01a0ba0c-e265-f588-f6a2-ad2808812bf9"
+        }
+      ],
+      "failure_module": {
+        "type": "WaitingForPriorSteps",
+        "job": null
+      }
+    }
+  }
+}

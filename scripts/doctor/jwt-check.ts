@@ -1,5 +1,5 @@
 /**
- * `check:connection` の jwt の答えを読む。
+ * doctor の jwt の答えを読む。
  *
  * 点検は、issuer から新しいトークンを取り、capture-ledger の `GET /api/archives` を Bearer で
  * 読む。**200 になるのは JWT を受ける API だけ**。拒まれたら、同じ API にヘッダで
@@ -13,10 +13,9 @@
  * 以前は、どの場面でも「OIDC_ISSUER を書いて」と言っていた。dev issuer の kid が固定だった
  * 頃の「issuer を起こし直した後の 401」(API が古い鍵を覚えていた) まで、それで取り違えた。
  *
- * 入出力を持たない (`can-submit.ts` と同じ理由: `check-stack.ts` は import した時点で点検を
- * 走らせるので、読み分けだけを単体で試せるようにしてある)。
+ * 入出力を持たない。訊くのは `checks.ts`。
  */
-import type { Verdict } from "./can-submit.js";
+import type { Verdict } from "./run.js";
 
 export interface JwtProbe {
   /**
