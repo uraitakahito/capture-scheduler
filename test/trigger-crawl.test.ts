@@ -95,6 +95,25 @@ describe("失敗したときの言い分", () => {
     await expect(main("http://capture-ledger:7070", "tok")).rejects.toThrow(/fga:grant submitter/);
   });
 
+  it("route が無い 404 には webhook の 2 行を示し、付与は疑わせない", async () => {
+    // capture-ledger が webhook の 2 行無しで起動していると、route ごと無い。本文は Fastify のもの。
+    responding(404, {
+      message: "Route POST:/api/crawls not found",
+      error: "Not Found",
+      statusCode: 404,
+    });
+    const err = (await main("http://capture-ledger:7070", "tok").catch((e: unknown) => e)) as Error;
+    expect(err.message).toMatch(/CAPTURE_LEDGER_CRAWL_WEBHOOK_URL/);
+    expect(err.message).not.toMatch(/fga:grant/);
+  });
+
+  it("付与の 404 には webhook を疑わせない", async () => {
+    // 同じ 404 でも、本文が capture-ledger のものなら route は在る。
+    responding(404, { error: "not found" });
+    const err = (await main("http://capture-ledger:7070", "tok").catch((e: unknown) => e)) as Error;
+    expect(err.message).not.toMatch(/WEBHOOK/);
+  });
+
   it("本文を必ず読む", async () => {
     // status だけだと capture-ledger が返している理由が消える。
     responding(500, { error: "internal error" });
