@@ -10,7 +10,7 @@ pnpm run check       # audit / format / env / typecheck / 単体 / CI との一�
 ```
 
 `pretest:e2e` が先に doctor を `--e2e` 付きで走らせ、足りないものを名指しする ——
-[クイックスタートの「確かめる」](/quickstart/#確かめる--1-本撮れるまで)の 13 本に、capture-fixtures と、
+[クイックスタートの「確かめる」](/quickstart/#確かめる--1-本撮れるまで)の 14 本に、capture-fixtures と、
 試験が名乗る `e2e` のクロールの許可（`fga:grant submitter e2e acme`）を足した 15 本。立っているかだけで
 なく、クロールが最後まで走る設定かも見る —— どれかが外れていると、クロールは段の報告のところで
 初めて落ち、`running` のまま残る。vitest の外に置いてあるのは意図的 —— global setup が throw すると
