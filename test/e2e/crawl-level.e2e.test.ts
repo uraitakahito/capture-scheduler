@@ -35,8 +35,19 @@ import { describe, it, expect, beforeAll } from "vitest";
 
 const WAGGLE = process.env["E2E_WAGGLE_URL"] ?? "http://127.0.0.1:7070";
 const ISSUER = process.env["E2E_ISSUER_URL"] ?? "http://127.0.0.1:9099";
-/** capture-ledger のスタックの capture-fixtures。コンテナからも host からも同じ名前で引ける。 */
+/**
+ * capture-ledger のスタックの capture-fixtures。**宛先が 2 つ要る。**
+ *
+ * `FIXTURES` は**取り込む側**が引く名前 —— 種の URL に載り、BrowserHive のコンテナが
+ * これを解決する。`FIXTURES_HOST` は**この試験自身**が叩く口で、loopback。
+ *
+ * 分けるのは macOS 26 の制限のため: Apple 署名でないバイナリ (node) はコンテナの
+ * subnet へ TCP を張れず、DNS 名は引けるのに `EHOSTUNREACH` になる
+ * (実測 2026-09-20: 同じ URL に curl は 200、node は EHOSTUNREACH)。
+ * **1 つの変数では両方を満たせない** —— コンテナの中から 127.0.0.1 は自分自身を指す。
+ */
 const FIXTURES = process.env["E2E_FIXTURES_URL"] ?? "http://capture-fixtures.capture-ledger:8080";
+const FIXTURES_HOST = process.env["E2E_FIXTURES_HOST_URL"] ?? "http://127.0.0.1:18085";
 
 /** 取り込みを起こせる主体。capture-ledger 側でクロールの許可 (`fga:grant submitter`) が要る。 */
 const SUBJECT = process.env["E2E_SUBJECT"] ?? "e2e";
@@ -62,7 +73,7 @@ beforeAll(async () => {
 describe("クロールが flow を通って索引まで終わる", () => {
   it("robots が禁じたページに触れず、取り込み、検索に出る", async () => {
     // capture-fixtures のリクエストログを白紙に戻す。ここから先に届いたものだけを見る。
-    await fetch(`${FIXTURES}/__reset`, { method: "POST" });
+    await fetch(`${FIXTURES_HOST}/__reset`, { method: "POST" });
 
     const started = await fetch(`${WAGGLE}/api/crawls`, {
       method: "POST",
@@ -118,7 +129,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
     //
     // これを守っているのは `plan_level.ts` の `?? true` **1 か所だけ**。
     // schema の `default: true` は webhook 実行では埋まらないので効いていない。
-    const counts = (await json(await fetch(`${FIXTURES}/__request-counts`))) as Record<
+    const counts = (await json(await fetch(`${FIXTURES_HOST}/__request-counts`))) as Record<
       string,
       number
     >;
@@ -166,5 +177,74 @@ describe("クロールが flow を通って索引まで終わる", () => {
         );
       }
     }
+  });
+
+  /**
+   * **台帳に入れたスクリプトが、ページの中で走ったか。**
+   *
+   * ここまでの検査は「撮れたか」「記録できたか」しか見ていない。目録が空でも、flow が
+   * `scripts` を落としても、取り込みは成功しアーカイブも出る —— `complete: true` のまま。
+   * その差を外から見分ける手が要る。
+   *
+   * capture-fixtures の `/responsive-images` がそのための面で、fixture 自身がこう書いている:
+   * 「1280px・DPR 1 の取り込みは要素ごとに 1 候補しか要求しないので、`autofetch` が
+   * 無ければ control の `hero.svg` しか届かない」。
+   *
+   * つまり **`hero-2x.svg` が相手に届いたこと**が、「目録 → flow → BrowserHive → ページ」の
+   * 鎖が全部通った証拠になる。判定を相手のリクエストログで採るのは ① と同じ理由 ——
+   * 台帳は「記録したこと」しか言わない。
+   */
+  it("台帳に入れたスクリプトが、ページの中で走る", async () => {
+    await fetch(`${FIXTURES_HOST}/__reset`, { method: "POST" });
+
+    const started = await fetch(`${WAGGLE}/api/crawls`, {
+      method: "POST",
+      headers: { ...auth(), "content-type": "application/json" },
+      // 種は 1 枚、辿らない。届いた要求はこの 1 枚のぶんだけになる。
+      body: JSON.stringify({ seeds: [`${FIXTURES}/responsive-images`], maxDepth: 0 }),
+    });
+    const startedBody = await started.text();
+    expect(
+      started.status,
+      startedBody +
+        (started.status === 400
+          ? " —— 目録は埋まっていますか (capture-ledger: pnpm run scripts import .upstream/capture-scripts)"
+          : started.status === 409
+            ? " —— 走行中のクロールが残っています。**この試験が途中で落ちると必ずこうなる**"
+            : ""),
+    ).toBe(202);
+    const crawlId = String((JSON.parse(startedBody) as Record<string, unknown>)["crawlId"]);
+
+    let state = "running";
+    for (let i = 0; i < 100 && state === "running"; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      const got = await json(await fetch(`${WAGGLE}/api/crawls/${crawlId}`, { headers: auth() }));
+      state = String(got["state"]);
+      if (state !== "running") {
+        expect(state, `stopReason=${String(got["stopReason"])}`).toBe("succeeded");
+        // 台帳が何を固定したか。**走ったことと、記録したことは別の主張**なので両方見る。
+        expect(
+          (got["scripts"] as { id: string }[]).map((script) => script.id),
+          "目録が autofetch を配っていない",
+        ).toContain("autofetch");
+      }
+    }
+    expect(state, "クロールが終わらなかった").not.toBe("running");
+
+    const counts = (await json(await fetch(`${FIXTURES_HOST}/__request-counts`))) as Record<
+      string,
+      number
+    >;
+
+    // control —— ブラウザが自分で要求する 1 枚。0 なら取り込み自体が届いていないので、
+    // 下の判定は空振りになる。**先にここで落とす。**
+    expect(counts["/assets/hero.svg"], "取り込みが届いていない").toBeGreaterThan(0);
+
+    // **ここが本題。** 1280px・DPR 1 のブラウザは -2x を要求しない。届いているなら、
+    // 目録の autofetch がページの中で走った。
+    expect(
+      counts["/assets/hero-2x.svg"],
+      "autofetch が走っていない —— 目録・flow の scripts・BrowserHive の受け皿のどれかで切れている",
+    ).toBeGreaterThan(0);
   });
 });
