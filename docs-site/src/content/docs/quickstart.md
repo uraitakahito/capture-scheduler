@@ -130,7 +130,7 @@ command to type, with the names capture-ledger actually saw.
 
 ```sh
 cd ~/projects/crawler/capture-scheduler
-pnpm run doctor   # 13 checks; all ✓ means a crawl is set up to run to the end
+pnpm run doctor   # 14 checks; all ✓ means a crawl is set up to run to the end
 pnpm run smoke    # captures https://example.com/ once; "撮れた" (captured) once the WACZ comes back
 ```
 
@@ -162,7 +162,7 @@ waits for the level report — then fetches the archive the ledger recorded thro
 and checks that it starts with `PK` (a WACZ is a zip):
 
 ```
-点検     doctor の 13 本とも ✓
+点検     doctor の 14 本とも ✓
 起こす   POST /api/crawls → 202  crawl 545e912c-…  https://example.com/
 待つ     running
 run      http://127.0.0.1:8000/run/01a0ba19-…?workspace=crawler

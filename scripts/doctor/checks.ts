@@ -1,5 +1,5 @@
 /**
- * doctor の点検 13 本 (e2e のときは 15 本)。**クイックスタートの手の順に並べてある。**
+ * doctor の点検 14 本 (e2e のときは 16 本)。**クイックスタートの手の順に並べてある。**
  *
  * 1 本ずつ「クイックスタートのどの手が済んでいるか」を、その手が作るものに訊く。立っているか
  * だけでなく、**クロールが最後まで走る設定か**まで見る —— 外れていても、API に POST すれば
@@ -33,6 +33,7 @@ import { readJwt } from "./jwt-check.js";
 import { runChecks, type Check, type Outcome, type Result, type Verdict } from "./run.js";
 import { SECTIONS } from "./sections.js";
 import {
+  readCatalog,
   readProto,
   readPush,
   readVariables,
@@ -295,6 +296,18 @@ const acceptsJwt = async (): Promise<Verdict> => {
  * **flow が実際に使うトークンで訊く**のが要点 —— 許可が無いことも、トークンが古いことも、
  * 名前が docs とずれていることも、flow が 404 や 401 を踏む前にここで分かる。
  */
+/**
+ * 目録に 1 本でも入っているか。**flow のトークンで訊く** —— 見えるかどうかは許可の
+ * 問題でもあるので、can_submit と同じ資格で確かめる。
+ */
+const catalogFilled = async (): Promise<Verdict> => {
+  const token = await variable("u/admin/waggle_token");
+  if (token === undefined || token === "") return unreadable("u/admin/waggle_token");
+  return readCatalog(
+    await answerOf(`${API}/api/scripts`, { headers: { authorization: `Bearer ${token}` } }),
+  );
+};
+
 const flowCanSubmit = async (): Promise<Verdict> => {
   const token = await variable("u/admin/waggle_token");
   if (token === undefined || token === "") return unreadable("u/admin/waggle_token");
@@ -529,6 +542,14 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
     // 取り直すまで通る)。
     needs: ["jwt", "変数", "openfga"],
     probe: flowCanSubmit,
+  },
+  {
+    name: "目録",
+    section: SECTIONS.grant,
+    where: `flow のトークンで GET ${API}/api/scripts (走らせるものが在るか)`,
+    // can_submit の後。許可が無ければ 404 しか返らないので、先に訊いても何も分からない。
+    needs: ["can_submit"],
+    probe: catalogFilled,
   },
   {
     name: "capture-fixtures",

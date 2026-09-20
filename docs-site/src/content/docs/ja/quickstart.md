@@ -128,7 +128,7 @@ pnpm run fga:grant submitter windmill acme
 
 ```sh
 cd ~/projects/crawler/capture-scheduler
-pnpm run doctor   # 13 本の点検。全部 ✓ なら、クロールが最後まで走る設定になっている
+pnpm run doctor   # 14 本の点検。全部 ✓ なら、クロールが最後まで走る設定になっている
 pnpm run smoke    # https://example.com/ を 1 本撮り、WACZ を取り出せたら「撮れた」
 ```
 
@@ -159,7 +159,7 @@ pnpm run smoke    # https://example.com/ を 1 本撮り、WACZ を取り出せ�
 見る:
 
 ```
-点検     doctor の 13 本とも ✓
+点検     doctor の 14 本とも ✓
 起こす   POST /api/crawls → 202  crawl 545e912c-…  https://example.com/
 待つ     running
 run      http://127.0.0.1:8000/run/01a0ba19-…?workspace=crawler
