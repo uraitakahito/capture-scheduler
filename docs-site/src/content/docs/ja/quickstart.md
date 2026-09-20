@@ -64,12 +64,21 @@ CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099
 bootstrap は打つたびに新しい token を作ります（前に作ったものも、使えるまま残ります）。打ち直さずに
 済ませるなら、`<bootstrap が出した値>` にはこの repo の `.env` の `WINDMILL_TOKEN` と同じ値を入れます。
 
-貼ったら、capture-ledger 側で issuer を起こし、API を起こし直します:
+貼ったら、capture-ledger 側で issuer を起こし、**API を起こし直します**。
+
+**capture-ledger のクイックスタート §6 で起こした API を、`Ctrl-C` で止めてから**
+同じコマンドをもう一度打ちます —— 新しく 2 本目を立てるのではありません。
+API が設定を読むのは**起動のときの 1 度だけ**なので、走ったままのプロセスは
+上の 4 行を知りません。並べて立てようとしても、2 本目は
+`EADDRINUSE: address already in use 0.0.0.0:7070` で落ちます。
+
+`oidc:issuer` は **API より先に**起こします。API は起動時に issuer の鍵を取りに行くので、
+居ないと JWT の設定で立ち上がれません。
 
 ```sh
 cd ~/projects/crawler/capture-ledger
 pnpm run oidc:issuer   # 動かし続ける
-pnpm run api           # 別のターミナルで。動いていたら起こし直す（設定は起動のときに 1 回だけ読む）
+pnpm run api           # §6 で起こしたものを止めてから、同じ口でもう一度
 ```
 
 4 行が効いたかは、API の起動ログの**最後の行**が言います:

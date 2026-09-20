@@ -64,12 +64,21 @@ bootstrap creates a new token every time you run it (the earlier ones stay valid
 again, put the same value as `WINDMILL_TOKEN` in this repo's `.env` where it says
 `<the value bootstrap printed>`.
 
-Then start the issuer on the capture-ledger side and restart the API:
+Then start the issuer on the capture-ledger side and **restart the API**.
+
+**Stop the API you started in §6 of capture-ledger's quickstart (`Ctrl-C`)** and run the same
+command again — this is not a second instance. The API reads its settings **once, at
+startup**, so a process left running never sees the four lines above. Trying to run both
+fails anyway: the second one exits with
+`EADDRINUSE: address already in use 0.0.0.0:7070`.
+
+Start `oidc:issuer` **before** the API: the API fetches the issuer's keys at startup and
+cannot come up in JWT mode without it.
 
 ```sh
 cd ~/projects/crawler/capture-ledger
 pnpm run oidc:issuer   # keep it running
-pnpm run api           # in another terminal; restart it if running (settings are read once, at startup)
+pnpm run api           # stop the one from §6 first, then use the same command
 ```
 
 The **last line** of the API's startup log says whether the four lines took:
