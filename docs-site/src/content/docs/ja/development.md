@@ -48,10 +48,31 @@ pnpm run docs:shots
 | `windmill/f/waggle/crawl_level.flow/flow.yaml` | クロール 1 段を回す flow                                                         |
 | `windmill/f/waggle/daily.schedule.yaml`        | 日次のクロールが起きる時刻                                                       |
 | `test/`                                        | 単体試験。**`windmill/f/` の下には置かないこと** —— `sync push` が配備してしまう |
-| `scripts/*.mjs`                                | host 側の道具（bootstrap、トークン、点検）                                       |
+| `scripts/*.ts`                                 | host 側の道具（bootstrap、トークン、点検）                                       |
+| `.env.local`                                   | **道具が書く**（`WINDMILL_TOKEN`）。git は無視する                               |
+| `.dev/capture-ledger.env`                      | capture-ledger に渡す 4 行。**読むのは向こうの `pnpm run connect`**              |
 
 環境変数を足すのは 3 点契約で、`scripts/check-env.ts` が両方向に検査する:
 `.env.example`、`scripts/env.ts` の名前の一覧、そしてリテラル文字列での読み取り。
+
+### 設定のファイルは 2 枚ある
+
+実行系の script は `.env` と `.env.local` を**この順で** node に渡す
+（`--env-file-if-exists` を 2 つ）。**後に渡したほうが勝つ**ので、同じ名前が両方に
+在れば `.env.local` の値が効く。
+
+分けてあるのは持ち主が違うから。`.env` は人が書く値、`.env.local` は
+**走らせてみないと決まらない値**（Windmill の token）。道具が人の書いた行を
+並べ替えたり消したりすると、次に何が起きたのか追えなくなる。
+
+**書くのは自分の repo だけ、跨ぐときは読むだけ。** `windmill:bootstrap` は
+capture-scheduler で打つコマンドなので、capture-ledger には書きに行かない ——
+渡したい 4 行は `.dev/capture-ledger.env` に置き、取りに行くのは向こうの
+`pnpm run connect`。打った repo の外が変わるのは、打った人の予想に反する。
+
+古い `.env.local` を疑うときは、**両方を作り直す**のがいちばん速い:
+`pnpm run windmill:bootstrap` を打ち直し、capture-ledger で `pnpm run connect`。
+どちらも何度打ってもよい（token は増えるが、古いものも使えるまま残る）。
 
 ## 範囲外
 
