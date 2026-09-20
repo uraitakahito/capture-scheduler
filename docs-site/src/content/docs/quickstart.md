@@ -11,6 +11,7 @@ its BrowserHive to take the pages.
 Before you start, finish §1–§5 of capture-ledger's
 [Quickstart](https://uraitakahito.github.io/capture-ledger/quickstart/) (the DNS domain, the
 submodules and `.env`, `stack:up`, the database, the two OpenFGA ids) and check that the stack is up.
+Its `pnpm run dev:up` does §3 onwards in one go, so §1 and §2 are the only ones you have to type.
 
 **Do not skip the catalog in §4.** BrowserHive holds no roster of its own, so an empty `scripts`
 table means a crawl runs nothing inside the page — no scrolling, no lazy loading — and still
@@ -27,6 +28,21 @@ with "OpenFGA (http://localhost:8090) に届きません" (OpenFGA is not reacha
 Every code block below starts with a `cd` that says which repo it runs in (this assumes both repos
 are cloned side by side under `~/projects/crawler/`; adjust if yours live elsewhere). Run a
 capture-scheduler command inside capture-ledger and pnpm only says `Missing script`.
+
+:::tip[All of it at once: one command in capture-ledger]
+`pnpm run dev:up` over in capture-ledger runs 14 steps in order — **including the ones on this
+page**: it brings Windmill up, bootstraps it, loads the flow and the proto, hands over the keys,
+and finishes with `doctor`. What it runs there are **this repo's own commands**, and **no file
+of this repo's is written from over there** (the four lines for capture-ledger are fetched by
+its own `pnpm run connect`).
+
+```sh
+cd ~/projects/crawler/capture-ledger && pnpm run dev:up
+```
+
+This page is the capture-scheduler half of those 14 steps, done one at a time. Both roads end
+in the same place.
+:::
 
 ## Bring it up
 
@@ -82,7 +98,10 @@ Once `connect` has run, start the issuer on the capture-ledger side and **restar
 command again — this is not a second instance. The API reads its settings **once, at
 startup**, so a process left running never sees the four lines above. Trying to run both
 fails anyway: the second one exits with
-`EADDRINUSE: address already in use 0.0.0.0:7070`.
+`EADDRINUSE: address already in use 0.0.0.0:7070`. **When you cannot tell what is still
+running**, capture-ledger's `pnpm run dev:status` prints the pid and start time and
+`pnpm run dev:down` stops it — neither the issuer nor the API is a container, so
+`container-compose down` leaves them alone.
 
 Start `oidc:issuer` **before** the API: the API fetches the issuer's keys at startup and
 cannot come up in JWT mode without it.

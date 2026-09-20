@@ -11,7 +11,8 @@ Windmill は capture-ledger のスタックの 2 つを使う。OpenFGA には�
 クロールがページを撮りに呼ぶ。始める前に、capture-ledger の
 [クイックスタート](https://uraitakahito.github.io/capture-ledger/ja/quickstart/)の §1〜§5
 （DNS ドメイン、submodule と `.env`、`stack:up`、データベース、OpenFGA の 2 つの ID）を済ませ、
-スタックが動いていることを確かめる。
+スタックが動いていることを確かめる。向こうの `pnpm run dev:up` は §3 以降をまとめて
+やるので、手で打つのは §1 と §2 だけでもよい。
 
 **§4 の目録を忘れないこと。** BrowserHive は走らせるものの顔ぶれを持たないので、
 `scripts` 表が空だと、クロールはページの中で何も走らせない —— スクロールも遅延読み込みも
@@ -28,6 +29,21 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'authorization: Bearer dev-key' http
 以下のコードブロックは、どれも 1 行目の `cd` で「どの repo で打つか」を示す（2 つの repo は
 `~/projects/crawler/` に並べて clone してある前提。別の場所なら読み替える）。capture-scheduler の
 コマンドを capture-ledger で打つと、pnpm は `Missing script` としか言わない。
+
+:::tip[まとめてなら、capture-ledger の 1 本で済みます]
+capture-ledger で `pnpm run dev:up` を打つと、**このページの手順も含めて** 14 段を順に
+起こします —— Windmill を立て、bootstrap し、flow と proto を入れ、鍵を渡し、最後に
+`doctor` まで。向こうが打つのは**この repo のコマンド**で、**ファイルはこの repo の中に
+しか書かれません**（capture-ledger に渡す 4 行は、向こうの `pnpm run connect` が
+取りに来ます）。
+
+```sh
+cd ~/projects/crawler/capture-ledger && pnpm run dev:up
+```
+
+このページは、その 14 段のうち capture-scheduler 側を 1 つずつ手でやる道です。
+どちらでも同じところに着きます。
+:::
 
 ## 立ち上げる
 
@@ -83,7 +99,10 @@ bootstrap は打つたびに新しい token を作ります（前に作ったも
 同じコマンドをもう一度打ちます —— 新しく 2 本目を立てるのではありません。
 API が設定を読むのは**起動のときの 1 度だけ**なので、走ったままのプロセスは
 上の 4 行を知りません。並べて立てようとしても、2 本目は
-`EADDRINUSE: address already in use 0.0.0.0:7070` で落ちます。
+`EADDRINUSE: address already in use 0.0.0.0:7070` で落ちます。**どこに残っているか
+分からなくなったら**、capture-ledger の `pnpm run dev:status` が pid と起動時刻を出し、
+`pnpm run dev:down` が止めます（issuer も API もコンテナではないので、
+`container-compose down` では消えません）。
 
 `oidc:issuer` は **API より先に**起こします。API は起動時に issuer の鍵を取りに行くので、
 居ないと JWT の設定で立ち上がれません。
