@@ -52,8 +52,8 @@ cost a round trip.
 One test, about 40 seconds. It goes through capture-ledger's API — **not** Windmill's
 run endpoint — because the point is to carry the arguments capture-ledger actually sends:
 `crawl_id`, `depth`, `frontier`, `per_host_delay_ms`, `host_parallelism`,
-`capture_formats`, `signing`, and `artifact_sink` where capture-ledger serves the
-sink. **`respect_robots` is not among them.**
+`capture_formats`, `signing`, `scripts`, and `artifact_sink` where capture-ledger serves
+the sink. **`respect_robots` is not among them.**
 
 It asserts four things:
 

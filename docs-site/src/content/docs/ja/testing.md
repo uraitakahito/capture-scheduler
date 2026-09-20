@@ -48,8 +48,8 @@ vitest は必ず「No test files found, exiting with code 1」を先に出し、
 
 1 件、約 40 秒。Windmill の実行の口ではなく **capture-ledger の API** を通す —— 目的が
 「capture-ledger が実際に送る引数」を運ぶことだから: `crawl_id` / `depth` / `frontier` /
-`per_host_delay_ms` / `host_parallelism` / `capture_formats` / `signing` と、受け口を出している
-配備では `artifact_sink` で、**`respect_robots` は入っていない**。
+`per_host_delay_ms` / `host_parallelism` / `capture_formats` / `signing` / `scripts` と、
+受け口を出している配備では `artifact_sink` で、**`respect_robots` は入っていない**。
 
 見ているのは 4 つ:
 

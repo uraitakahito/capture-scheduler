@@ -45,6 +45,26 @@ schema:
       type: boolean
       description: ""
       default: null
+    scripts:
+      type: array
+      description: ""
+      default: null
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+          version:
+            type: integer
+          phase:
+            type: string
+          source:
+            type: string
+          sha256:
+            type: string
+          options:
+            type: object
+      originalType: CrawlScript[]
     urls:
       type: array
       description: ""
@@ -59,3 +79,4 @@ schema:
     - per_host_delay_ms
     - capture_formats
     - signing
+    - scripts

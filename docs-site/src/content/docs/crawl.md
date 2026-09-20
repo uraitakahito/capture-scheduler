@@ -100,7 +100,16 @@ runs**, so a webhook run gets nothing — the BrowserHive target arrived
 `undefined` and the job died with "Channel target must be a string".
 
 What does arrive as arguments is what capture-ledger decides for that crawl and always
-sends: the URLs, the delay, and `capture_formats` / `signing`.
+sends: the URLs, the delay, `capture_formats` / `signing`, and **`scripts`** — the
+JavaScript to run inside each page.
+
+`scripts` is required for the same reason `capture_formats` is. BrowserHive v11.0.0
+holds no roster of its own: send nothing and nothing runs inside the page, and the
+capture still succeeds and still produces an archive. A forgotten argument would be a
+crawl that never scrolled, indistinguishable from one that did. This flow only carries
+them — what runs, in what order, and in which of BrowserHive's two injection points
+(`behavior` after load, `preload` before navigation) is decided by capture-ledger's
+catalog.
 
 ```sh
 pnpm run windmill:capture-ledger-token   # waggle_token / waggle_api_url /
