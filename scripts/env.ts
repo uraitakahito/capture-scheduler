@@ -26,8 +26,13 @@ export const OPTIONAL_ENV = [
   "CAPTURE_LEDGER_BROWSERHIVE_TLS_CA_PEM",
 ];
 
-/** 値を貼るまで空でいる変数。`guardEnv` の対象外。 */
-export const PASTED_ENV = ["WINDMILL_TOKEN"];
+/**
+ * **道具が `.env.local` に書く変数。人は書かない。** `guardEnv` の対象外。
+ *
+ * 以前は「貼るまで空でいる変数」だった。`windmill:bootstrap` が印字し、人が `.env` へ
+ * 書き写していた頃の名前 —— 書き写す作業は `env-local.ts` で無くなった。
+ */
+export const GENERATED_ENV = ["WINDMILL_TOKEN"];
 
 /**
  * 空で設定されている optional な変数があれば、起動時に落とす。

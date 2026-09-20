@@ -10,11 +10,11 @@
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { OPTIONAL_ENV, PASTED_ENV, repoRoot } from "./env.js";
+import { GENERATED_ENV, OPTIONAL_ENV, repoRoot } from "./env.js";
 
 const root = repoRoot();
 
-const declared = [...OPTIONAL_ENV, ...PASTED_ENV];
+const declared = [...OPTIONAL_ENV, ...GENERATED_ENV];
 
 /** `.env.example` が名前を挙げている変数。`NAME=` も `#NAME=` も拾う。 */
 const documented = (): Set<string> => {

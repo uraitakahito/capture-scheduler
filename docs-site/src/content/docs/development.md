@@ -50,11 +50,35 @@ When you drop `puppeteer`, drop its `//devDependencies` note in `package.json` t
 | `windmill/f/waggle/crawl_level.flow/flow.yaml` | the flow that runs one crawl level                                                  |
 | `windmill/f/waggle/daily.schedule.yaml`        | when the nightly crawl fires                                                        |
 | `test/`                                        | unit tests; **never put these under `windmill/f/`** — `sync push` would deploy them |
-| `scripts/*.mjs`                                | host-side helpers (bootstrap, tokens, checks)                                       |
+| `scripts/*.ts`                                 | host-side helpers (bootstrap, tokens, checks)                                       |
+| `.env.local`                                   | **written by the tools** (`WINDMILL_TOKEN`); git ignores it                         |
+| `.dev/capture-ledger.env`                      | the four lines for capture-ledger. **Its `pnpm run connect` reads them**            |
 
 Adding an environment variable is a three-part contract, checked in both
 directions by `scripts/check-env.ts`: `.env.example`, the name lists in
 `scripts/env.ts`, and a literal-string read.
+
+### There are two settings files
+
+Every runnable script hands node `.env` and then `.env.local` (two
+`--env-file-if-exists` flags). **The later one wins**, so a name present in both
+takes its value from `.env.local`.
+
+They are split because they have different owners. `.env` holds what a person
+decided; `.env.local` holds **what only running things can decide** (the Windmill
+token). When a tool reorders or drops a line a person wrote, nobody can tell
+afterwards what happened.
+
+**Write only inside your own repo; to cross, read.** `windmill:bootstrap` is a
+command you run in capture-scheduler, so it never writes into capture-ledger —
+the four lines go into `.dev/capture-ledger.env`, and fetching them is the other
+side's `pnpm run connect`. A repo changing because of a command typed somewhere
+else is not what the person typing it expects.
+
+When you suspect a stale `.env.local`, the fastest fix is to **regenerate both**:
+run `pnpm run windmill:bootstrap` again, then `pnpm run connect` in
+capture-ledger. Both are safe to repeat (tokens accumulate, and the old ones
+stay valid).
 
 ## Out of scope
 
