@@ -90,7 +90,14 @@ Windmill は schema の既定値を **UI からの実行にしか埋めない**�
 「Channel target must be a string」になった。
 
 引数で届くのは、そのクロールについて capture-ledger が決めて**必ず送る**もの —— URL と
-間隔、そして `capture_formats` / `signing`。
+間隔、`capture_formats` / `signing`、そして **`scripts`**（ページの中で走らせる JavaScript）。
+
+`scripts` を必須にしてあるのは `capture_formats` と同じ理由。BrowserHive v11.0.0 は
+走らせるものの顔ぶれを持たないので、送らなければページの中では何も走らず、**それでも
+取り込みは成功してアーカイブも出る**。渡し忘れは「一度もスクロールしなかったクロール」に
+なり、した側と見分けが付かない。この flow は運ぶだけで、何を・どの順で・どちらの口
+（読み込み後の `behavior` か、遷移前の `preload` か）で走らせるかは capture-ledger の
+目録が決める。
 
 ```sh
 pnpm run windmill:capture-ledger-token   # waggle_token / waggle_api_url /

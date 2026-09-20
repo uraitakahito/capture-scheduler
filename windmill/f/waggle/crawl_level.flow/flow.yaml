@@ -68,6 +68,9 @@ value:
                 signing:
                   type: javascript
                   expr: flow_input.signing
+                scripts:
+                  type: javascript
+                  expr: flow_input.scripts
                 artifact_sink:
                   type: javascript
                   expr: flow_input.artifact_sink
@@ -194,6 +197,27 @@ schema:
     signing:
       type: boolean
       description: WACZ に署名するか。capture-ledger が決めて必ず送る
+    scripts:
+      # ページの中で走らせるもの。**flow は運ぶだけで中身を見ない** —— 何を走らせるかも
+      # 並びも capture-ledger が目録から決める。BrowserHive は顔ぶれを持たないので、
+      # ここが空なら本当にページの中では何も走らない。
+      type: array
+      description: ページの中で走らせるスクリプト。capture-ledger が目録から解決して必ず送る
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+          version:
+            type: integer
+          phase:
+            type: string
+          source:
+            type: string
+          sha256:
+            type: string
+          options:
+            type: object
     artifact_sink:
       # 成果物の送り先。**必須にしない** —— 省けば BrowserHive は従来どおり自前の
       # 保管庫へ書くので、2 つの経路が同時に生きる。切り替えを 1 本のクロールから
@@ -206,7 +230,7 @@ schema:
         token:
           type: string
   # capture-ledger が送るのは crawl_id / depth / frontier / 間隔 / 並列度 /
-  # capture_formats / signing と、受け口を出している配備では artifact_sink。並列度は
+  # capture_formats / signing / scripts と、受け口を出している配備では artifact_sink。並列度は
   # plan_level が BrowserHive の口の数で頭打ちにしてから for-loop に渡る。
   # capture-ledger は自分がコンテナからどう見えるかを知らないし、issuer の鍵も持っていない。
   #
@@ -222,7 +246,9 @@ schema:
     - crawl_id
     - depth
     - frontier
-    # **形式と署名は必須。** 既定値は webhook 起動では埋まらないので、
+    # **形式と署名とスクリプトは必須。** 既定値は webhook 起動では埋まらないので、
     # 省略できる形にすると「渡し忘れ」が黙って別の形式で走ることになる。
+    # scripts を落とすと、ページの中で何も走らないまま成功したアーカイブが出る。
     - capture_formats
     - signing
+    - scripts
