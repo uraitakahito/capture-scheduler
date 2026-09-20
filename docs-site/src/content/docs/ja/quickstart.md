@@ -11,7 +11,11 @@ Windmill は capture-ledger のスタックの 2 つを使う。OpenFGA には�
 クロールがページを撮りに呼ぶ。始める前に、capture-ledger の
 [クイックスタート](https://uraitakahito.github.io/capture-ledger/ja/quickstart/)の §1〜§5
 （DNS ドメイン、submodule と `.env`、`stack:up`、データベース、OpenFGA の 2 つの ID）を済ませ、
-スタックが動いていることを確かめる:
+スタックが動いていることを確かめる。
+
+**§4 の目録を忘れないこと。** BrowserHive は走らせるものの顔ぶれを持たないので、
+`scripts` 表が空だと、クロールはページの中で何も走らせない —— スクロールも遅延読み込みも
+起きないまま、成功したアーカイブが出る。下の `doctor` の**目録**がそれを言う。
 
 ```sh
 curl -s -o /dev/null -w '%{http_code}\n' -H 'authorization: Bearer dev-key' http://127.0.0.1:8090/stores
@@ -190,6 +194,7 @@ smoke は capture-ledger v0.43.0 以上を前提にする（最後の段の run 
 
 | 見えたもの                                                                                                                                      | 意味                                                                                      | 直す                                                                        |
 | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| doctor の目録が ✗ ／ smoke が 400 `the script catalog is empty`                                                                                 | 目録が空。ページの中で何も走らない                                                        | capture-ledger で `pnpm run scripts import .upstream/capture-scripts`       |
 | doctor の windmill が ✗ で、下の点検が「先に windmill を」                                                                                      | Windmill が落ちている                                                                     | `container-compose up -d`（この repo で）                                   |
 | doctor の proto が ✗「Windmill に proto が無い」／smoke の原因が `[cap] Resource not found at u/admin/browserhive_proto …`                      | proto を入れていない                                                                      | `pnpm run windmill:push-proto`                                              |
 | doctor の proto が ✗「repo の capture.proto と違う」                                                                                            | BrowserHive の版を上げて proto を取り直したが、Windmill の写しが古い                      | `pnpm run windmill:push-proto`                                              |
