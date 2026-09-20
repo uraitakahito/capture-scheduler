@@ -37,19 +37,30 @@ sudo container system dns create capture-scheduler   # once per machine
 container-compose up -d
 pnpm install
 
-pnpm run windmill:bootstrap   # creates the workspace and a token, and prints lines for two places (below)
+pnpm run windmill:bootstrap   # creates the workspace and a token, and writes two files (below)
 pnpm run windmill:push        # upload the scripts, the flow and the schedule
 pnpm run windmill:push-proto  # upload BrowserHive's proto (crawl_host reads it; push does not include it)
 ```
 
-Paste bootstrap's output in two places. `WINDMILL_TOKEN=…` goes into this repo's `.env`. The four
-lines after it go, as they are, **at the end of** capture-ledger's `.env` (a later line wins over an
-earlier one with the same name). **Miss any of the four and no crawl runs to the end**:
+**There is nothing to paste any more.** bootstrap writes two files, both inside this repo:
 
-```dotenv title="capture-ledger/.env (at the end)"
-# the four lines capture-scheduler's pnpm run windmill:bootstrap printed
+| File                      | What is in it                                                    |
+| ------------------------- | ---------------------------------------------------------------- |
+| `.env.local`              | `WINDMILL_TOKEN`, read by this repo's own scripts                |
+| `.dev/capture-ledger.env` | the four lines for capture-ledger. **The other side reads them** |
+
+Changing capture-ledger's settings is the job of a command you run **there**:
+
+```sh
+cd ~/projects/crawler/capture-ledger
+pnpm run connect              # reads the four lines above into capture-ledger's .env.local
+```
+
+These are the four lines. **Miss any of them and no crawl runs to the end**:
+
+```dotenv title="capture-scheduler/.dev/capture-ledger.env"
 CAPTURE_LEDGER_CRAWL_WEBHOOK_URL=http://127.0.0.1:8000/api/w/crawler/jobs/run/f/f/waggle/crawl_level
-CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN=<the value bootstrap printed>
+CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN=<the token bootstrap created>
 CAPTURE_LEDGER_API_HOST=0.0.0.0
 CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099
 ```
@@ -60,11 +71,12 @@ CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099
 | `CAPTURE_LEDGER_API_HOST=0.0.0.0`              | Level reports come from a container, and an API listening on `127.0.0.1` never receives them        |
 | `CAPTURE_LEDGER_OIDC_ISSUER`                   | The flow identifies itself with a JWT. Without it the API trusts dev headers, and reports get `401` |
 
-bootstrap creates a new token every time you run it (the earlier ones stay valid). To skip running it
-again, put the same value as `WINDMILL_TOKEN` in this repo's `.env` where it says
-`<the value bootstrap printed>`.
+bootstrap creates a new token every time you run it (the earlier ones stay valid), so **run `connect`
+again whenever you run bootstrap again** — the handoff file is rewritten with the new token, and
+without fetching it capture-ledger keeps the old one. The old token still works, so this does not
+break: it looks like "I changed it and nothing changed".
 
-Then start the issuer on the capture-ledger side and **restart the API**.
+Once `connect` has run, start the issuer on the capture-ledger side and **restart the API**.
 
 **Stop the API you started in §6 of capture-ledger's quickstart (`Ctrl-C`)** and run the same
 command again — this is not a second instance. The API reads its settings **once, at
@@ -215,8 +227,8 @@ Every row was produced for real and checked (2026-09-19).
 | smoke: `succeeded` with 0 pages, cause `… net::ERR_NAME_NOT_RESOLVED …`                                                                              | the URL's host does not resolve                                                                          | check the URL; if it is right, whether BrowserHive's containers can resolve outside names |
 | doctor: can_submit ✗ "… のクロールの許可が無い" / smoke: `… /pages → 404`                                                                            | windmill may not start crawls                                                                            | `pnpm run fga:grant submitter windmill acme` in capture-ledger                            |
 | doctor: can_submit ✗ "トークンが通らない" / smoke: `… /pages → 401`                                                                                  | the issuer was restarted and Windmill's token is stale                                                   | `pnpm run windmill:capture-ledger-token`                                                  |
-| doctor: jwt ✗ "ヘッダで名乗る設定で動いている" (the startup log's last line says `crawl level reports: blocked`)                                     | capture-ledger's API does not accept JWTs (`CAPTURE_LEDGER_OIDC_ISSUER` is not in effect)                | paste bootstrap's four lines at the end of capture-ledger's `.env` and restart the API    |
-| doctor: container→api ✗ "API が 127.0.0.1 で待っている" / smoke: `Unable to connect`                                                                 | level reports cannot reach the API from a container (`CAPTURE_LEDGER_API_HOST=0.0.0.0` is not in effect) | paste bootstrap's four lines at the end of capture-ledger's `.env` and restart the API    |
+| doctor: jwt ✗ "ヘッダで名乗る設定で動いている" (the startup log's last line says `crawl level reports: blocked`)                                     | capture-ledger's API does not accept JWTs (`CAPTURE_LEDGER_OIDC_ISSUER` is not in effect)                | run `pnpm run connect` in capture-ledger and restart the API                              |
+| doctor: container→api ✗ "API が 127.0.0.1 で待っている" / smoke: `Unable to connect`                                                                 | level reports cannot reach the API from a container (`CAPTURE_LEDGER_API_HOST=0.0.0.0` is not in effect) | run `pnpm run connect` in capture-ledger and restart the API                              |
 | smoke: 409 "走行中のクロールがある: …"                                                                                                               | an earlier crawl is still `running`                                                                      | wait for it, or `pnpm run smoke --close-running`                                          |
 
 ## How the token gets there
