@@ -2,3 +2,6 @@ node_modules/
 .env
 dist/
 .DS_Store
+# 道具が書くもの。どちらも token を持つ (scripts/env-local.ts)。
+.env.local
+.dev/

@@ -185,7 +185,10 @@ for (const section of Object.values(SECTIONS)) {
 // クイックスタートの dotenv のブロックは、bootstrap の出力の写し。写しは腐る —— 2026-09-19 と
 // 20 に、写しの中に無かった 2 行で止まった (以前は 4 行を sh のブロックのコメントで並べていた)。
 // 名前と値が一字一句同じかを見る。token の値 (docs では置き場所の説明) と、コメントの行は比べない。
-const LEDGER_BLOCK = /^```dotenv title="capture-ledger\/\.env[^"]*"\n([\s\S]*?)^```$/m;
+// 題名は `capture-ledger/.env` から `capture-scheduler/.dev/capture-ledger.env` へ移った
+// (bootstrap が引き渡しファイルに書くようになったため)。**見る中身は同じ** ——
+// 綴りが一字でも違えば flow は 401 になるので、名前と値の一致は緩めない。
+const LEDGER_BLOCK = /^```dotenv title="[^"]*capture-ledger[^"]*"\n([\s\S]*?)^```$/m;
 const TOKEN_NAME = "CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN";
 const expectedLedger = ledgerEnv({
   windmillUrl: windmillUrl(),
