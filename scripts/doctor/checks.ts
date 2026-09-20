@@ -554,15 +554,22 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
   {
     name: "capture-fixtures",
     section: SECTIONS.e2e,
-    where: "capture-fixtures.capture-ledger:8080",
+    // **loopback で訊く。** macOS 26 では Apple 署名でないバイナリ (node) が
+    // コンテナの subnet へ TCP を張れず、DNS 名は引けるのに EHOSTUNREACH になる
+    // (実測 2026-09-20: 同じ URL に curl は 200、node は EHOSTUNREACH)。
+    // 名前で訊くと、**起きている fixtures を「待っていない」と報告する**。
+    //
+    // 取り込む側 (browserhive) は今までどおり名前で引く —— そちらはコンテナ同士なので
+    // 制限に当たらない。e2e の種の URL が名前のままなのはそのため。
+    where: "127.0.0.1:18085 (取り込みは capture-fixtures.capture-ledger:8080 で引く)",
     probe: async () =>
-      (await portOpen("capture-fixtures.capture-ledger", 8080))
+      (await portOpen("127.0.0.1", 18085))
         ? { ok: true }
         : {
             ok: false,
             need:
               "capture-fixtures が待っていない → " +
-              "cd ../capture-ledger && container-compose --profile capture-fixtures up -d -b",
+              "cd ../capture-ledger && pnpm run stack:up --profile capture-fixtures",
           },
     e2eOnly: true,
   },
