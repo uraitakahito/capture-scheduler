@@ -72,12 +72,42 @@ export interface CaptureSettings {
   };
   signing: boolean;
   /**
+   * ページの中で走らせるもの。**capture-ledger が目録から解決して、並びごと渡す。**
+   *
+   * BrowserHive v11.0.0 から、サーバは走らせるものの顔ぶれを持たない —— 送らなければ
+   * ページでは何も走らず、それでも取り込みは成功してアーカイブも出る。**この層は
+   * 中身を見ない**: 何を走らせるかを決めるのも、順番を決めるのも capture-ledger。
+   *
+   * 必須にしてある。省ける形にすると、渡し忘れが「スクロールも遅延読み込みもしない
+   * クロール」として黙って成功する —— `capture_formats` を必須にしたのと同じ理由。
+   */
+  scripts: CrawlScript[];
+  /**
    * 成果物の押し出し先。**在れば BrowserHive は自前の保管庫へ書かない。**
    *
    * capture-ledger が crawl ごとに 1 回きりで発行するので、ここには「運んできたもの」しか
    * 入らない —— この層は中身を見ないし、作りもしない。
    */
   artifactSink?: { url: string; token: string };
+}
+
+/**
+ * 走らせるもの 1 本。台帳の目録から解決済みで、ここを素通りして BrowserHive へ行く。
+ *
+ * `phase` が入る口を決める。`behavior` は読み込みの後・主フレーム・1 回、
+ * `preload` は遷移の**前**・iframe を含む全フレーム・遷移のたび。BrowserHive では
+ * それぞれ `behaviors` と `preload` という別の欄になる。
+ *
+ * `sha256` は **BrowserHive が `source` と照合する**。食い違えば `INVALID_ARGUMENT`
+ * で拒まれる —— 運ぶ途中で入れ替わっていないか、だけを見る仕掛け。
+ */
+export interface CrawlScript {
+  id: string;
+  version: number;
+  phase: "preload" | "behavior";
+  source: string;
+  sha256: string;
+  options: Record<string, unknown>;
 }
 
 export interface PageResult {
@@ -413,6 +443,37 @@ const captureOnAny = async (
 };
 
 /**
+ * 目録の 1 本を、BrowserHive の `Script` の形にする。
+ *
+ * **`version` は送らない。** あちらは `id` / `source` / `sha256` / `options_json` しか
+ * 持たない —— 版は台帳の言葉で、走る側には関係が無い。どの版が走ったかは
+ * `crawls.scripts` とサーバのログが答える。
+ *
+ * `optionsJson` は空のときに送らない。proto では optional な文字列で、`"{}"` を
+ * 送ることと省くことは、受け側 (`__bh.opts[<id>]` が `undefined` になる) では同じ。
+ */
+const toScript = (script: CrawlScript): Record<string, unknown> => ({
+  id: script.id,
+  source: script.source,
+  sha256: script.sha256,
+  ...(Object.keys(script.options).length === 0
+    ? {}
+    : { optionsJson: JSON.stringify(script.options) }),
+});
+
+/** 読み込みの後に走らせるもの。**並びがそのまま実行順**になる。 */
+const toBehaviors = (scripts: CrawlScript[]): Record<string, unknown> => {
+  const items = scripts.filter((s) => s.phase === "behavior").map(toScript);
+  return items.length === 0 ? {} : { behaviors: { behaviors: { items } } };
+};
+
+/** 遷移の前に入れるもの。**登録した順**に、すべてのフレームで走る。 */
+const toPreload = (scripts: CrawlScript[]): Record<string, unknown> => {
+  const items = scripts.filter((s) => s.phase === "preload").map(toScript);
+  return items.length === 0 ? {} : { preload: { items } };
+};
+
+/**
  * 1 件取り込む。1 往復で答えが返る —— 待つのは gRPC の deadline だけ。
  *
  * **report が SUCCESS でなければ失敗**。一過性の型 (`RETRYABLE`) なら間隔を空けて
@@ -439,6 +500,11 @@ const captureOne = async (
     // 「指定なし」として届く。何を立てるかを決めるのは capture-ledger。
     captureFormats: capture.formats,
     signing: capture.signing,
+    // **口が 2 つある。** `behaviors` は読み込みの後、`preload` は遷移の前。
+    // 空なら鍵ごと送らない —— proto3 の optional message なので、空の入れ物を
+    // 送っても「無い」と同じだが、本文に意味の無い欄を増やさない。
+    ...toBehaviors(capture.scripts),
+    ...toPreload(capture.scripts),
     // 在れば BrowserHive はここへ押し出し、自前の保管庫へは書かない。
     ...(capture.artifactSink === undefined ? {} : { artifactSink: capture.artifactSink }),
   };
@@ -562,6 +628,13 @@ export async function main(
   per_host_delay_ms: number,
   capture_formats: CaptureSettings["formats"],
   signing: boolean,
+  /**
+   * ページの中で走らせるもの。capture-ledger が目録から解決して、**並びごと**渡す。
+   *
+   * **省けない。** 省ける形にすると、渡し忘れが「何も走らないクロール」として
+   * 黙って成功する。空配列を渡すことは意思表示として通る。
+   */
+  scripts: CrawlScript[],
   initial_delay_ms = 0,
   /**
    * 成果物の押し出し先。capture-ledger が crawl ごとに 1 回きりで発行する。
@@ -591,6 +664,7 @@ export async function main(
     {
       formats: capture_formats,
       signing,
+      scripts,
       ...(artifact_sink === undefined ? {} : { artifactSink: artifact_sink }),
     },
     per_host_delay_ms,

@@ -36,6 +36,10 @@ interface Call {
 const CAPTURE = {
   formats: { png: false, webp: false, html: false, links: true, mhtml: false, wacz: true },
   signing: false,
+  // 走らせるものを持たないクロール。**これは異常ではない** —— 台帳が空配列を渡せば、
+  // ページの中では何も走らない。ここでは注入の形ではなく礼儀と再試行を見ているので、
+  // いちばん静かな値を置く。
+  scripts: [],
 };
 
 /** busy の待ち。既定の 0.5〜1.5 秒では試験が秒単位になる。 */
@@ -481,6 +485,7 @@ describe("取り込む形式", () => {
     const capture = {
       formats: { png: true, webp: false, html: true, links: false, mhtml: false, wacz: true },
       signing: true,
+      scripts: [],
     };
     await captureHost([fakeEndpoint("bh-1", { seen })], "m", ["a"], "c1", capture, 0, 0, FAST);
 
@@ -501,7 +506,7 @@ describe("成果物の送り先", () => {
       "m",
       ["a"],
       "c1",
-      { formats, signing: false, artifactSink: sink },
+      { formats, signing: false, scripts: [], artifactSink: sink },
       0,
       0,
       FAST,
@@ -519,12 +524,134 @@ describe("成果物の送り先", () => {
       "m",
       ["a"],
       "c1",
-      { formats, signing: false },
+      { formats, signing: false, scripts: [] },
       0,
       0,
       FAST,
     );
 
     expect((seen[0] as { artifactSink?: unknown }).artifactSink).toBeUndefined();
+  });
+});
+
+/**
+ * **走らせるものを運ぶ。** BrowserHive v11.0.0 から、サーバは顔ぶれを持たない ——
+ * 送らなければページの中では何も走らず、それでも取り込みは成功してアーカイブも出る。
+ *
+ * この層は中身を見ない。見ているのは「台帳が渡したものが、2 つの口に正しく分かれて、
+ * 並びを保ったまま本文に載るか」だけ。
+ */
+describe("ページで走らせるスクリプト", () => {
+  const formats = { png: false, webp: false, html: false, links: false, mhtml: false, wacz: true };
+  const script = (
+    id: string,
+    phase: "preload" | "behavior",
+    options: Record<string, unknown> = {},
+  ) => ({ id, version: 3, phase, source: `/* ${id} */`, sha256: "e".repeat(64), options });
+
+  const sendWith = async (scripts: ReturnType<typeof script>[]) => {
+    const seen: unknown[] = [];
+    await captureHost(
+      [fakeEndpoint("bh-1", { seen })],
+      "m",
+      ["a"],
+      "c1",
+      { formats, signing: false, scripts },
+      0,
+      0,
+      FAST,
+    );
+    return seen[0] as {
+      behaviors?: { behaviors: { items: Record<string, unknown>[] } };
+      preload?: { items: Record<string, unknown>[] };
+    };
+  };
+
+  it("phase で 2 つの口に分ける", async () => {
+    // 同じ形の 1 本でも、入る口で約束が違う —— behavior は読み込みの後・主フレーム、
+    // preload は遷移の前・全フレーム。混ぜると、どちらで走ったのかを誰も言えない。
+    const req = await sendWith([script("autoscroll", "behavior"), script("hide", "preload")]);
+
+    expect(req.behaviors?.behaviors.items.map((i) => i["id"])).toEqual(["autoscroll"]);
+    expect(req.preload?.items.map((i) => i["id"])).toEqual(["hide"]);
+  });
+
+  it("並びを保つ —— 並びがそのまま実行順", async () => {
+    const req = await sendWith([
+      script("b", "behavior"),
+      script("a", "behavior"),
+      script("c", "behavior"),
+    ]);
+    expect(req.behaviors?.behaviors.items.map((i) => i["id"])).toEqual(["b", "a", "c"]);
+  });
+
+  it("version は送らない —— 版は台帳の言葉", async () => {
+    // BrowserHive の `Script` は id / source / sha256 / options_json しか持たない。
+    // どの版が走ったかは `crawls.scripts` とサーバのログが答える。
+    const req = await sendWith([script("autoscroll", "behavior")]);
+    expect(req.behaviors?.behaviors.items[0]).toEqual({
+      id: "autoscroll",
+      source: "/* autoscroll */",
+      sha256: "e".repeat(64),
+    });
+  });
+
+  it("options は JSON の文字列にして載せ、空なら載せない", async () => {
+    // proto では optional な文字列。`"{}"` を送ることと省くことは受け側では同じなので、
+    // 意味の無い欄を本文に増やさない。
+    const req = await sendWith([
+      script("autoscroll", "behavior", { maxSteps: 60 }),
+      script("autofetch", "behavior"),
+    ]);
+    expect(req.behaviors?.behaviors.items[0]?.["optionsJson"]).toBe('{"maxSteps":60}');
+    expect(req.behaviors?.behaviors.items[1]).not.toHaveProperty("optionsJson");
+  });
+
+  it("空なら、どちらの鍵も送らない", async () => {
+    // **これは異常ではない。** 台帳が「何も走らせない」と決めた形。
+    const req = await sendWith([]);
+    expect(req).not.toHaveProperty("behaviors");
+    expect(req).not.toHaveProperty("preload");
+  });
+
+  it("片方しか無ければ、その口だけを送る", async () => {
+    const req = await sendWith([script("hide", "preload")]);
+    expect(req).not.toHaveProperty("behaviors");
+    expect(req.preload?.items).toHaveLength(1);
+  });
+
+  /**
+   * **本物の proto に通す。** 偽の client は受け取った object をそのまま返すので、
+   * 上の試験は「こちらが組んだ形」しか見ていない —— 欄の綴りが違っても、入れ子の
+   * 深さが違っても緑になる。序列化して戻すと、proto が知らない欄は**黙って消える**ので、
+   * 消えなかったことが「この形で届く」の証拠になる。
+   */
+  it("組んだ本文が、vendor した proto をそのまま通る", async () => {
+    const definition = loadSync("proto/browserhive/v1/capture.proto", {
+      keepCase: false,
+      longs: String,
+      enums: String,
+      defaults: true,
+      oneofs: true,
+    });
+    const method = (
+      definition["browserhive.v1.CaptureService"] as unknown as Record<
+        string,
+        { requestSerialize: (v: unknown) => Buffer; requestDeserialize: (b: Buffer) => unknown }
+      >
+    )["Capture"]!;
+
+    const sent = await sendWith([
+      script("autoscroll", "behavior", { maxSteps: 60 }),
+      script("hide", "preload"),
+    ]);
+    const back = method.requestDeserialize(method.requestSerialize(sent)) as typeof sent;
+
+    expect(back.behaviors?.behaviors.items[0]).toMatchObject({
+      id: "autoscroll",
+      source: "/* autoscroll */",
+      optionsJson: '{"maxSteps":60}',
+    });
+    expect(back.preload?.items[0]).toMatchObject({ id: "hide" });
   });
 });
