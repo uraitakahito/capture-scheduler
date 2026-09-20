@@ -93,9 +93,11 @@ export interface PageResult {
    * `.links.json` の置き場所。**中身は読まない。**
    *
    * 読むのは capture-ledger の仕事にしてある —— あちらは既に S3 の client を持っていて、
-   * 範囲の絞り込みと重複排除もあちらに在る。ここで読むと、S3 の資格情報と到達性を
-   * Windmill にも用意することになり (別ドメインのコンテナからは seaweedfs に届かない)、
-   * 「見つけた URL は何か」の判断材料が 2 か所に散る。
+   * 範囲の絞り込みと重複排除もあちらに在る。ここで読むと、S3 の資格情報を Windmill にも
+   * 配ることになり、「見つけた URL は何か」の判断材料が 2 か所に散る。
+   *
+   * 到達性は理由ではない: store は crawler で 1 つ (`seaweedfs.crawler-storage`) で、
+   * **別ドメインのコンテナからも host からも届く** (実測)。
    */
   linksLocation?: string;
   /**
