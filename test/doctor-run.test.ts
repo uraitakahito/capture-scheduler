@@ -32,7 +32,7 @@ const stateOf = (results: Result[], name: string): Result | undefined =>
   results.find((r) => r.check.name === name);
 
 describe("本物の点検の並び", () => {
-  /** 13 本の probe を差し替える。`failing` だけ ✗ にする。 */
+  /** 全部の probe を差し替える。`failing` だけ ✗ にする。 */
   const withOnlyFailing = (failing: string): Check[] =>
     CHECKS.filter((c) => c.e2eOnly !== true).map((c) => ({
       ...c,
@@ -54,6 +54,8 @@ describe("本物の点検の並び", () => {
         "worker→browserhive",
         "workspace",
         "変数",
+        // 目録は can_submit の子。親が飛ばされれば、こちらも飛ばされる。
+        "目録",
       ].sort(),
     );
     for (const r of skipped) expect(r).toMatchObject({ reason: "先に windmill を" });
@@ -67,9 +69,9 @@ describe("本物の点検の並び", () => {
     expect(stateOf(results, "can_submit")).toMatchObject({ state: "skip", reason: "先に jwt を" });
   });
 
-  it("点検は 13 本で、e2e のときだけ 2 本増える", () => {
-    expect(CHECKS.filter((c) => c.e2eOnly !== true)).toHaveLength(13);
-    expect(CHECKS).toHaveLength(15);
+  it("点検は 14 本で、e2e のときだけ 2 本増える", () => {
+    expect(CHECKS.filter((c) => c.e2eOnly !== true)).toHaveLength(14);
+    expect(CHECKS).toHaveLength(16);
   });
 
   it("親は必ず子より前に並ぶ (報告がクイックスタートの順に読め、循環も無い)", () => {

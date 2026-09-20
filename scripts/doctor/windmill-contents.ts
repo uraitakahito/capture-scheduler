@@ -131,6 +131,36 @@ export const VARIABLES = [
   "u/admin/browserhive_tls_ca",
 ] as const;
 
+/**
+ * `GET /api/scripts` の答え。**目録が空なら ✗。**
+ *
+ * 空でもクロールは起こせてしまう時期が在った —— ページの中で何も走らず、スクロールも
+ * 遅延読み込みも起きないまま `complete: true` のアーカイブが出る。capture-ledger は
+ * いまそれを 400 で止めるが、**止まるのは頼んだ後**。doctor は「全部 ✓ なら、クロールを
+ * 起こせば最後まで走る」と名乗っているので、頼む前にここで言う。
+ *
+ * 404 は「許可が無い」—— 口そのものは webhook の設定に依らず出るので、
+ * 在るかどうかではなく can_submit を疑う先になる。
+ */
+export const readCatalog = (answer: Answer): Verdict => {
+  if (answer.status === 404) {
+    return { ok: false, need: "この token にクロールの許可が無い (上の can_submit を先に)" };
+  }
+  const value = answer.status === 200 ? parse(answer.body) : undefined;
+  const scripts =
+    typeof value === "object" && value !== null && "scripts" in value ? value.scripts : undefined;
+  if (!Array.isArray(scripts)) {
+    return { ok: false, need: `GET /api/scripts → ${shown(answer)}` };
+  }
+  if (scripts.length > 0) return { ok: true };
+  return {
+    ok: false,
+    need:
+      "目録が空 —— 撮れてもページの中では何も走らない (クロールは 400 で断られる) → " +
+      "cd ../capture-ledger && pnpm run scripts import .upstream/capture-scripts",
+  };
+};
+
 export const readVariables = (exists: ReadonlyMap<string, boolean>): Verdict => {
   const missing = VARIABLES.filter((path) => exists.get(path) !== true);
   if (missing.length === 0) return { ok: true };

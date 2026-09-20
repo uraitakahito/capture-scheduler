@@ -10,7 +10,11 @@ below writes a permission into its OpenFGA ("windmill may start crawls for acme"
 its BrowserHive to take the pages.
 Before you start, finish §1–§5 of capture-ledger's
 [Quickstart](https://uraitakahito.github.io/capture-ledger/quickstart/) (the DNS domain, the
-submodules and `.env`, `stack:up`, the database, the two OpenFGA ids) and check that the stack is up:
+submodules and `.env`, `stack:up`, the database, the two OpenFGA ids) and check that the stack is up.
+
+**Do not skip the catalog in §4.** BrowserHive holds no roster of its own, so an empty `scripts`
+table means a crawl runs nothing inside the page — no scrolling, no lazy loading — and still
+produces a successful archive. The catalog check in `doctor` below says so.
 
 ```sh
 curl -s -o /dev/null -w '%{http_code}\n' -H 'authorization: Bearer dev-key' http://127.0.0.1:8090/stores
@@ -130,7 +134,7 @@ command to type, with the names capture-ledger actually saw.
 
 ```sh
 cd ~/projects/crawler/capture-scheduler
-pnpm run doctor   # 13 checks; all ✓ means a crawl is set up to run to the end
+pnpm run doctor   # 14 checks; all ✓ means a crawl is set up to run to the end
 pnpm run smoke    # captures https://example.com/ once; "撮れた" (captured) once the WACZ comes back
 ```
 
@@ -162,7 +166,7 @@ waits for the level report — then fetches the archive the ledger recorded thro
 and checks that it starts with `PK` (a WACZ is a zip):
 
 ```
-点検     doctor の 13 本とも ✓
+点検     doctor の 14 本とも ✓
 起こす   POST /api/crawls → 202  crawl 545e912c-…  https://example.com/
 待つ     running
 run      http://127.0.0.1:8000/run/01a0ba19-…?workspace=crawler
@@ -193,6 +197,7 @@ Every row was produced for real and checked (2026-09-19).
 
 | What you see                                                                                                                                         | Meaning                                                                                                  | Fix                                                                                       |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| doctor: 目録 ✗ / smoke: 400 `the script catalog is empty`                                                                                            | the catalog is empty — nothing runs inside the page                                                      | in capture-ledger: `pnpm run scripts import .upstream/capture-scripts`                    |
 | doctor: windmill ✗, and the checks below say "先に windmill を"                                                                                      | Windmill is down                                                                                         | `container-compose up -d` (in this repo)                                                  |
 | doctor: proto ✗ "Windmill に proto が無い" / smoke: `[cap] Resource not found at u/admin/browserhive_proto …`                                        | the proto was never uploaded                                                                             | `pnpm run windmill:push-proto`                                                            |
 | doctor: proto ✗ "repo の capture.proto と違う"                                                                                                       | BrowserHive was upgraded and the proto re-fetched, but Windmill's copy is stale                          | `pnpm run windmill:push-proto`                                                            |
