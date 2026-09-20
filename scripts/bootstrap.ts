@@ -6,16 +6,23 @@
  * 使い捨てのサービスが無い (subcommand は up / down / build / version の 4 つだけ)。
  * capture-ledger の `scripts/fga-migrate.mjs` と同じ立場。
  *
- * **token は .env に書かず、貼れる形で標準出力に出す。** `fga:deploy` と同じ作法。
- * 書き込む側にすると、`.env` を持つのが人間なのかスクリプトなのかが曖昧になる。
+ * **書くのは自分の repo の中だけ。** token は `.env.local` へ、capture-ledger に渡す 4 行は
+ * `.dev/capture-ledger.env` へ。`.env` は人のもので、道具は触らない（`env-local.ts`）。
+ * 打ったのは capture-scheduler のコマンドなので、**向こうの repo には書きに行かない** ——
+ * 取りに行くのは向こうの仕事で、`cd ../capture-ledger && pnpm run connect` が読む。
  *
- * **capture-ledger の `.env` の末尾に貼る 4 行も出す**（webhook の URL と token、待ち受け、issuer ——
- * `env.ts` の `ledgerEnv`）。どれもここで決まるか決め打ちの値で、人に組み立てさせると古くなる。
- * 以前は webhook の 2 行だけを出していて、残り 2 行を書き漏らした API で 2 度止まった。
+ * 4 行は webhook の URL と token、待ち受け、issuer（`env.ts` の `ledgerEnv`）。どれもここで
+ * 決まるか決め打ちの値で、人に組み立てさせると古くなる。以前は webhook の 2 行だけを出して
+ * いて、残り 2 行を書き漏らした API で 2 度止まった。
+ *
+ * **印字は残す。** 値そのものを見たい場面（別の機械へ持っていく、壊れたときに突き合わせる）が
+ * 残るため。変えたのは「貼れ」という指示のほうで、貼る作業は無くなった。
  *
  * workspace は、既にあれば作り直さない。**token は毎回作る** —— 値は作ったときにしか読めないので、
  * 出せるのは作ったばかりのものだけ。前に作った token は残り、使えるまま。
  */
+import { relative } from "node:path";
+
 import {
   guardEnv,
   ledgerEnv,
@@ -25,6 +32,7 @@ import {
   windmillUrl,
   windmillWorkspace,
 } from "./env.js";
+import { upsertEnvLocal, writeHandoff } from "./env-local.js";
 
 guardEnv();
 
@@ -120,17 +128,23 @@ const main = async () => {
       : `token を作りました (label "${LABEL}")。\n`,
   );
 
-  process.stderr.write("\n── この repo (capture-scheduler) の .env ──\n");
-  // 貼れる形で **標準出力へ**。stderr との分離は意図的で、
+  // 値は **標準出力へ** 1 行だけ。stderr との分離は意図的で、
   // `pnpm run windmill:bootstrap | tail -1` が使える。
   process.stdout.write(`WINDMILL_TOKEN=${token}\n`);
 
-  // 標準出力は `WINDMILL_TOKEN=` の 1 行のまま (上の約束)。こちらは標準エラーへ出す。
+  // 標準出力は `WINDMILL_TOKEN=` の 1 行のまま (上の約束)。以下は標準エラーへ。
+  const { path: envLocal } = upsertEnvLocal({ WINDMILL_TOKEN: token });
+  const handoff = writeHandoff(
+    ledgerEnv({ windmillUrl: windmillUrl(), workspace, token, issuer: ledgerIssuer() }),
+  );
+  const shown = (path: string): string => relative(process.cwd(), path);
   process.stderr.write(
-    "\n── capture-ledger の .env の末尾に。4 行とも (同じ名前の行が前にあっても、後ろの行が効きます) ──\n" +
-      "# capture-scheduler の pnpm run windmill:bootstrap が出した 4 行\n" +
-      `${ledgerEnv({ windmillUrl: windmillUrl(), workspace, token, issuer: ledgerIssuer() }).join("\n")}\n\n` +
-      "貼ったら capture-ledger の API を起こし直します (設定は起動のときに 1 回だけ読みます)。\n" +
+    `\n── 書いたファイル (どちらもこの repo の中。.env は触っていません) ──\n` +
+      `  ${shown(envLocal)}   WINDMILL_TOKEN\n` +
+      `  ${shown(handoff)}   capture-ledger に渡す 4 行\n` +
+      "\n次は capture-ledger 側で、取りに行かせます:\n" +
+      "\n  cd ../capture-ledger && pnpm run connect\n" +
+      "\nそのあと capture-ledger の API を起こし直します (設定は起動のときに 1 回だけ読みます)。\n" +
       "起動ログの最後の行が「crawl level reports: ready」なら、4 行は効いています。\n",
   );
 };
