@@ -288,10 +288,11 @@ describe("クロールが flow を通って索引まで終わる", () => {
         got = await json(await fetch(`${WAGGLE}/api/crawls/${crawlId}`, { headers: auth() }));
       }
       expect(got["state"], `stopReason=${String(got["stopReason"])}`).toBe("failed");
-      // fail_crawl が段の例外の文をそのまま reason にする。診断の code まで台帳に残る
-      const reason = String(got["stopReason"]);
+      // fail_crawl が段の例外の文をそのまま reason に送り、台帳は crawls.error に入れて
+      // GET /api/crawls/:id の `error` で返す (stopReason は "failed" の 1 語)。診断の code まで台帳に残る
+      const reason = String(got["error"]);
       expect(reason, "落ちた段が compile ではない").toContain("compile 422");
-      expect(reason, "型エラーの code が reason に無い").toContain("TS2322");
+      expect(reason, "型エラーの code が error に無い").toContain("TS2322");
     } finally {
       ledger("rm", "broken");
     }

@@ -13,21 +13,36 @@ schema:
       type: array
       description: ""
       default: null
+      format: resource-crawl_script
       items:
         type: object
         properties:
           id:
             type: string
+            description: ""
+            originalType: string
           version:
-            type: integer
-          phase:
-            type: string
-          source:
-            type: string
-          sha256:
-            type: string
+            type: number
+            description: ""
           options:
             type: object
-      originalType: CrawlScript[]
+            description: ""
+            format: resource-record
+          phase:
+            type: string
+            description: ""
+            enum:
+              - preload
+              - behavior
+            originalType: enum
+          sha256:
+            type: string
+            description: ""
+            originalType: string
+          source:
+            type: string
+            description: ""
+            originalType: string
+      originalType: record[]
   required:
     - scripts
