@@ -112,7 +112,11 @@ What does arrive as arguments is what capture-ledger decides for that crawl and 
 sends: the URLs, the delay, `capture_formats` / `signing`, and **`scripts`** — the
 TypeScript to run inside each page. The catalog keeps it as written (its `sha256` is over the
 TypeScript bytes); `compile_scripts` turns it into JavaScript and re-hashes it, and BrowserHive
-checks the JavaScript's hash. The two hashes meet at that one step.
+checks the JavaScript's hash. The two hashes meet at that one step. `report_level` then carries
+the JavaScript hash, with the compiler version and the host-types tag the service answered
+with, back to capture-ledger (`compiled` in the level report). The ledger writes them next to
+the TypeScript hash on the crawl, and refuses a later level that reports a different hash
+(409).
 
 `scripts` is required for the same reason `capture_formats` is. BrowserHive v11.0.0
 holds no roster of its own: send nothing and nothing runs inside the page, and the

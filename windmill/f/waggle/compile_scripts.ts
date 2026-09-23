@@ -33,8 +33,10 @@ export interface CrawlScript {
 
 export interface Compiled {
   scripts: CrawlScript[];
-  /** 何で変換したか (typescript の版)。job の結果に残る */
+  /** 何で変換したか (typescript の版)。`report_level` が台帳に運ぶ */
   typescript: string;
+  /** 何に向けて変換したか (受け皿の型の capture-scripts の tag)。同じく台帳に運ぶ */
+  hostTypes: string;
   /** 同じ TS の並びを、変換サービスが前にも変換していたか */
   cached: boolean;
 }

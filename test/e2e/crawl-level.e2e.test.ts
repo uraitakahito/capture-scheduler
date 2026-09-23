@@ -226,10 +226,28 @@ describe("クロールが flow を通って索引まで終わる", () => {
       if (state !== "running") {
         expect(state, `stopReason=${String(got["stopReason"])}`).toBe("succeeded");
         // 台帳が何を固定したか。**走ったことと、記録したことは別の主張**なので両方見る。
+        const scripts = got["scripts"] as {
+          id: string;
+          sha256: string;
+          jsSha256: string | null;
+          compiledWith: { typescript: string; hostTypes: string } | null;
+        }[];
         expect(
-          (got["scripts"] as { id: string }[]).map((script) => script.id),
+          scripts.map((script) => script.id),
           "目録が autofetch を配っていない",
         ).toContain("autofetch");
+        // 走った JS の hash と変換の記録が、報告で台帳に戻っている。目録の sha256 は TS の物なので、
+        // JS の物と同じなら「変換されていない」。
+        for (const script of scripts) {
+          expect(script.jsSha256, `${script.id}: JS の hash が台帳に戻っていない`).toMatch(
+            /^[0-9a-f]{64}$/,
+          );
+          expect(script.jsSha256, `${script.id}: JS の hash が TS の hash と同じ`).not.toBe(
+            script.sha256,
+          );
+          expect(script.compiledWith?.typescript).toMatch(/^\d+\.\d+\.\d+$/);
+          expect(script.compiledWith?.hostTypes).toMatch(/^v\d+\.\d+\.\d+$/);
+        }
       }
     }
     expect(state, "クロールが終わらなかった").not.toBe("running");

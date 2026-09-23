@@ -124,6 +124,11 @@ value:
               results.hosts.flat().concat(
                 results.plan.skipped.map((s) => ({ url: s.url, status: "skipped", skipReason: s.reason }))
               )
+          # compile の段の出力そのもの。JS の sha256 と、何で・何に向けて変換したか。
+          # report_level が身元と hash だけに削って台帳へ運ぶ
+          compiled:
+            type: javascript
+            expr: results.compile
     - id: index
       summary: 索引に載せる
       value:
