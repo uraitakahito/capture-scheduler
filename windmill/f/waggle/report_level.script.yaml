@@ -6,6 +6,38 @@ lock: "!inline f/waggle/report_level.script.lock"
 kind: script
 schema:
   properties:
+    compiled:
+      type: object
+      description: ""
+      default: null
+      format: resource-compiled_level
+      properties:
+        hostTypes:
+          type: string
+          description: ""
+          originalType: string
+        scripts:
+          type: array
+          description: ""
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                description: ""
+                originalType: string
+              version:
+                type: number
+                description: ""
+              sha256:
+                type: string
+                description: ""
+                originalType: string
+          originalType: record[]
+        typescript:
+          type: string
+          description: ""
+          originalType: string
     crawl_id:
       type: string
       description: ""
@@ -72,3 +104,4 @@ schema:
     - crawl_id
     - depth
     - results
+    - compiled

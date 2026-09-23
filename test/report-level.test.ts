@@ -43,24 +43,50 @@ const CAPTURED = [
   },
 ];
 
+/** compile の段の出力そのもの。source も運ばれてくるが、台帳へは身元と hash だけを送る。 */
+const COMPILED = {
+  typescript: "6.0.3",
+  hostTypes: "v0.2.0",
+  cached: false,
+  scripts: [
+    {
+      id: "autoscroll",
+      version: 3,
+      phase: "behavior",
+      source: '"use strict";\n',
+      sha256: "b".repeat(64),
+      options: {},
+    },
+  ],
+};
+const SENT = {
+  typescript: "6.0.3",
+  hostTypes: "v0.2.0",
+  scripts: [{ id: "autoscroll", version: 3, sha256: "b".repeat(64) }],
+};
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe("報告の送り方", () => {
-  it("深さと結果を本文に載せる", async () => {
+  it("深さと結果と、走った JS の hash を本文に載せる (source は運ばない)", async () => {
     const seen = responding(200, { next: [], stopReason: null });
-    await main("c-1", 2, CAPTURED);
+    await main("c-1", 2, CAPTURED, COMPILED);
 
     expect(seen[0]!.url).toBe("http://capture-ledger:7070/api/crawls/c-1/pages");
-    expect(JSON.parse(String(seen[0]!.init.body))).toEqual({ depth: 2, results: CAPTURED });
+    expect(JSON.parse(String(seen[0]!.init.body))).toEqual({
+      depth: 2,
+      results: CAPTURED,
+      compiled: SENT,
+    });
   });
 
   it("本文があるので content-type を送る", async () => {
     // `index_level` と対。**あちらは本文が無いので送ってはいけない。**
     // 同じ形に揃えたくなるが、Fastify の扱いが逆になる。
     const seen = responding(200, { next: [], stopReason: null });
-    await main("c-1", 0, CAPTURED);
+    await main("c-1", 0, CAPTURED, COMPILED);
 
     const headers = seen[0]!.init.headers as Record<string, string>;
     expect(headers["content-type"]).toBe("application/json");
@@ -69,7 +95,10 @@ describe("報告の送り方", () => {
   it("次の段と打ち切りの理由をそのまま返す", async () => {
     const next = [{ url: "http://m/b", host: "m", depth: 1 }];
     responding(200, { next, stopReason: "max_pages" });
-    await expect(main("c-1", 0, CAPTURED)).resolves.toEqual({ next, stopReason: "max_pages" });
+    await expect(main("c-1", 0, CAPTURED, COMPILED)).resolves.toEqual({
+      next,
+      stopReason: "max_pages",
+    });
   });
 });
 
@@ -78,19 +107,19 @@ describe("失敗したときの言い分", () => {
     // **この一言で原因が即分かった実績がある。** issuer は起動のたびに鍵を作り直すので、
     // Windmill に入れてあるトークンが黙って無効になる。status だけでは辿れない。
     responding(401, { error: "unauthenticated" });
-    await expect(main("c-1", 0, CAPTURED)).rejects.toThrow(/issuer/);
+    await expect(main("c-1", 0, CAPTURED, COMPILED)).rejects.toThrow(/issuer/);
   });
 
   it("404 には許可の示唆を付ける", async () => {
     // capture-ledger は「見てはいけない」と「存在しない」を区別せずに答えるので、
     // 404 だけでは足りない。クロールの許可を疑う先を書いておく。
     responding(404, { error: "not found" });
-    await expect(main("c-1", 0, CAPTURED)).rejects.toThrow(/fga:grant submitter/);
+    await expect(main("c-1", 0, CAPTURED, COMPILED)).rejects.toThrow(/fga:grant submitter/);
   });
 
   it("本文を必ず読む", async () => {
     // status だけだと capture-ledger が返している理由が消える。
     responding(500, "crawl is not running");
-    await expect(main("c-1", 0, CAPTURED)).rejects.toThrow(/crawl is not running/);
+    await expect(main("c-1", 0, CAPTURED, COMPILED)).rejects.toThrow(/crawl is not running/);
   });
 });

@@ -101,6 +101,9 @@ Windmill は schema の既定値を **UI からの実行にしか埋めない**�
 間隔、`capture_formats` / `signing`、そして **`scripts`**（ページの中で走らせる TypeScript）。
 目録が持つのは書いたままの TS で、`sha256` はそのバイト列に打たれている。`compile_scripts` が
 JS にして hash を打ち直し、BrowserHive は JS の hash を照合する。2 つの hash はその 1 段で継がれる。
+`report_level` はその JS の hash を、サービスが名乗った compiler の版と受け皿の型の tag と一緒に
+capture-ledger へ運ぶ（段の報告の `compiled`）。台帳はそれをクロールの TS の hash の隣に書き、
+後の段が違う hash を報告すれば 409 で断る。
 
 `scripts` を必須にしてあるのは `capture_formats` と同じ理由。BrowserHive v11.0.0 は
 走らせるものの顔ぶれを持たないので、送らなければページの中では何も走らず、**それでも

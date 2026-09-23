@@ -54,7 +54,12 @@ afterAll(async () => {
 
 describe("compile_scripts", () => {
   it("200 なら、変換サービスの答えをそのまま次の段に渡す", async () => {
-    const compiled = { typescript: "6.0.3", cached: false, scripts: [script("autoscroll", "js")] };
+    const compiled = {
+      typescript: "6.0.3",
+      hostTypes: "v0.2.0",
+      cached: false,
+      scripts: [script("autoscroll", "js")],
+    };
     nextAnswer = { status: 200, body: compiled };
     const out = await main([script("autoscroll", "ts")]);
     expect(out).toEqual(compiled);
