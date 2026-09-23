@@ -270,6 +270,55 @@ describe("クロールが flow を通って索引まで終わる", () => {
   });
 
   /**
+   * **目録を空にしたクロールは、何も走らせずに成功する。**
+   *
+   * 上の試験の対照。同じページ・同じ条件で、台帳に `scriptIds: []` (「何も走らせない」という意思) を渡す。
+   * compile の段は空の目録を 200 で通し (ts-compile-service v0.2.1 から)、BrowserHive はページの中で
+   * 何も走らせない。その証拠は fixtures の request log に在る —— autofetch が居なければ hero-2x.svg は
+   * 誰も要求しない。これが無いと、上の試験の hero-2x.svg が本当に autofetch の仕業かを、走らなかった
+   * ときの姿と比べて言えない。
+   *
+   * compile の段が空を断る版 (v0.2.0 まで) では、台帳の error に "[compile] compile 400 …" が残って
+   * state で落ちる。その文面をそのまま失敗の理由にする。
+   */
+  it("目録を空にしたクロールは、何も走らせずに成功する", async () => {
+    await fetch(`${FIXTURES_HOST}/__reset`, { method: "POST" });
+
+    const started = await fetch(`${WAGGLE}/api/crawls`, {
+      method: "POST",
+      headers: { ...auth(), "content-type": "application/json" },
+      body: JSON.stringify({
+        seeds: [`${FIXTURES}/responsive-images`],
+        maxDepth: 0,
+        scriptIds: [],
+      }),
+    });
+    const startedBody = await started.text();
+    expect(started.status, startedBody).toBe(202);
+    const crawlId = String((JSON.parse(startedBody) as Record<string, unknown>)["crawlId"]);
+
+    let got: Record<string, unknown> = {};
+    for (let i = 0; i < 100; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      got = await json(await fetch(`${WAGGLE}/api/crawls/${crawlId}`, { headers: auth() }));
+      if (got["state"] !== "running") break;
+    }
+    expect(got["state"], String(got["error"])).toBe("succeeded");
+    // 台帳は空の目録を固定した (省略なら autoscroll と autofetch が入る)
+    expect(got["scripts"]).toEqual([]);
+
+    const counts = (await json(await fetch(`${FIXTURES_HOST}/__request-counts`))) as Record<
+      string,
+      number
+    >;
+    // control —— 取り込みは届いている
+    expect(counts["/assets/hero.svg"], "取り込みが届いていない").toBeGreaterThan(0);
+    // **ここが本題。** autofetch が居ないので -2x は誰も要求しない。上の試験の hero-2x.svg が
+    // autofetch の仕業である証拠は、この 0 と対にして初めて言える
+    expect(counts["/assets/hero-2x.svg"] ?? 0, "目録が空なのに何かが走った").toBe(0);
+  });
+
+  /**
    * **型が通らないスクリプトを目録に入れると、クロールは compile の段で落ちる。**
    *
    * 目録は tag を経ずに CLI でも足せる。だから capture-scripts の CI が緑でも、走る前にもう 1 か所の
