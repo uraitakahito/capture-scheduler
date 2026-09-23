@@ -45,10 +45,22 @@ export interface LevelOutcome {
   stopReason: string | null;
 }
 
+/**
+ * compile の段の出力 (`compile_scripts.ts` の Compiled)。台帳に運ぶのは JS の sha256 と、
+ * 何で・何に向けて変換したかだけ —— source は運ばない。台帳が持つのは身元と hash で、
+ * 中身は archive に在る。
+ */
+export interface CompiledLevel {
+  typescript: string;
+  hostTypes: string;
+  scripts: { id: string; version: number; sha256: string }[];
+}
+
 export async function main(
   crawl_id: string,
   depth: number,
   results: PageResult[],
+  compiled: CompiledLevel,
 ): Promise<LevelOutcome> {
   // **設定は変数から読む。引数では受けない。**
   // Windmill は schema の既定値を UI からの実行にしか埋めない (`crawl_host.ts` に詳しい)。
@@ -60,7 +72,17 @@ export async function main(
   const res = await fetch(`${waggle_url}/api/crawls/${crawl_id}/pages`, {
     method: "POST",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify({ depth, results }),
+    body: JSON.stringify({
+      depth,
+      results,
+      // 走った JS の hash と変換の記録。台帳は目録の各要素に写し、段ごとに同じ値かを見る
+      // (違えば 409)。台帳側では必須 —— 載せ忘れは 400 で、この段が落ちる
+      compiled: {
+        typescript: compiled.typescript,
+        hostTypes: compiled.hostTypes,
+        scripts: compiled.scripts.map(({ id, version, sha256 }) => ({ id, version, sha256 })),
+      },
+    }),
   });
 
   if (!res.ok) {
