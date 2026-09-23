@@ -5,29 +5,44 @@ description: |
 
   台帳が送った TS の目録を ts-compile-service に POST し、JS の目録を受け取る。
   型が通らなければ 422 で、ここで投げる —— flow は failure_module へ落ち、クロールは failed になる。
-lock: "!inline f/waggle/compile_scripts.script.lock"
+lock: '!inline f/waggle/compile_scripts.script.lock'
 kind: script
 schema:
   properties:
     scripts:
       type: array
-      description: ""
+      description: ''
       default: null
+      format: resource-crawl_script
       items:
         type: object
         properties:
           id:
             type: string
+            description: ''
+            originalType: string
           version:
-            type: integer
-          phase:
-            type: string
-          source:
-            type: string
-          sha256:
-            type: string
+            type: number
+            description: ''
           options:
             type: object
-      originalType: CrawlScript[]
+            description: ''
+            format: resource-record
+          phase:
+            type: string
+            description: ''
+            enum:
+              - preload
+              - behavior
+            originalType: enum
+          sha256:
+            type: string
+            description: ''
+            originalType: string
+          source:
+            type: string
+            description: ''
+            originalType: string
+      originalType: record[]
   required:
     - scripts
