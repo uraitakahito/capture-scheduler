@@ -24,6 +24,7 @@ export const OPTIONAL_ENV = [
   "CAPTURE_LEDGER_TOKEN_EXPIRES_IN",
   "CAPTURE_LEDGER_BROWSERHIVE_ENDPOINTS",
   "CAPTURE_LEDGER_BROWSERHIVE_TLS_CA_PEM",
+  "TS_COMPILE_URL",
 ];
 
 /**
@@ -80,6 +81,14 @@ export const repoRoot = (): string => process.cwd();
 /** よく使う 2 つ。既定値は `.env.example` のコメントと一致させること。 */
 export const windmillUrl = () => optional("WINDMILL_URL", "http://127.0.0.1:8000");
 export const windmillWorkspace = () => optional("WINDMILL_WORKSPACE", "crawler");
+
+/**
+ * **コンテナから見た** ts-compile-service (TS を型検査して JS にする)。flow の `compile` の段が
+ * 変数 `u/admin/ts_compile_url` から読む。既定はこの repo の compose の service `ts-compile`。
+ * URL の形で書くのは、素のサービス名を値にすると container-compose が IP に書き換えるため。
+ */
+export const tsCompileUrl = () =>
+  optional("TS_COMPILE_URL", "http://ts-compile.capture-scheduler:8080");
 
 /**
  * クロール 1 段を回す flow のパス。**webhook の URL の一部**で、実体は

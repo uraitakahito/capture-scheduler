@@ -123,12 +123,13 @@ export const readProto = (answer: Answer, repo: string): Verdict => {
   };
 };
 
-/** flow と点検が読む変数。`windmill:capture-ledger-token` が 4 つとも入れる。 */
+/** flow と点検が読む変数。`windmill:capture-ledger-token` が 5 つとも入れる。 */
 export const VARIABLES = [
   "u/admin/waggle_token",
   "u/admin/waggle_api_url",
   "u/admin/browserhive_endpoints",
   "u/admin/browserhive_tls_ca",
+  "u/admin/ts_compile_url",
 ] as const;
 
 /**

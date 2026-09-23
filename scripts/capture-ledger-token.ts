@@ -23,6 +23,7 @@ import {
   ledgerApiUrl,
   ledgerIssuer,
   optional,
+  tsCompileUrl,
   windmillFetch,
   windmillWorkspace,
 } from "./env.js";
@@ -66,6 +67,9 @@ const ENDPOINTS_PATH = "u/admin/browserhive_endpoints";
  */
 const TLS_CA_PATH = "u/admin/browserhive_tls_ca";
 const TLS_CA_PEM = optional("CAPTURE_LEDGER_BROWSERHIVE_TLS_CA_PEM", "");
+/** 目録の TS を JS にする変換サービス。flow の `compile` の段が読む。 */
+const TS_COMPILE_PATH = "u/admin/ts_compile_url";
+const TS_COMPILE_URL = tsCompileUrl();
 
 const mintToken = async () => {
   const res = await fetch(`${ISSUER}/token`, {
@@ -146,12 +150,19 @@ const main = async () => {
     false,
   );
   const tlsAction = await upsertVariable(windmillToken, TLS_CA_PATH, TLS_CA_PEM, false);
+  const tsCompileAction = await upsertVariable(
+    windmillToken,
+    TS_COMPILE_PATH,
+    TS_COMPILE_URL,
+    false,
+  );
 
   process.stderr.write(
     `${TOKEN_PATH} を${tokenAction} (sub=${SUBJECT} orgs=${ORGANIZATIONS.join(",")} exp=${EXPIRES_IN})\n` +
       `${URL_PATH} を${urlAction} (${apiUrl}${apiUrlFrom})\n` +
       `${ENDPOINTS_PATH} を${endpointsAction} (${BROWSERHIVE_ENDPOINTS.join(", ")})\n` +
-      `${TLS_CA_PATH} を${tlsAction} (${TLS_CA_PEM === "" ? "空 = 平文" : "CA あり"})\n\n` +
+      `${TLS_CA_PATH} を${tlsAction} (${TLS_CA_PEM === "" ? "空 = 平文" : "CA あり"})\n` +
+      `${TS_COMPILE_PATH} を${tsCompileAction} (${TS_COMPILE_URL})\n\n` +
       `${SUBJECT} には ${ORGANIZATIONS[0] ?? "acme"} のクロールの許可が要る (1 度だけ。済んだかは pnpm run doctor の can_submit が言う):\n` +
       `  cd ../capture-ledger && pnpm run fga:grant submitter ${SUBJECT} ${ORGANIZATIONS[0] ?? "acme"}\n`,
   );

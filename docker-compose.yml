@@ -92,5 +92,21 @@ services:
       - windmill-db
     mem_limit: 2gb
 
+  # 目録の TS を型検査して JS にする変換サービス。flow の compile の段が
+  # 変数 u/admin/ts_compile_url (既定 http://ts-compile.capture-scheduler:8080) で呼ぶ。
+  #
+  # image は ts-compile-service の tag で ghcr.io に公開されている物 (arm64)。手元で建てるなら
+  # `container build -t ts-compile-service:dev -f Containerfile .` して image: をそれに。
+  # port は開けない —— 呼ぶのは worker だけ。
+  #
+  # /healthz の hostTypes が「受け皿の型 (capture-scripts の types/host.d.ts) をどの tag から
+  # 写したか」。目録の capture-scripts の tag と同じでなければ、向こうで通った TS がここで 422 になりうる。
+  ts-compile:
+    image: ghcr.io/uraitakahito/ts-compile-service:v0.1.0
+    environment:
+      - PORT=8080
+      - HOST=0.0.0.0
+    mem_limit: 512mb
+
 volumes:
   windmill-db-data:

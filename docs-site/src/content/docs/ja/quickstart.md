@@ -129,7 +129,7 @@ Windmill の flow が capture-ledger を呼ぶためのトークンと、呼ぶ�
 
 ```sh
 cd ~/projects/crawler/capture-scheduler
-pnpm run windmill:capture-ledger-token   # トークンと、コンテナから見た API の宛先を入れる
+pnpm run windmill:capture-ledger-token   # トークンと、コンテナから見た API の宛先と、ts-compile-service の宛先を入れる
 ```
 
 API の宛先（`u/admin/waggle_api_url`）は、`CAPTURE_LEDGER_API_URL` を書かなければ default

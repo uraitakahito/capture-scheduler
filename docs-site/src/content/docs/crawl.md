@@ -8,15 +8,24 @@ of `capture_targets` — and hands capture-scheduler **one level at a time**. Th
 `f/waggle/crawl_level`; one execution is one level.
 
 ```
-plan_level    group by host, fetch robots.txt once per host
+plan_level       group by host, fetch robots.txt once per host
   ↓
-for-each      parallel across hosts (parallelism = host_parallelism)
-  crawl_host    sequential within a host: finish → wait → next
+compile_scripts  type-check the catalog's TypeScript and turn it into JavaScript (ts-compile-service)
   ↓
-report_level  report to capture-ledger, receive the next level
+for-each         parallel across hosts (parallelism = host_parallelism)
+  crawl_host       sequential within a host: finish → wait → next
   ↓
-index_level   ask capture-ledger to index what landed in the ledger
+report_level     report to capture-ledger, receive the next level
+  ↓
+index_level      ask capture-ledger to index what landed in the ledger
 ```
+
+`compile_scripts` is the one step that calls a service outside the stack's own
+repositories: [ts-compile-service](https://github.com/uraitakahito/ts-compile-service), which
+runs as the `ts-compile` service of this repo's compose. If a single script fails the type
+check, the service answers 422 and the step throws — the flow drops into `fail_crawl`
+and the crawl ends as `failed`, with the diagnostics in its reason. A script that does
+not type-check never reaches a page.
 
 **capture-ledger does the repeating.** This flow ends after one level. Putting the loop
 in Windmill was tried: a minimal flow with `stop_after_if` **ran 643 iterations
@@ -101,7 +110,9 @@ runs**, so a webhook run gets nothing — the BrowserHive target arrived
 
 What does arrive as arguments is what capture-ledger decides for that crawl and always
 sends: the URLs, the delay, `capture_formats` / `signing`, and **`scripts`** — the
-JavaScript to run inside each page.
+TypeScript to run inside each page. The catalog keeps it as written (its `sha256` is over the
+TypeScript bytes); `compile_scripts` turns it into JavaScript and re-hashes it, and BrowserHive
+checks the JavaScript's hash. The two hashes meet at that one step.
 
 `scripts` is required for the same reason `capture_formats` is. BrowserHive v11.0.0
 holds no roster of its own: send nothing and nothing runs inside the page, and the
@@ -113,9 +124,15 @@ catalog.
 
 ```sh
 pnpm run windmill:capture-ledger-token   # waggle_token / waggle_api_url /
-                                 # browserhive_endpoints / browserhive_tls_ca
+                                 # browserhive_endpoints / browserhive_tls_ca /
+                                 # ts_compile_url
 pnpm run windmill:push-proto     # BrowserHive's proto (a resource)
 ```
+
+`u/admin/ts_compile_url` is where `compile_scripts` sends the catalog (default
+`http://ts-compile.capture-scheduler:8080`, the `ts-compile` service of this repo's compose;
+override with `TS_COMPILE_URL`). `pnpm run doctor` checks that the worker can reach its
+`/healthz`.
 
 `u/admin/browserhive_tls_ca` is the CA certificate (PEM) for the gRPC leg to
 BrowserHive, and **an empty value means plaintext**. The variable is written even

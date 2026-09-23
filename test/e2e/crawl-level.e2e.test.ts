@@ -1,3 +1,6 @@
+import { execFileSync } from "node:child_process";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, it, expect, beforeAll } from "vitest";
 
 /**
@@ -246,5 +249,51 @@ describe("クロールが flow を通って索引まで終わる", () => {
       counts["/assets/hero-2x.svg"],
       "autofetch が走っていない —— 目録・flow の scripts・BrowserHive の受け皿のどれかで切れている",
     ).toBeGreaterThan(0);
+  });
+
+  /**
+   * **型が通らないスクリプトを目録に入れると、クロールは compile の段で落ちる。**
+   *
+   * 目録は tag を経ずに CLI でも足せる。だから capture-scripts の CI が緑でも、走る前にもう 1 か所の
+   * 門番が要る —— flow の `compile` の段 (ts-compile-service)。ここではその門番が本当に段を落とし、
+   * 台帳が failed で締められる (fail_crawl) ことを見る。落ちる理由に型エラーの code が載るのは、
+   * Windmill の履歴を開かなくても台帳だけで「なぜ落ちたか」が読めるようにするため。
+   *
+   * 壊れた 1 本は試験の最後に目録から消す。残すと以後のクロールが全部ここで落ちる。
+   */
+  it("型が通らないスクリプトを目録に入れると、クロールは compile の段で落ちる", async () => {
+    const ledgerDir = process.env["E2E_LEDGER_DIR"] ?? resolve(process.cwd(), "../capture-ledger");
+    const broken = fileURLToPath(new URL("./fixtures/broken-script.txt", import.meta.url));
+    const ledger = (...args: string[]): string =>
+      execFileSync("pnpm", ["run", "--silent", "scripts", ...args], {
+        cwd: ledgerDir,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+
+    ledger("add", "broken", "--file", broken, "--phase", "behavior");
+    try {
+      const started = await fetch(`${WAGGLE}/api/crawls`, {
+        method: "POST",
+        headers: { ...auth(), "content-type": "application/json" },
+        body: JSON.stringify({ seeds: [`${FIXTURES}/responsive-images`], maxDepth: 0 }),
+      });
+      const startedBody = await started.text();
+      expect(started.status, startedBody).toBe(202);
+      const crawlId = String((JSON.parse(startedBody) as Record<string, unknown>)["crawlId"]);
+
+      let got: Record<string, unknown> = { state: "running" };
+      for (let i = 0; i < 100 && got["state"] === "running"; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        got = await json(await fetch(`${WAGGLE}/api/crawls/${crawlId}`, { headers: auth() }));
+      }
+      expect(got["state"], `stopReason=${String(got["stopReason"])}`).toBe("failed");
+      // fail_crawl が段の例外の文をそのまま reason にする。診断の code まで台帳に残る
+      const reason = String(got["stopReason"]);
+      expect(reason, "落ちた段が compile ではない").toContain("compile 422");
+      expect(reason, "型エラーの code が reason に無い").toContain("TS2322");
+    } finally {
+      ledger("rm", "broken");
+    }
   });
 });
