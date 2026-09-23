@@ -1,0 +1,5 @@
+/** 型が通らない標本。e2e が台帳の目録に入れて、クロールが compile の段で落ちることを見る */
+(async () => {
+  const n: number = "x";
+  globalThis.__bh.report("broken", { n, missing: globalThis.__bh.remaining });
+})();

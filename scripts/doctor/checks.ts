@@ -1,5 +1,5 @@
 /**
- * doctor の点検 14 本 (e2e のときは 16 本)。**クイックスタートの手の順に並べてある。**
+ * doctor の点検 15 本 (e2e のときは 17 本)。**クイックスタートの手の順に並べてある。**
  *
  * 1 本ずつ「クイックスタートのどの手が済んでいるか」を、その手が作るものに訊く。立っているか
  * だけでなく、**クロールが最後まで走る設定か**まで見る —— 外れていても、API に POST すれば
@@ -46,6 +46,7 @@ import {
   parseCurl,
   readBrowserhiveProbes,
   readContainerApi,
+  readTsCompileProbe,
   type CurlAnswer,
 } from "./worker-probes.js";
 
@@ -400,6 +401,18 @@ const workerReachesBrowserhive = async (): Promise<Outcome> => {
   return readBrowserhiveProbes(probes);
 };
 
+/**
+ * 変換サービス (変数 `u/admin/ts_compile_url`) の `/healthz` に、worker の中から届くか。
+ * flow の compile の段が呼ぶ宛先そのもの。届かなければ、どのクロールも compile の段で落ちる。
+ */
+const workerReachesTsCompile = async (): Promise<Verdict> => {
+  const url = await variable("u/admin/ts_compile_url");
+  if (url === undefined) return unreadable("u/admin/ts_compile_url");
+  const answer = await curlInWorker(`${url}/healthz`, 5);
+  if ("error" in answer) return workerUnreachable(answer.error);
+  return readTsCompileProbe({ url, answer });
+};
+
 // ── e2e ────────────────────────────────────────────────────────────────
 
 /** e2e の試験が名乗る名前に、クロールの許可があるか。 */
@@ -532,6 +545,13 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
     where: "worker の中から、u/admin/browserhive_endpoints の口ごとに HTTP/2",
     needs: ["変数"],
     probe: workerReachesBrowserhive,
+  },
+  {
+    name: "worker→ts-compile",
+    section: SECTIONS.handOver,
+    where: "worker の中から、u/admin/ts_compile_url の /healthz",
+    needs: ["変数"],
+    probe: workerReachesTsCompile,
   },
   {
     name: "can_submit",

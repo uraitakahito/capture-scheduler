@@ -129,7 +129,7 @@ Windmill's variables:
 
 ```sh
 cd ~/projects/crawler/capture-scheduler
-pnpm run windmill:capture-ledger-token   # the token, and the API address as a container sees it
+pnpm run windmill:capture-ledger-token   # the token, the API address as a container sees it, and the ts-compile-service address
 ```
 
 The API address (`u/admin/waggle_api_url`) comes from the gateway of the `default` network

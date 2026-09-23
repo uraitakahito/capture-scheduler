@@ -37,6 +37,19 @@ value:
           host_parallelism:
             type: javascript
             expr: flow_input.host_parallelism
+    # **目録の TS を JS にする。** 台帳が持つのは書いたままの TS (sha256 は TS のバイト列)。
+    # BrowserHive が評価するのは JS (sha256 は JS のバイト列)。その継ぎ目がこの段で、
+    # 変換するのは ts-compile-service —— 型が通らなければ 422 でこの段が落ち、failure_module が
+    # クロールを failed で締める。通らない TS を黙って走らせない。
+    - id: compile
+      summary: TS を型検査して JS に (ts-compile-service)。通らなければ段ごと落ちる
+      value:
+        type: script
+        path: f/waggle/compile_scripts
+        input_transforms:
+          scripts:
+            type: javascript
+            expr: flow_input.scripts
     - id: hosts
       summary: ホストごとに並列、ホスト内は逐次
       value:
@@ -68,9 +81,11 @@ value:
                 signing:
                   type: javascript
                   expr: flow_input.signing
+                # compile の段が返した JS の目録。flow_input.scripts (TS) を直接渡さない ——
+                # 渡すと BrowserHive はページの中で TS を評価しようとして失敗する (試験が赤くなる)。
                 scripts:
                   type: javascript
-                  expr: flow_input.scripts
+                  expr: results.compile.scripts
                 artifact_sink:
                   type: javascript
                   expr: flow_input.artifact_sink

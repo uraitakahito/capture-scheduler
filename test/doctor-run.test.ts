@@ -52,6 +52,7 @@ describe("本物の点検の並び", () => {
         "proto",
         "push",
         "worker→browserhive",
+        "worker→ts-compile",
         "workspace",
         "変数",
         // 目録は can_submit の子。親が飛ばされれば、こちらも飛ばされる。
@@ -69,9 +70,9 @@ describe("本物の点検の並び", () => {
     expect(stateOf(results, "can_submit")).toMatchObject({ state: "skip", reason: "先に jwt を" });
   });
 
-  it("点検は 14 本で、e2e のときだけ 2 本増える", () => {
-    expect(CHECKS.filter((c) => c.e2eOnly !== true)).toHaveLength(14);
-    expect(CHECKS).toHaveLength(16);
+  it("点検は 15 本で、e2e のときだけ 2 本増える", () => {
+    expect(CHECKS.filter((c) => c.e2eOnly !== true)).toHaveLength(15);
+    expect(CHECKS).toHaveLength(17);
   });
 
   it("親は必ず子より前に並ぶ (報告がクイックスタートの順に読め、循環も無い)", () => {
