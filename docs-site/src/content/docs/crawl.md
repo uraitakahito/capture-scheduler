@@ -116,7 +116,9 @@ checks the JavaScript's hash. The two hashes meet at that one step. `report_leve
 the JavaScript hash, with the compiler version and the host-types tag the service answered
 with, back to capture-ledger (`compiled` in the level report). The ledger writes them next to
 the TypeScript hash on the crawl, and refuses a later level that reports a different hash
-(409).
+(409). An empty catalog (`scriptIds: []` on the crawl) is a valid level too: the service answers
+200 with no scripts, the page runs nothing, and the report still carries `typescript` and
+`hostTypes`.
 
 `scripts` is required for the same reason `capture_formats` is. BrowserHive v11.0.0
 holds no roster of its own: send nothing and nothing runs inside the page, and the
