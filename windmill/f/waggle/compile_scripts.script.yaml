@@ -1,0 +1,33 @@
+summary: TS を型検査して JS にする (ts-compile-service)
+description: |
+  クロール 1 段を回す flow (f/waggle/crawl_level) の部品。plan と hosts の間。
+  単体で叩くものではない。
+
+  台帳が送った TS の目録を ts-compile-service に POST し、JS の目録を受け取る。
+  型が通らなければ 422 で、ここで投げる —— flow は failure_module へ落ち、クロールは failed になる。
+lock: "!inline f/waggle/compile_scripts.script.lock"
+kind: script
+schema:
+  properties:
+    scripts:
+      type: array
+      description: ""
+      default: null
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+          version:
+            type: integer
+          phase:
+            type: string
+          source:
+            type: string
+          sha256:
+            type: string
+          options:
+            type: object
+      originalType: CrawlScript[]
+  required:
+    - scripts

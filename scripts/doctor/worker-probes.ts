@@ -112,3 +112,37 @@ export const readContainerApi = ({
     need: `worker から ${url}/healthz → curl rc=${String(answer.rc)} http=${answer.http}`,
   };
 };
+
+/**
+ * 変換サービス (変数 `u/admin/ts_compile_url`) の `/healthz`。
+ *
+ * この repo の compose の service なので、直し方は BrowserHive とも API とも違う —— 名前が引けなければ
+ * compose に居ない (この repo で `container-compose up -d`)、refused か答えなければ起動中か落ちている。
+ */
+export const readTsCompileProbe = ({
+  url,
+  answer,
+}: {
+  url: string;
+  answer: CurlAnswer;
+}): Verdict => {
+  if (answer.rc === 0 && answer.http === "200") return { ok: true };
+  if (answer.rc === 6) {
+    return {
+      ok: false,
+      need:
+        `worker から ${url} の名前が引けない —— ts-compile が compose に居ない → ` +
+        "この repo で container-compose up -d (変数の綴りは TS_COMPILE_URL)",
+    };
+  }
+  if (answer.rc === 7)
+    return {
+      ok: false,
+      need: `worker から ${url} に届かない (refused) —— ts-compile が起動中か落ちた`,
+    };
+  if (answer.rc === 28) return { ok: false, need: `worker から ${url} が 5 秒で答えない` };
+  return {
+    ok: false,
+    need: `worker から ${url}/healthz → curl rc=${String(answer.rc)} http=${answer.http}`,
+  };
+};

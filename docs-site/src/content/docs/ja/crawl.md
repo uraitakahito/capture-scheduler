@@ -8,15 +8,23 @@ capture-ledger の `POST /api/crawls` が種を受け取り（URL の配列か�
 `f/waggle/crawl_level` で、1 回の実行が 1 段。
 
 ```
-plan_level    ホストで束ね、robots.txt を 1 ホスト 1 回引く
+plan_level       ホストで束ね、robots.txt を 1 ホスト 1 回引く
   ↓
-for-each      ホストごとに並列（parallelism = host_parallelism）
-  crawl_host    1 ホスト内は逐次。完了 → 間隔 → 次
+compile_scripts  目録の TypeScript を型検査して JavaScript にする（ts-compile-service）
   ↓
-report_level  capture-ledger に報告し、次の段があるかを受け取る
+for-each         ホストごとに並列（parallelism = host_parallelism）
+  crawl_host       1 ホスト内は逐次。完了 → 間隔 → 次
   ↓
-index_level   台帳に載ったぶんを索引に載せるよう capture-ledger に頼む
+report_level     capture-ledger に報告し、次の段があるかを受け取る
+  ↓
+index_level      台帳に載ったぶんを索引に載せるよう capture-ledger に頼む
 ```
+
+`compile_scripts` は、この flow で唯一、スタックの外のサービスを呼ぶ段 ——
+[ts-compile-service](https://github.com/uraitakahito/ts-compile-service) で、この repo の
+compose の `ts-compile` として動く。1 本でも型が通らなければサービスは 422 を返し、段が投げる。
+flow は `fail_crawl` へ落ち、クロールは診断を reason に載せて `failed` で終わる。型が通らない
+スクリプトはページに届かない。
 
 **繰り返すのは capture-ledger。** この flow は 1 段で終わる。Windmill の while ループに
 繰り返しを持たせようとしたが、`stop_after_if` を付けた最小の flow が
@@ -90,7 +98,9 @@ Windmill は schema の既定値を **UI からの実行にしか埋めない**�
 「Channel target must be a string」になった。
 
 引数で届くのは、そのクロールについて capture-ledger が決めて**必ず送る**もの —— URL と
-間隔、`capture_formats` / `signing`、そして **`scripts`**（ページの中で走らせる JavaScript）。
+間隔、`capture_formats` / `signing`、そして **`scripts`**（ページの中で走らせる TypeScript）。
+目録が持つのは書いたままの TS で、`sha256` はそのバイト列に打たれている。`compile_scripts` が
+JS にして hash を打ち直し、BrowserHive は JS の hash を照合する。2 つの hash はその 1 段で継がれる。
 
 `scripts` を必須にしてあるのは `capture_formats` と同じ理由。BrowserHive v11.0.0 は
 走らせるものの顔ぶれを持たないので、送らなければページの中では何も走らず、**それでも
@@ -101,9 +111,14 @@ Windmill は schema の既定値を **UI からの実行にしか埋めない**�
 
 ```sh
 pnpm run windmill:capture-ledger-token   # waggle_token / waggle_api_url /
-                                 # browserhive_endpoints / browserhive_tls_ca
+                                 # browserhive_endpoints / browserhive_tls_ca /
+                                 # ts_compile_url
 pnpm run windmill:push-proto     # browserhive の proto (resource)
 ```
+
+`u/admin/ts_compile_url` は `compile_scripts` が目録を送る宛先（既定は
+`http://ts-compile.capture-scheduler:8080`、この repo の compose の `ts-compile`。
+`TS_COMPILE_URL` で変えられる）。`pnpm run doctor` が worker からその `/healthz` に届くかを見る。
 
 `u/admin/browserhive_tls_ca` は browserhive への gRPC を TLS にするときの CA 証明書
 （PEM）で、**空文字は「平文」**。空でも変数そのものは必ず作る —— 変数を作らない形に
