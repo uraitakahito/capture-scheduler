@@ -7,7 +7,7 @@ capture-scheduler runs [capture-ledger](https://uraitakahito.github.io/capture-l
 **on [Windmill](https://www.windmill.dev/)**. It has two jobs.
 
 - **Capture** — capture-ledger hands a crawl over one level at a time, through a webhook. The flow
-  groups that level's URLs by host, checks robots.txt, has BrowserHive capture them over gRPC, and
+  groups that level's URLs by host, checks robots.txt, has BrowserHive capture them over HTTP, and
   returns what it found. Crawls it did not start run here too. **The flow in this repository is the
   only thing that calls BrowserHive** — capture-ledger no longer talks to it.
 - **Start** — every day at 04:00 it asks capture-ledger for a crawl seeded from the enabled rows of

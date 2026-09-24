@@ -30,8 +30,6 @@
     "clean:scripts": "rm -rf dist",
     "build:scripts": "pnpm run clean:scripts && tsc -p tsconfig.scripts.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "windmill:push-proto": "pnpm run build:scripts && node --env-file-if-exists=.env --env-file-if-exists=.env.local dist/scripts/push-proto.js",
-    "proto:check": "pnpm run build:scripts && node dist/scripts/proto-check.js",
     "test": "vitest run --project unit",
     "test:watch": "vitest --project unit",
     "pretest:e2e": "pnpm run build:scripts && node --env-file-if-exists=.env --env-file-if-exists=.env.local dist/scripts/doctor.js --e2e",
@@ -46,8 +44,6 @@
     "docs:shots": "pnpm run build:scripts && node dist/scripts/docs-shots.js"
   },
   "devDependencies": {
-    "@grpc/grpc-js": "1.14.4",
-    "@grpc/proto-loader": "0.8.1",
     "@types/node": "^26.5.0",
     "prettier": "3.6.2",
     "puppeteer": "25.10.0",

@@ -122,9 +122,6 @@ const API_STEPS = new Set(["report", "index", "failure"]);
  * 型はどれも実物で見たもの (`test/fixtures/crawl/`)。知らない型は文をそのまま出して run を見させる。
  */
 export const readStepFailure = (step: string | undefined, message: string): string => {
-  if (/Resource not found at u\/admin\/browserhive_proto/.test(message)) {
-    return "Windmill に BrowserHive の proto が無い → pnpm run windmill:push-proto";
-  }
   const unreachable = /BrowserHive に届きません: (.+)$/.exec(message);
   if (unreachable !== null) {
     return (
