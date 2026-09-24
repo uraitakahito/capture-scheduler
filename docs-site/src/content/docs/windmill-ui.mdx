@@ -10,13 +10,11 @@ import home from "../../assets/windmill-ui/03-home.png";
 import runsList from "../../assets/windmill-ui/04-runs-list.png";
 import runFlow from "../../assets/windmill-ui/05-run-flow.png";
 import runStep from "../../assets/windmill-ui/06-run-step.png";
-import errProto from "../../assets/windmill-ui/07-run-error-proto.png";
 import errReport from "../../assets/windmill-ui/08-run-error-report.png";
 import flowDetail from "../../assets/windmill-ui/09-flow-detail.png";
 import scriptForm from "../../assets/windmill-ui/10-script-form.png";
 import schedules from "../../assets/windmill-ui/11-schedules.png";
 import variables from "../../assets/windmill-ui/12-variables.png";
-import resources from "../../assets/windmill-ui/13-resources-states.png";
 import trigger from "../../assets/windmill-ui/14-trigger-script.png";
 
 Windmill ships its own web UI. In this deployment that UI **is**
@@ -90,23 +88,13 @@ inputs and result. Steps run independently, so this is where you trace
 
 <Image src={runStep} alt="The report_level step run detail, with crawl_id and the results input" />
 
-## Digging into failures — two real ones
+## Digging into failures — a real one
 
 Failures happen in different steps for different reasons. **Read the step and
 error in Runs, then take the detail to each service's logs** — that is how you
-dig. Two happened today.
+dig. One happened today.
 
-**① `crawl_host` with `Resource not found`.** Without the resource
-`u/admin/browserhive_proto` (the copy of browserhive's gRPC `.proto`) this is
-what you get — `windmill:push` uploads scripts but not the proto. The fix is
-`windmill:push-proto` (the [variable ledger](#the-variable-ledger--which-script-provisions-what) below).
-
-<Image
-  src={errProto}
-  alt="crawl_host failure run: Result shows Resource not found at u/admin/browserhive_proto"
-/>
-
-**② `report_level` got a `500` back from capture-ledger's
+**`report_level` got a `500` back from capture-ledger's
 `POST /api/crawls/…/pages`.** Runs tells you this much — **the content of the
 500 is only in capture-ledger's logs**. The UI shows which step, which target,
 which status; identifying the cause is handed to the target's logs.
@@ -115,6 +103,12 @@ which status; identifying the cause is handed to the target's logs.
   src={errReport}
   alt="report_level failure run: Result shows POST /api/crawls/…/pages → 500 internal error"
 />
+
+A `crawl_host` failure reads the same way. The step fails only when no
+BrowserHive can be reached (`BrowserHive に届きません: …` lists every endpoint);
+a refusal from one BrowserHive (`400 ValidationException: …`, with the field it
+refused) is the page's own failure inside the step's result, and the crawl goes
+on. Either way, what BrowserHive did with the request is in BrowserHive's logs.
 
 ## Flow and script — what they are
 
@@ -154,25 +148,19 @@ daily) fires `trigger_crawl`. The toggle on the right is `enabled`.
 restores it. To stop it for good, edit the yaml and push. What it means is on
 [Schedule](/schedule/).
 
-## Variables and Resources
+## Variables
 
-The four `u/admin/*` variables. `waggle_token` is a secret, so its value
-comes out masked (`••••`) — **the masking itself** is the proof that the token
-is not exposed in the UI.
+The `u/admin/*` variables. `waggle_token` is a secret, so its value comes out
+masked (`••••`) — **the masking itself** is the proof that the token is not
+exposed in the UI.
 
 <Image
   src={variables}
   alt="Variables: waggle_token masked, the others show browserhive_endpoints and so on"
 />
 
-`browserhive_proto` lives in Resources, not Variables. But its
-`resource_type` is `state`, so it is not on the default Workspace tab — switch
-to the **States tab** to see it. Failure ① was this being absent.
-
-<Image
-  src={resources}
-  alt="Resources, States tab: browserhive_proto as one entry with resource type state"
-/>
+Resources stay empty: this repo puts nothing there (until v0.22 a copy of
+BrowserHive's `.proto` lived there, under the States tab).
 
 ## Firing one run by hand
 
@@ -189,25 +177,22 @@ webhook, which is why `daily` passes values from variables instead.
 ## The variable ledger — which script provisions what
 
 `windmill:push` only uploads **what is in git** (scripts, the flow, the
-schedule). Variables and resources are provisioned by separate scripts.
-Confuse the two and push stays green while the flow dies with
-`Resource not found` (failure ① above).
+schedule). Variables are provisioned by a separate script. Confuse the two and
+push stays green while the flow dies on its first `getVariable`.
 
-| Path                            | Contents                                                                                                                                | Provisioned by                  |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| `u/admin/waggle_token`          | JWT for capture-ledger (secret)                                                                                                         | `windmill:capture-ledger-token` |
-| `u/admin/waggle_api_url`        | Where the capture-ledger API is (default: the gateway of the `default` network)                                                         | same                            |
-| `u/admin/browserhive_endpoints` | JSON array of gRPC targets, one per BrowserHive (default `["browserhive-1.capture-ledger:50051","browserhive-2.capture-ledger:50051"]`) | same                            |
-| `u/admin/browserhive_tls_ca`    | TLS CA (empty = plaintext)                                                                                                              | same                            |
-| `u/admin/browserhive_proto`     | Copy of `capture.proto` (read by `crawl_host`)                                                                                          | `windmill:push-proto`           |
+| Path                            | Contents                                                                                                                                                  | Provisioned by                  |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| `u/admin/waggle_token`          | JWT for capture-ledger (secret)                                                                                                                           | `windmill:capture-ledger-token` |
+| `u/admin/waggle_api_url`        | Where the capture-ledger API is (default: the gateway of the `default` network)                                                                           | same                            |
+| `u/admin/browserhive_endpoints` | JSON array of BrowserHive URLs, one per BrowserHive (default `["http://browserhive-1.capture-ledger:50051","http://browserhive-2.capture-ledger:50051"]`) | same                            |
+| `u/admin/browserhive_tls_ca`    | CA for `https://` endpoints (empty = plaintext `http://`)                                                                                                 | same                            |
+| `u/admin/ts_compile_url`        | Where ts-compile-service is (default `http://ts-compile.capture-scheduler:8080`)                                                                          | same                            |
 
-**`windmill:push-proto` is not part of `windmill:push`.** Whenever the proto
-is refreshed, run it again — Windmill reads this copy, not the submodule.
-
-`crawl_host` refuses a copy older than BrowserHive v10.0.0 (one without
-`ManifestOutcome`) and names this command. With such a copy the capture responses
-still decode, but their manifest location is silently dropped: every capture is
-reported without one, the crawl succeeds, and capture-ledger admits nothing.
+The endpoints are `http(s)://` URLs since BrowserHive v12. `crawl_host` refuses
+the `host:port` form of v11 and names this variable, and
+`windmill:capture-ledger-token` refuses it before writing the variable — so a
+stale `CAPTURE_LEDGER_BROWSERHIVE_ENDPOINTS` in `.env` stops at the tool, not in
+the flow.
 
 ## Recovering from total loss
 
@@ -220,8 +205,7 @@ pnpm run windmill:bootstrap            # recreates the workspace, prints a fresh
                                        # → paste the four lines after it at the end of
                                        #   capture-ledger's .env and restart its API
 pnpm run windmill:push                 # scripts / flow / schedule
-pnpm run windmill:push-proto           # ← forget this and crawl_host dies with Resource not found
-pnpm run windmill:capture-ledger-token # the four variables
+pnpm run windmill:capture-ledger-token # the five variables
 cd ../capture-ledger
 pnpm run fga:grant submitter windmill acme  # let windmill start crawls for acme
 ```

@@ -1,5 +1,5 @@
 /**
- * doctor の点検 15 本 (e2e のときは 17 本)。**クイックスタートの手の順に並べてある。**
+ * doctor の点検 14 本 (e2e のときは 16 本)。**クイックスタートの手の順に並べてある。**
  *
  * 1 本ずつ「クイックスタートのどの手が済んでいるか」を、その手が作るものに訊く。立っているか
  * だけでなく、**クロールが最後まで走る設定か**まで見る —— 外れていても、API に POST すれば
@@ -34,7 +34,6 @@ import { runChecks, type Check, type Outcome, type Result, type Verdict } from "
 import { SECTIONS } from "./sections.js";
 import {
   readCatalog,
-  readProto,
   readPush,
   readVariables,
   readWorkspace,
@@ -235,12 +234,6 @@ const pushed = async (): Promise<Verdict> => {
   return readPush(deployed);
 };
 
-const protoMatches = async (): Promise<Verdict> =>
-  readProto(
-    await windmill(inWorkspace("resources/get_value/u/admin/browserhive_proto")),
-    readFileSync(join(repoRoot(), "proto", "browserhive", "v1", "capture.proto"), "utf8"),
-  );
-
 // ── 立ち上げる: capture-ledger ─────────────────────────────────────────
 
 /** issuer が名乗る iss。discovery から読む —— need に出す値を決め打ちしない。 */
@@ -369,7 +362,7 @@ const containerReachesApi = async (): Promise<Verdict> => {
 
 /**
  * BrowserHive の口 (変数 `u/admin/browserhive_endpoints`) に、worker の中から届くか。
- * 口は browser 1 台に 1 つなので、全部を並べて叩き、落ちている口を名指しする。
+ * 口は browser 1 台に 1 つなので、全部を並べて `GET /status` を叩き、落ちている口を名指しする。
  */
 const workerReachesBrowserhive = async (): Promise<Outcome> => {
   const [list, ca] = await Promise.all([
@@ -377,7 +370,8 @@ const workerReachesBrowserhive = async (): Promise<Outcome> => {
     variable("u/admin/browserhive_tls_ca"),
   ]);
   if (list === undefined) return unreadable("u/admin/browserhive_endpoints");
-  // TLS の口に平文の HTTP/2 で訊いても、答えの読み方を実測していない。推測で ✓ も ✗ も出さない。
+  // TLS の口は、worker の curl に CA を渡す口が無い (変数の PEM をコンテナの中の file にする
+  // 手順が要る)。推測で ✓ も ✗ も出さない。
   if (ca !== undefined && ca !== "") {
     return { skipped: "TLS の口は見ない (u/admin/browserhive_tls_ca に CA が入っている)" };
   }
@@ -389,9 +383,7 @@ const workerReachesBrowserhive = async (): Promise<Outcome> => {
     };
   }
   const answers = await Promise.all(
-    endpoints.map((endpoint: string) =>
-      curlInWorker(`http://${endpoint}/`, 3, ["--http2-prior-knowledge"]),
-    ),
+    endpoints.map((endpoint: string) => curlInWorker(`${endpoint}/status`, 3)),
   );
   const probes: { endpoint: string; answer: CurlAnswer }[] = [];
   for (const [i, answer] of answers.entries()) {
@@ -471,13 +463,6 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
     probe: pushed,
   },
   {
-    name: "proto",
-    section: SECTIONS.bringUp,
-    where: "u/admin/browserhive_proto が repo の capture.proto と同じか",
-    needs: ["workspace"],
-    probe: protoMatches,
-  },
-  {
     name: "capture-ledger api",
     section: SECTIONS.bringUp,
     where: `${API}/healthz`,
@@ -542,7 +527,7 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
   {
     name: "worker→browserhive",
     section: SECTIONS.handOver,
-    where: "worker の中から、u/admin/browserhive_endpoints の口ごとに HTTP/2",
+    where: "worker の中から、u/admin/browserhive_endpoints の口ごとに GET /status",
     needs: ["変数"],
     probe: workerReachesBrowserhive,
   },

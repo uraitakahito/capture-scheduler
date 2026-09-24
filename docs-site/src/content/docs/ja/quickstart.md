@@ -32,7 +32,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'authorization: Bearer dev-key' http
 
 :::tip[まとめてなら、capture-ledger の 1 本で済みます]
 capture-ledger で `pnpm run dev:up` を打つと、**このページの手順も含めて** 14 段を順に
-起こします —— Windmill を立て、bootstrap し、flow と proto を入れ、鍵を渡し、最後に
+起こします —— Windmill を立て、bootstrap し、flow を入れ、鍵を渡し、最後に
 `doctor` まで。向こうが打つのは**この repo のコマンド**で、**ファイルはこの repo の中に
 しか書かれません**（capture-ledger に渡す 4 行は、向こうの `pnpm run connect` が
 取りに来ます）。
@@ -56,7 +56,6 @@ pnpm install
 
 pnpm run windmill:bootstrap   # workspace と token を作り、2 枚のファイルに書く（下）
 pnpm run windmill:push        # script・flow・schedule を入れる
-pnpm run windmill:push-proto  # BrowserHive の proto を入れる（crawl_host が読む。push には含まれない）
 ```
 
 **貼る行はもう出ません。**bootstrap が書くのは、この repo の中の 2 枚だけです:
@@ -178,8 +177,8 @@ pnpm run smoke    # https://example.com/ を 1 本撮り、WACZ を取り出せ�
 ```
 
 **doctor** は、このページの見出しごとに「その手が済んでいるか」を、その手が作ったものに訊く。
-立っているかだけでなく、script の中身が repo と同じか、proto が古くないか、Windmill が持っている
-トークンでクロールを起こせるか、worker の中から API と BrowserHive に届くか、まで見る。✗ は、何を
+立っているかだけでなく、script の中身が repo と同じか、Windmill が持っているトークンで
+クロールを起こせるか、worker の中から API と BrowserHive に届くか、まで見る。✗ は、何を
 直すかと、このページのどの節の手かを言う。✗ の点検に頼る点検は走らせず、「先に〇〇を」とだけ
 出す —— 直すものが 1 つなら、✗ も 1 本。
 
@@ -216,7 +215,7 @@ run      http://127.0.0.1:8000/run/01a0ba19-…?workspace=crawler
 **撮れなかったら**、smoke が落ちた段と直し方を言う（`原因` と `直す` の 2 行）。言われた手を直して
 smoke をもう一度。自分が起こしたクロールは、失敗しても時間切れでも Ctrl-C でも締めるので、次の 1 本が
 409 で塞がれることはない。Windmill の画面で追うなら、smoke が出す `run` の URL を開く（見方は
-[Windmill UI の「失敗を掘る」](/windmill-ui/#失敗を掘る--実例-2-つ)）。
+[Windmill UI の「失敗を掘る」](/windmill-ui/#失敗を掘る--実例-1-つ)）。
 
 ```sh
 cd ~/projects/crawler/capture-scheduler
@@ -237,8 +236,6 @@ smoke は capture-ledger v0.43.0 以上を前提にする（最後の段の run 
 | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | doctor の目録が ✗ ／ smoke が 400 `the script catalog is empty`                                                                                 | 目録が空。ページの中で何も走らない                                                        | capture-ledger で `pnpm run scripts import .upstream/capture-scripts` |
 | doctor の windmill が ✗ で、下の点検が「先に windmill を」                                                                                      | Windmill が落ちている                                                                     | `container-compose up -d`（この repo で）                             |
-| doctor の proto が ✗「Windmill に proto が無い」／smoke の原因が `[cap] Resource not found at u/admin/browserhive_proto …`                      | proto を入れていない                                                                      | `pnpm run windmill:push-proto`                                        |
-| doctor の proto が ✗「repo の capture.proto と違う」                                                                                            | BrowserHive の版を上げて proto を取り直したが、Windmill の写しが古い                      | `pnpm run windmill:push-proto`                                        |
 | doctor の push が ✗「repo と中身が違う」                                                                                                        | script を直したが push していない（または Windmill の UI で直した）                       | `pnpm run windmill:push`（違いを見るだけなら `windmill:diff`）        |
 | doctor の worker→browserhive が ✗「名前が引けない」（止めた直後の数秒は「3 秒で答えない」）／smoke の原因が `[cap] BrowserHive に届きません: …` | BrowserHive のコンテナが止まっている（止めたコンテナは名前ごと消える）                    | capture-ledger で `pnpm run stack:up`                                 |
 | smoke が `succeeded`・撮ったページ 0 で、原因が `… net::ERR_NAME_NOT_RESOLVED …`                                                                | 撮る URL の名前が引けない                                                                 | URL の綴り。正しければ、BrowserHive のコンテナから外の名前を引けるか  |

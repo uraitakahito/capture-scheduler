@@ -30,10 +30,9 @@ compose pin and the version in `shots-manifest.json` disagree, so CI stops you
 if you forget.
 
 ```sh
-# 1. Bring the stack up and create the run history the script needs (three of them):
+# 1. Bring the stack up and create the run history the script needs (two of them):
 ./setup.sh && container-compose up -d -b   # + the capture-ledger API / issuer
 #    - one successful crawl_level
-#    - one failed crawl_host (with browserhive_proto absent)
 #    - one failed report_level (any failure)
 # 2. Capture (Chromium is fetched by hand the first time; puppeteer is docs-only)
 ./node_modules/.bin/puppeteer browsers install chrome

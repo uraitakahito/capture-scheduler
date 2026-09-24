@@ -3,7 +3,7 @@ locks:
   f/waggle/_shape_probe.flow+__flow_hash: 823a7723bac4970dbfaa01e4a9153f6d34bd8f0a0d78384ced90c02503c79564
   f/waggle/_shape_probe.flow+c.inline_script.ts: 5c29c6745f0637db467439be56f5427bb062bed875618535f8a45a7e5c66b9ef
   f/waggle/compile_scripts: 81deae3ce0ba1fa101ab59d0090e3958aaa42f7c5b6b5be76a64a8f7bc6be558
-  f/waggle/crawl_host: 1a2956d479082f91536772ea3289a8f29742d6eda80d0134f73bf0f63335fcd1
+  f/waggle/crawl_host: 8b0022755df5f7fe3d4c2598a94393798e21dd71fab8a2f72d58123888c551b9
   f/waggle/crawl_level.flow+__flow_hash: 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a
   f/waggle/index_level: 5b53af7f9c30c9aead40b2cb3afdb85bf3ea126993957858033cf94840688d5f
   f/waggle/plan_level: b9bba21a0cb4759ee2d91650ebb4cb808720e45f006214345a223c24383fa043

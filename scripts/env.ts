@@ -68,7 +68,7 @@ export const required = (name: string, hint?: string): string => {
  * repo の根。**dist 経由で動くことを前提に解く。**
  *
  * script は `dist/scripts/foo.js` として実行されるので、自分の位置から
- * `..` を 1 つ登ると `dist/` で止まる —— `.env.example` も `proto/` も
+ * `..` を 1 つ登ると `dist/` で止まる —— `.env.example` も `windmill/` も
  * `docs-site/` もそこには無い。TypeScript 化のときに実際に踏んだ
  * (`ENOENT: dist/.env.example`)。
  *

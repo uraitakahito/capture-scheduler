@@ -28,10 +28,9 @@ pnpm run windmill:push   # git を正として UI に反映する
 ので、忘れても CI が止める。
 
 ```sh
-# 1. スタックを上げ、run 履歴を作る（下の 3 種が要る。無いと script が止まる）
+# 1. スタックを上げ、run 履歴を作る（下の 2 種が要る。無いと script が止まる）
 ./setup.sh && container-compose up -d -b   # + capture-ledger 側の API / issuer
 #    - crawl_level の成功が 1 本
-#    - crawl_host の失敗（browserhive_proto が無い状態で 1 本）
 #    - report_level の失敗（何らかの失敗が 1 本）
 # 2. 撮る（Chromium は初回だけ手で取得。puppeteer は docs 撮影専用）
 ./node_modules/.bin/puppeteer browsers install chrome

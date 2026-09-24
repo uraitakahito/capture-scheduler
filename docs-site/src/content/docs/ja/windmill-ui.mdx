@@ -10,13 +10,11 @@ import home from "../../../assets/windmill-ui/03-home.png";
 import runsList from "../../../assets/windmill-ui/04-runs-list.png";
 import runFlow from "../../../assets/windmill-ui/05-run-flow.png";
 import runStep from "../../../assets/windmill-ui/06-run-step.png";
-import errProto from "../../../assets/windmill-ui/07-run-error-proto.png";
 import errReport from "../../../assets/windmill-ui/08-run-error-report.png";
 import flowDetail from "../../../assets/windmill-ui/09-flow-detail.png";
 import scriptForm from "../../../assets/windmill-ui/10-script-form.png";
 import schedules from "../../../assets/windmill-ui/11-schedules.png";
 import variables from "../../../assets/windmill-ui/12-variables.png";
-import resources from "../../../assets/windmill-ui/13-resources-states.png";
 import trigger from "../../../assets/windmill-ui/14-trigger-script.png";
 
 Windmill は Web の管理画面を同梱している。この配備ではそれがそのまま
@@ -85,22 +83,12 @@ flow の中の 1 段（ここでは `report_level`）を開くと、その段だ
 
 <Image src={runStep} alt="report_level の段の run 詳細。crawl_id と results の入力" />
 
-## 失敗を掘る —— 実例 2 つ
+## 失敗を掘る —— 実例 1 つ
 
 失敗は段ごとに違う場所で違う理由で起きる。**Runs で段と error を見て、
-中身は各サービスのログへ** というのが掘り方。今日 2 つ踏んだ。
+中身は各サービスのログへ** というのが掘り方。今日 1 つ踏んだ。
 
-**① `crawl_host` が `Resource not found`。** browserhive の gRPC の
-`.proto` を写した resource `u/admin/browserhive_proto` が無いとこうなる ——
-`windmill:push` は script を入れるが proto は入れないため。直すのは
-`windmill:push-proto`（下の[変数の台帳](#変数の台帳--どの-script-が何を入れるか)）。
-
-<Image
-  src={errProto}
-  alt="crawl_host の失敗 run。Result に Resource not found at u/admin/browserhive_proto"
-/>
-
-**② `report_level` が capture-ledger の `POST /api/crawls/…/pages` に対して
+**`report_level` が capture-ledger の `POST /api/crawls/…/pages` に対して
 `500` を受け取った。** Runs が言うのはここまで —— **500 の中身は
 capture-ledger のログにしか無い**。UI で分かるのは「どの段が・どの宛先に・
 何のステータスで落ちたか」で、原因の特定は宛先側のログに渡す、という切り分けになる。
@@ -109,6 +97,11 @@ capture-ledger のログにしか無い**。UI で分かるのは「どの段が
   src={errReport}
   alt="report_level の失敗 run。Result に POST /api/crawls/…/pages → 500 internal error"
 />
+
+`crawl_host` の失敗も同じ読み方をする。段ごと落ちるのは BrowserHive に 1 つも届かない
+ときだけ（`BrowserHive に届きません: …` に口が全部並ぶ）。1 つの BrowserHive に断られた
+（`400 ValidationException: …`、断られた項目つき）のは段の結果の中のそのページの失敗で、
+クロールは続く。どちらでも、BrowserHive がその要求をどう扱ったかは BrowserHive のログに在る。
 
 ## Flow と script —— 何をするものか
 
@@ -139,9 +132,9 @@ Asia/Tokyo）で `trigger_crawl` を起こす。右のトグルが `enabled`。
 次の `windmill:push` で戻る。** 恒久的に止めるなら yaml を直して push する。
 意味は [いつ走るか](/schedule/) を見ること。
 
-## Variables と Resources
+## Variables
 
-`u/admin/*` の 4 変数。`waggle_token` は secret なので値がマスクされて出る
+`u/admin/*` の変数。`waggle_token` は secret なので値がマスクされて出る
 （`••••`）—— **マスクされていること自体**が「UI に token を晒していない」の証拠。
 
 <Image
@@ -149,14 +142,8 @@ Asia/Tokyo）で `trigger_crawl` を起こす。右のトグルが `enabled`。
   alt="Variables。waggle_token は値がマスク、他は browserhive_endpoints などが見える"
 />
 
-`browserhive_proto` は Variables ではなく Resources に居る。ただし
-`resource_type: state` なので既定の Workspace タブには出ない ——
-**States タブ**に切り替えると見える。失敗①はこれが無い状態だった。
-
-<Image
-  src={resources}
-  alt="Resources の States タブ。browserhive_proto が resource type state で 1 件"
-/>
+Resources は空のまま —— この repo はそこに何も置かない（v0.22 までは BrowserHive の
+`.proto` の写しが States タブに居た）。
 
 ## 手で 1 回だけ起こす
 
@@ -173,24 +160,20 @@ Asia/Tokyo）で `trigger_crawl` を起こす。右のトグルが `enabled`。
 ## 変数の台帳 —— どの script が何を入れるか
 
 `windmill:push` が入れるのは **git にあるものだけ**（script・flow・schedule）。
-変数とリソースは別の script が入れる。ここを混同すると、push が緑なのに
-flow が `Resource not found` で落ちる（上の失敗①）。
+変数は別の script が入れる。ここを混同すると、push が緑なのに flow が最初の
+`getVariable` で落ちる。
 
-| 置き場                          | 中身                                                                                                                                     | 入れる script                   |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| `u/admin/waggle_token`          | capture-ledger への JWT (secret)                                                                                                         | `windmill:capture-ledger-token` |
-| `u/admin/waggle_api_url`        | capture-ledger API の宛先（既定は default ネットワークの gateway）                                                                       | 同上                            |
-| `u/admin/browserhive_endpoints` | gRPC の宛先の JSON 配列。BrowserHive 1 つに 1 要素（既定 `["browserhive-1.capture-ledger:50051","browserhive-2.capture-ledger:50051"]`） | 同上                            |
-| `u/admin/browserhive_tls_ca`    | TLS の CA（空 = 平文）                                                                                                                   | 同上                            |
-| `u/admin/browserhive_proto`     | `capture.proto` の写し（`crawl_host` が読む）                                                                                            | `windmill:push-proto`           |
+| 置き場                          | 中身                                                                                                                                                           | 入れる script                   |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| `u/admin/waggle_token`          | capture-ledger への JWT (secret)                                                                                                                               | `windmill:capture-ledger-token` |
+| `u/admin/waggle_api_url`        | capture-ledger API の宛先（既定は default ネットワークの gateway）                                                                                             | 同上                            |
+| `u/admin/browserhive_endpoints` | BrowserHive の URL の JSON 配列。BrowserHive 1 つに 1 要素（既定 `["http://browserhive-1.capture-ledger:50051","http://browserhive-2.capture-ledger:50051"]`） | 同上                            |
+| `u/admin/browserhive_tls_ca`    | `https://` の口のための CA（空 = 平文の `http://`）                                                                                                            | 同上                            |
+| `u/admin/ts_compile_url`        | ts-compile-service の宛先（既定 `http://ts-compile.capture-scheduler:8080`）                                                                                   | 同上                            |
 
-**`windmill:push-proto` は `windmill:push` に含まれない。** proto を取り直したら
-これも実行し直すこと —— Windmill が読むのはこの写しで、submodule ではない。
-
-`crawl_host` は BrowserHive v10.0.0 より前の写し（`ManifestOutcome` の無いもの）を読むと、
-このコマンドを名指しして止まる。そういう写しでも応答は復号できてしまい、manifest の場所だけが
-黙って落ちる —— すべての取り込みが場所なしで報告され、クロールは成功し、capture-ledger には
-何も入らない。
+口は BrowserHive v12 から `http(s)://` の URL。`crawl_host` は v11 の `host:port` の形を
+この変数の名前を挙げて断り、`windmill:capture-ledger-token` は変数に書く前に断る ——
+`.env` に残った古い `CAPTURE_LEDGER_BROWSERHIVE_ENDPOINTS` は flow ではなく道具で止まる。
 
 ## 全部消えたときの復旧
 
@@ -203,8 +186,7 @@ pnpm run windmill:bootstrap            # workspace を作り直し、新しい t
                                        # → 続く 4 行を capture-ledger の .env の末尾に
                                        #   貼り直して、あちらの API を起こし直す
 pnpm run windmill:push                 # script / flow / schedule
-pnpm run windmill:push-proto           # ← 忘れると crawl_host が Resource not found
-pnpm run windmill:capture-ledger-token # 変数 4 つ
+pnpm run windmill:capture-ledger-token # 変数 5 つ
 cd ../capture-ledger
 pnpm run fga:grant submitter windmill acme  # windmill に acme のクロールを許可する
 ```

@@ -9,7 +9,6 @@
   "prerequisites": [
     "スタックが起動していること",
     "run 履歴に crawl_level の成功が 1 本あること",
-    "run 履歴に crawl_host の失敗 (browserhive_proto 欠落) が 1 本あること",
     "run 履歴に report_level の失敗が 1 本あること"
   ],
   "shots": [
@@ -19,13 +18,11 @@
     "04-runs-list.png",
     "05-run-flow.png",
     "06-run-step.png",
-    "07-run-error-proto.png",
     "08-run-error-report.png",
     "09-flow-detail.png",
     "10-script-form.png",
     "11-schedules.png",
     "12-variables.png",
-    "13-resources-states.png",
     "14-trigger-script.png"
   ]
 }

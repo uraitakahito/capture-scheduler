@@ -6,6 +6,36 @@ lock: "!inline f/waggle/crawl_host.script.lock"
 kind: script
 schema:
   properties:
+    artifact_sink:
+      type: object
+      description: ""
+      default: null
+      properties:
+        token:
+          type: string
+          description: ""
+          originalType: string
+        url:
+          type: string
+          description: ""
+          originalType: string
+    capture_formats:
+      type: object
+      description: ""
+      default: null
+      properties:
+        html:
+          type: boolean
+        links:
+          type: boolean
+        mhtml:
+          type: boolean
+        png:
+          type: boolean
+        wacz:
+          type: boolean
+        webp:
+          type: boolean
     crawl_id:
       type: string
       description: ""
@@ -24,47 +54,45 @@ schema:
       type: number
       description: ""
       default: null
-    capture_formats:
-      type: object
-      description: ""
-      default: null
-      properties:
-        png:
-          type: boolean
-        webp:
-          type: boolean
-        html:
-          type: boolean
-        links:
-          type: boolean
-        mhtml:
-          type: boolean
-        wacz:
-          type: boolean
-    signing:
-      type: boolean
-      description: ""
-      default: null
     scripts:
       type: array
       description: ""
       default: null
+      format: resource-crawl_script
       items:
         type: object
         properties:
           id:
             type: string
+            description: ""
+            originalType: string
           version:
-            type: integer
-          phase:
-            type: string
-          source:
-            type: string
-          sha256:
-            type: string
+            type: number
+            description: ""
           options:
             type: object
-      originalType: CrawlScript[]
+            description: ""
+            format: resource-record
+          phase:
+            type: string
+            description: ""
+            enum:
+              - preload
+              - behavior
+            originalType: enum
+          sha256:
+            type: string
+            description: ""
+            originalType: string
+          source:
+            type: string
+            description: ""
+            originalType: string
+      originalType: record[]
+    signing:
+      type: boolean
+      description: ""
+      default: null
     urls:
       type: array
       description: ""

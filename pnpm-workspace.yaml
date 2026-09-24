@@ -11,15 +11,12 @@ packages:
 #             解決する Node のシムで、platform パッケージは optional dependency
 #             として postinstall と無関係に入る。だから false でも動く
 #             (capture-ledger で実測済み —— あちらの pnpm-workspace.yaml に同じ記録がある)。
-#   protobufjs — @grpc/grpc-js 経由。postinstall は依存の版の書き方について stderr に
-#             助言を書くだけで、ファイルを 1 つも作らない (capture-ledger が実物を読んで確認済み)。
 #   puppeteer — docs のスクリーンショット撮影 (scripts/docs-shots.mjs) にしか使わない。
 #             false にして Chromium を install 時に取りに行かせない (CI で 150MB を
 #             毎回 DL しない)。撮る人は初回だけ手で `puppeteer browsers install chrome`。
 #             .npmrc の PUPPETEER_SKIP_DOWNLOAD も同じ意図の二重の保険。
 allowBuilds:
   esbuild: false
-  protobufjs: false
   puppeteer: false
 
 # windmill-cli は server と同じ版を追う (ほぼ毎日出る)。新しさを理由に

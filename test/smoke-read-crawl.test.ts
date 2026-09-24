@@ -47,7 +47,7 @@ const failedRun = (name: string): Extract<Run, { state: "failed" }> => {
   return run;
 };
 
-const DIG = /windmill-ui\/#失敗を掘る--実例-2-つ/;
+const DIG = /windmill-ui\/#失敗を掘る--実例-1-つ/;
 
 describe("撮れたとき・撮っている最中", () => {
   it("succeeded で 1 ページ以上なら、読み分けは何も言わない (中身は smoke が取り出して見る)", () => {
@@ -62,16 +62,6 @@ describe("撮れたとき・撮っている最中", () => {
 });
 
 describe("台帳の error で終わったとき (締める段が締めた)", () => {
-  it("F1 proto が無い → push-proto", () => {
-    const reading = readFinished(crawlOf("f1-proto-missing"));
-    expect(reading?.evidence).toMatch(
-      /^台帳の error: \[cap\] Resource not found at u\/admin\/browserhive_proto/,
-    );
-    expect(reading?.fix).toBe(
-      "Windmill に BrowserHive の proto が無い → pnpm run windmill:push-proto",
-    );
-  });
-
   it("F2 BrowserHive が 2 台とも止まっている → 口を挙げて stack:up", () => {
     const reading = readFinished(crawlOf("f2-browserhive-down"));
     expect(reading?.fix).toMatch(
@@ -81,7 +71,7 @@ describe("台帳の error で終わったとき (締める段が締めた)", () 
   });
 
   it("for ループの段 (hosts) の job に文は無い —— だから台帳の error を読む", () => {
-    for (const name of ["f1-proto-missing", "f2-browserhive-down"]) {
+    for (const name of ["f2-browserhive-down"]) {
       expect(failedRun(name).step).toBe("hosts");
       expect(stepMessage(fixture(name).failedStep)).toBeUndefined();
     }
@@ -178,7 +168,7 @@ describe("起こせなかったとき", () => {
 describe("知らない失敗", () => {
   it("文をそのまま出し、run と「失敗を掘る」を見させる", () => {
     const reading = readFinished({
-      ...crawlOf("f1-proto-missing"),
+      ...crawlOf("f2-browserhive-down"),
       error: "[cap] 見たことのない失敗",
     });
     expect(reading?.evidence).toBe("台帳の error: [cap] 見たことのない失敗");

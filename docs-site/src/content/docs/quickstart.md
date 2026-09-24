@@ -31,7 +31,7 @@ capture-scheduler command inside capture-ledger and pnpm only says `Missing scri
 
 :::tip[All of it at once: one command in capture-ledger]
 `pnpm run dev:up` over in capture-ledger runs 14 steps in order — **including the ones on this
-page**: it brings Windmill up, bootstraps it, loads the flow and the proto, hands over the keys,
+page**: it brings Windmill up, bootstraps it, loads the flow, hands over the keys,
 and finishes with `doctor`. What it runs there are **this repo's own commands**, and **no file
 of this repo's is written from over there** (the four lines for capture-ledger are fetched by
 its own `pnpm run connect`).
@@ -55,7 +55,6 @@ pnpm install
 
 pnpm run windmill:bootstrap   # creates the workspace and a token, and writes two files (below)
 pnpm run windmill:push        # upload the scripts, the flow and the schedule
-pnpm run windmill:push-proto  # upload BrowserHive's proto (crawl_host reads it; push does not include it)
 ```
 
 **There is nothing to paste any more.** bootstrap writes two files, both inside this repo:
@@ -179,9 +178,9 @@ pnpm run smoke    # captures https://example.com/ once; "撮れた" (captured) o
 ```
 
 **doctor** asks, for each heading of this page, whether that step is done — by asking the things
-the step created. It goes past "is it up": whether the scripts match the repo, whether the proto
-is stale, whether the token Windmill holds may start crawls, whether the API and BrowserHive are
-reachable from inside the worker. A ✗ says what to fix and which section of this page the step
+the step created. It goes past "is it up": whether the scripts match the repo, whether the token
+Windmill holds may start crawls, whether the API and BrowserHive are reachable from inside the
+worker. A ✗ says what to fix and which section of this page the step
 lives in. Checks that depend on a ✗ do not run and only say "先に … を" (… first) — one thing to
 fix means one ✗.
 
@@ -218,7 +217,7 @@ run      http://127.0.0.1:8000/run/01a0ba19-…?workspace=crawler
 **When it fails**, smoke names the step that failed and how to fix it (the `原因` cause and
 `直す` fix lines). Fix that and run smoke again. It closes the crawl it started — on failure, on
 timeout, on Ctrl-C — so the next run is never blocked by a 409. To follow it in Windmill, open the
-`run` URL smoke prints ([Windmill UI: "Digging into failures"](/windmill-ui/#digging-into-failures--two-real-ones)).
+`run` URL smoke prints ([Windmill UI: "Digging into failures"](/windmill-ui/#digging-into-failures--a-real-one)).
 
 ```sh
 cd ~/projects/crawler/capture-scheduler
@@ -239,8 +238,6 @@ Every row was produced for real and checked (2026-09-19).
 | ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | doctor: 目録 ✗ / smoke: 400 `the script catalog is empty`                                                                                            | the catalog is empty — nothing runs inside the page                                                      | in capture-ledger: `pnpm run scripts import .upstream/capture-scripts`                    |
 | doctor: windmill ✗, and the checks below say "先に windmill を"                                                                                      | Windmill is down                                                                                         | `container-compose up -d` (in this repo)                                                  |
-| doctor: proto ✗ "Windmill に proto が無い" / smoke: `[cap] Resource not found at u/admin/browserhive_proto …`                                        | the proto was never uploaded                                                                             | `pnpm run windmill:push-proto`                                                            |
-| doctor: proto ✗ "repo の capture.proto と違う"                                                                                                       | BrowserHive was upgraded and the proto re-fetched, but Windmill's copy is stale                          | `pnpm run windmill:push-proto`                                                            |
 | doctor: push ✗ "repo と中身が違う"                                                                                                                   | a script was changed but not pushed (or was edited in the Windmill UI)                                   | `pnpm run windmill:push` (`windmill:diff` to just look)                                   |
 | doctor: worker→browserhive ✗ "名前が引けない" ("3 秒で答えない" for a few seconds right after the stop) / smoke: `[cap] BrowserHive に届きません: …` | a BrowserHive container is stopped (a stopped container loses its DNS name too)                          | `pnpm run stack:up` in capture-ledger                                                     |
 | smoke: `succeeded` with 0 pages, cause `… net::ERR_NAME_NOT_RESOLVED …`                                                                              | the URL's host does not resolve                                                                          | check the URL; if it is right, whether BrowserHive's containers can resolve outside names |
