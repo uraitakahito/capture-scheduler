@@ -30,7 +30,7 @@ are cloned side by side under `~/projects/crawler/`; adjust if yours live elsewh
 capture-scheduler command inside capture-ledger and pnpm only says `Missing script`.
 
 :::tip[All of it at once: one command in capture-ledger]
-`pnpm run dev:up` over in capture-ledger runs 14 steps in order — **including the ones on this
+`pnpm run dev:up` over in capture-ledger runs 16 steps in order — **including the ones on this
 page**: it brings Windmill up, bootstraps it, loads the flow, hands over the keys,
 and finishes with `doctor`. What it runs there are **this repo's own commands**, and **no file
 of this repo's is written from over there** (the four lines for capture-ledger are fetched by
@@ -40,7 +40,7 @@ its own `pnpm run connect`).
 cd ~/projects/crawler/capture-ledger && pnpm run dev:up
 ```
 
-This page is the capture-scheduler half of those 14 steps, done one at a time. Both roads end
+This page is the capture-scheduler half of those 16 steps, done one at a time. Both roads end
 in the same place.
 :::
 

@@ -31,7 +31,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'authorization: Bearer dev-key' http
 コマンドを capture-ledger で打つと、pnpm は `Missing script` としか言わない。
 
 :::tip[まとめてなら、capture-ledger の 1 本で済みます]
-capture-ledger で `pnpm run dev:up` を打つと、**このページの手順も含めて** 14 段を順に
+capture-ledger で `pnpm run dev:up` を打つと、**このページの手順も含めて** 16 段を順に
 起こします —— Windmill を立て、bootstrap し、flow を入れ、鍵を渡し、最後に
 `doctor` まで。向こうが打つのは**この repo のコマンド**で、**ファイルはこの repo の中に
 しか書かれません**（capture-ledger に渡す 4 行は、向こうの `pnpm run connect` が
@@ -41,7 +41,7 @@ capture-ledger で `pnpm run dev:up` を打つと、**このページの手順�
 cd ~/projects/crawler/capture-ledger && pnpm run dev:up
 ```
 
-このページは、その 14 段のうち capture-scheduler 側を 1 つずつ手でやる道です。
+このページは、その 16 段のうち capture-scheduler 側を 1 つずつ手でやる道です。
 どちらでも同じところに着きます。
 :::
 
