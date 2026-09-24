@@ -33,17 +33,27 @@ guardEnv();
 const ISSUER = ledgerIssuer();
 const SUBJECT = optional("CAPTURE_LEDGER_SUBJECT", "windmill");
 /**
- * browserhive の gRPC の宛先。**browser 1 台に口 1 つなので複数**。カンマ区切りで受け、
+ * browserhive の口 (URL)。**browser 1 台に口 1 つなので複数**。カンマ区切りで受け、
  * 変数には JSON 配列で入れる (Windmill の変数は文字列なので、形を 1 つに決めておく)。
  * 空いている口を選ぶのは `crawl_host` で、並列度の上限にするのは `plan_level`。
+ *
+ * BrowserHive v12 から口は HTTP なので `http(s)://` の URL。v11 までの `host:port` は
+ * ここで止める —— `crawl_host` が読むまで待つと、変数を入れた後で気づくことになる。
  */
 const BROWSERHIVE_ENDPOINTS = optional(
   "CAPTURE_LEDGER_BROWSERHIVE_ENDPOINTS",
-  "browserhive-1.capture-ledger:50051,browserhive-2.capture-ledger:50051",
+  "http://browserhive-1.capture-ledger:50051,http://browserhive-2.capture-ledger:50051",
 )
   .split(",")
   .map((s) => s.trim())
   .filter((s) => s !== "");
+for (const endpoint of BROWSERHIVE_ENDPOINTS) {
+  if (!/^https?:\/\//.test(endpoint)) {
+    throw new Error(
+      `CAPTURE_LEDGER_BROWSERHIVE_ENDPOINTS は http(s):// の URL にしてください (BrowserHive v12 から HTTP): ${endpoint}`,
+    );
+  }
+}
 const ORGANIZATIONS = optional("CAPTURE_LEDGER_ORGANIZATIONS", "acme")
   .split(",")
   .map((s) => s.trim())
@@ -58,7 +68,7 @@ const URL_PATH = "u/admin/waggle_api_url";
  */
 const ENDPOINTS_PATH = "u/admin/browserhive_endpoints";
 /**
- * browserhive の gRPC を TLS にするときの CA 証明書 (PEM)。
+ * browserhive の口を HTTPS にするときの CA 証明書 (PEM)。
  *
  * **空文字は「TLS を使わない」**。変数そのものを作らない選択にしなかったのは、
  * `getVariable` が「無い」で落ちるのと「空だった」を script 側で区別すると、

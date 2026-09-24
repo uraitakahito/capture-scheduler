@@ -90,8 +90,9 @@ Commit before syncing, and push before pulling. `pnpm run windmill:diff` is
 
 ## Variables have a size limit
 
-Somewhere between 10,000 and 20,000 bytes. BrowserHive's proto is 16,315 bytes
-and lives in a **resource** instead.
+Somewhere between 10,000 and 20,000 bytes. Measured when this repo still carried
+BrowserHive's 16,315-byte `.proto` (until v0.22): it did not fit and lived in a
+**resource** instead. Nothing this size is stored any more.
 
 ## Schedule error handlers are Enterprise-only
 

@@ -10,13 +10,12 @@
  *
  * 前提 (無いと途中で止まる):
  *   1. スタックが起動していること (container-compose up -d)
- *   2. workspace crawler が bootstrap 済みで、run 履歴に次の 3 本があること:
+ *   2. workspace crawler が bootstrap 済みで、run 履歴に次の 2 本があること:
  *        - f/waggle/crawl_level の成功
- *        - crawl_host の失敗 (browserhive_proto が無い)
  *        - report_level の失敗 (内容は履歴次第。今日の実物は POST /pages → 500)
- *      無ければ quickstart の手順で 1 本流す。失敗 2 本は、proto リソースを
- *      一時的に消す / waggle_api_url を一時的に曲げると再現できる (どちらも
- *      2026-09-11 に実際に起きた形)。run の ID は API から拾うので直書きは無い。
+ *      無ければ quickstart の手順で 1 本流す。失敗は waggle_api_url を一時的に
+ *      曲げると再現できる (2026-09-11 に実際に起きた形)。run の ID は API から
+ *      拾うので直書きは無い。
  *
  *   pnpm run docs:shots                # CI では走らせない —— 実機が要る
  *
@@ -26,8 +25,10 @@
  *     /user/workspaces で「crawler」を **クリックして** から各ルートへ行く
  *   - networkidle だけでは SPA の白い絵が撮れる。ルートごとに「その画面に
  *     しか出ない文字列」を待つ
- *   - browserhive_proto は resource_type: "state" なので、Resources の
- *     既定タブ (Workspace) には出ない。**States タブをクリック**してから撮る
+ *
+ * 07 (crawl_host が proto の resource を見つけられない失敗) と 13 (Resources の States タブ) は
+ * BrowserHive v12 で proto の配布が無くなったので撮らない。番号は詰めない —— docs の
+ * import と manifest が名前で結び付いているので、詰めると全部を書き換えることになる。
  */
 import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -72,12 +73,10 @@ interface CompletedJob {
   success?: boolean;
 }
 
-/** 教材にする 4 本の run の ID。撮影の前提が揃っているかの検査でもある。 */
+/** 教材にする 3 本の run の ID。撮影の前提が揃っているかの検査でもある。 */
 interface TeachingRuns {
   /** crawl_level の成功 */
   flowOk: string;
-  /** crawl_host の失敗 (browserhive_proto が無い) */
-  protoFail: string;
   /** report_level の失敗 */
   reportFail: string;
   /** report_level の成功 (段の詳細を見せる用) */
@@ -94,18 +93,17 @@ const findTeachingRuns = async (token: string): Promise<TeachingRuns> => {
   for (const j of rows) {
     const p = j.script_path ?? "";
     if (p === "f/waggle/crawl_level" && j.success && !picks.flowOk) picks.flowOk = j.id;
-    if (p.endsWith("crawl_host") && !j.success && !picks.protoFail) picks.protoFail = j.id;
     if (p.endsWith("report_level") && !j.success && !picks.reportFail) picks.reportFail = j.id;
     if (p.endsWith("report_level") && j.success && !picks.stepOk) picks.stepOk = j.id;
   }
-  for (const key of ["flowOk", "protoFail", "reportFail", "stepOk"] as const) {
+  for (const key of ["flowOk", "reportFail", "stepOk"] as const) {
     if (picks[key] === undefined) {
       throw new Error(
         `run 履歴に ${key} が無い —— このファイル冒頭の「前提」を見て作ってから撮り直すこと`,
       );
     }
   }
-  // 上のループが 4 つとも揃っていることを確かめた後。型はそれを追えないので
+  // 上のループが 3 つとも揃っていることを確かめた後。型はそれを追えないので
   // ここだけ言い切る —— 検査を通り抜けた時点で Partial ではない。
   return picks as TeachingRuns;
 };
@@ -188,7 +186,7 @@ const main = async () => {
 
   const shots = [
     { file: "04-runs-list.png", route: "/runs", wait: "crawl_level" },
-    // run 詳細はヘッダだけだと何も教えない。flow は段グラフまで、失敗 2 本は
+    // run 詳細はヘッダだけだと何も教えない。flow は段グラフまで、失敗は
     // エラーパネルまで scroll してから撮る
     {
       file: "05-run-flow.png",
@@ -197,12 +195,6 @@ const main = async () => {
       scrollTo: "crawl_host",
     },
     { file: "06-run-step.png", route: `/run/${runs.stepOk}`, wait: "report_level" },
-    {
-      file: "07-run-error-proto.png",
-      route: `/run/${runs.protoFail}`,
-      wait: "browserhive_proto",
-      scrollTo: "browserhive_proto",
-    },
     {
       file: "08-run-error-report.png",
       route: `/run/${runs.reportFail}`,
@@ -221,17 +213,6 @@ const main = async () => {
     },
     { file: "11-schedules.png", route: "/schedules", wait: "trigger_crawl" },
     { file: "12-variables.png", route: "/variables", wait: "waggle_token" },
-    // browserhive_proto は resource_type: "state"。既定の Workspace タブには
-    // 出ないので、States タブへ切り替えてから撮る
-    {
-      file: "13-resources-states.png",
-      route: "/resources",
-      wait: "Resources",
-      prepare: async () => {
-        await clickByText(page, "States");
-        await waitForText(page, "browserhive_proto");
-      },
-    },
     // 手で 1 回起こす入口。Run のフォームは get ページの中に居る
     {
       file: "14-trigger-script.png",
@@ -243,7 +224,6 @@ const main = async () => {
   for (const s of shots) {
     await page.goto(`${BASE}${s.route}`, { waitUntil: "networkidle2" });
     await waitForText(page, s.wait);
-    if (s.prepare !== undefined) await s.prepare();
     if (s.scrollTo !== undefined) await scrollToText(page, s.scrollTo);
     await shoot(s.file);
   }
@@ -257,7 +237,6 @@ const main = async () => {
     prerequisites: [
       "スタックが起動していること",
       "run 履歴に crawl_level の成功が 1 本あること",
-      "run 履歴に crawl_host の失敗 (browserhive_proto 欠落) が 1 本あること",
       "run 履歴に report_level の失敗が 1 本あること",
     ],
     shots: ["01-login.png", "02-workspaces.png", "03-home.png", ...shots.map((s) => s.file)],

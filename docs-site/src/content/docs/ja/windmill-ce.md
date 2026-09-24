@@ -86,8 +86,9 @@ Windmill の flow エディタは flow 全体・1 step・途中まで、を実�
 
 ## 変数には大きさの上限がある
 
-10,000〜20,000 バイトのどこか。BrowserHive の proto は 16,315 バイトなので、
-**resource** に置いてある。
+10,000〜20,000 バイトのどこか。この repo が BrowserHive の `.proto`（16,315 バイト）を
+持っていた頃（v0.22 まで）に測った —— 入らないので **resource** に置いていた。
+いまはその大きさのものを置いていない。
 
 ## schedule の error handler は Enterprise 限定
 

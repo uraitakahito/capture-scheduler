@@ -1,8 +1,8 @@
 /**
- * Windmill の中身の読み分け —— workspace・push・proto・変数。
+ * Windmill の中身の読み分け —— workspace・push・変数・目録。
  *
  * どれも「在るか」だけでなく「repo と同じか」を見る。push を忘れたことは、flow が走って
- * 古い script が動くまで何も言わない。proto が古いと、manifest が黙って落ちた前例がある。
+ * 古い script が動くまで何も言わない。
  *
  * 入出力を持たない。答えを取ってくるのは `checks.ts`。
  */
@@ -94,32 +94,6 @@ export const readPush = (items: readonly Deployed[]): Verdict => {
   return {
     ok: false,
     need: `${parts.join("。")} → pnpm run windmill:push (違いを見るだけなら windmill:diff)`,
-  };
-};
-
-const lines = (text: string): number => text.split("\n").length;
-
-/**
- * `resources/get_value/u/admin/browserhive_proto` の答えと、repo の capture.proto。
- *
- * 無いのと古いのを分ける。古いのは BrowserHive の版を上げて proto を取り直したのに、
- * push-proto をし忘れたとき —— crawl_host は Windmill の写しを読むので、repo を直しても届かない。
- */
-export const readProto = (answer: Answer, repo: string): Verdict => {
-  const push = "pnpm run windmill:push-proto (crawl_host が読む。windmill:push には含まれない)";
-  if (answer.status === 404) return { ok: false, need: `Windmill に proto が無い → ${push}` };
-  const value = answer.status === 200 ? parse(answer.body) : undefined;
-  const proto =
-    typeof value === "object" && value !== null && "proto" in value ? value.proto : undefined;
-  if (typeof proto !== "string") {
-    return { ok: false, need: `u/admin/browserhive_proto → ${shown(answer)}` };
-  }
-  if (proto === repo) return { ok: true };
-  return {
-    ok: false,
-    need:
-      `Windmill の proto が repo の capture.proto と違う (Windmill ${String(lines(proto))} 行・` +
-      `repo ${String(lines(repo))} 行) → ${push}`,
   };
 };
 

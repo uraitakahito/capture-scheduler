@@ -73,8 +73,8 @@ flow は `fail_crawl` へ落ち、クロールは診断を reason に載せて `
 
 ## BrowserHive は browser 1 台に口 1 つ
 
-BrowserHive (v9) は queue も pool も持たない。`Capture` は 1 往復で、走行中の server は
-`RESOURCE_EXHAUSTED` で断る。だから空いている server を選ぶのは `crawl_host` の仕事 ——
+BrowserHive は queue も pool も持たない。`POST /captures` は 1 往復で、走行中の server は
+`429 Busy` で断る。だから空いている server を選ぶのは `crawl_host` の仕事 ——
 `u/admin/browserhive_endpoints` の一覧を順に試し、busy なら次へ、届かない口はその
 呼び出しの間は飛ばし、全部 busy なら 0.5〜1.5 秒待ってもう一周する。1 つも届かない
 ときだけ `ServerUnavailable` を投げ、段ごと失敗させる。
@@ -117,14 +117,13 @@ capture-ledger へ運ぶ（段の報告の `compiled`）。台帳はそれをク
 pnpm run windmill:capture-ledger-token   # waggle_token / waggle_api_url /
                                  # browserhive_endpoints / browserhive_tls_ca /
                                  # ts_compile_url
-pnpm run windmill:push-proto     # browserhive の proto (resource)
 ```
 
 `u/admin/ts_compile_url` は `compile_scripts` が目録を送る宛先（既定は
 `http://ts-compile.capture-scheduler:8080`、この repo の compose の `ts-compile`。
 `TS_COMPILE_URL` で変えられる）。`pnpm run doctor` が worker からその `/healthz` に届くかを見る。
 
-`u/admin/browserhive_tls_ca` は browserhive への gRPC を TLS にするときの CA 証明書
+`u/admin/browserhive_tls_ca` は browserhive の口が `https://` のときの CA 証明書
 （PEM）で、**空文字は「平文」**。空でも変数そのものは必ず作る —— 変数を作らない形に
 すると `getVariable` が落ち、script 側で「読めなかった」を「TLS は要らない」と扱った
 瞬間、読み取りの失敗が黙って平文に落ちる経路になる。「システムの root で TLS」は
@@ -132,6 +131,8 @@ pnpm run windmill:push-proto     # browserhive の proto (resource)
 というのは server が公開インターネット上に在るという意味になるが、そうではない。
 開発のスタックは平文。
 
-proto が **resource** で変数でないのは、変数の上限（10,000〜20,000 バイトの間）を
-16,315 バイトの proto が超えるため。`pnpm run proto:check` が capture-ledger の写しとの差分を
-見る —— 手で写した契約は黙って腐るので、番人を置く。
+BrowserHive から写しているものは他に無い。`crawl_host` は BrowserHive の HTTP API
+（v12 からの `POST /captures`、本文は JSON）を `fetch` で話すので、同期し続ける契約の
+ファイルが無い —— v0.22 までは BrowserHive の gRPC の `.proto` の写しを Windmill の resource に
+置き、腐りを捕まえる番人を付けていた。だから口は `http(s)://` の URL で、`crawl_host` は
+古い `host:port` の形を変数の名前を挙げて断る。

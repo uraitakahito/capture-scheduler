@@ -11,7 +11,7 @@ pnpm run check       # audit, format, env, typecheck, unit tests, CI parity, doc
 
 `pretest:e2e` runs doctor with `--e2e` first and names what is missing — the 14 checks of
 [the quickstart's "Check it"](/quickstart/#check-it-take-one-capture), plus capture-fixtures and
-the crawl permission for `e2e`, the name the test uses (`fga:grant submitter e2e acme`): 15 in
+the crawl permission for `e2e`, the name the test uses (`fga:grant submitter e2e acme`): 16 in
 all. It checks not just that things are up but that a crawl can run to the end — miss any of
 these and a crawl fails only at its level report, staying `running`. It lives outside vitest
 deliberately: vitest prints "No test files found, exiting with code 1" whenever a global setup

@@ -7,7 +7,7 @@ capture-scheduler は [capture-ledger](https://uraitakahito.github.io/capture-le
 **[Windmill](https://www.windmill.dev/) の上で回す**。仕事は 2 つ。
 
 - **撮る** —— capture-ledger がクロールを 1 段ずつ webhook で渡してくる。flow はその段の URL を
-  ホストで束ね、robots.txt を確かめ、BrowserHive に gRPC で撮らせて、見つけたものを返す。
+  ホストで束ね、robots.txt を確かめ、BrowserHive に HTTP で撮らせて、見つけたものを返す。
   自分が起こしていないクロールも、ここで回る。**BrowserHive を呼ぶのはこの repo の flow だけ** ——
   capture-ledger はもう BrowserHive と話さない。
 - **起こす** —— 毎日 04:00 に、`capture_targets` の有効な行を種にしたクロールを capture-ledger に

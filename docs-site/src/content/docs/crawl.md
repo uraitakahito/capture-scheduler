@@ -79,8 +79,8 @@ implementation that simply always used robots' value passes a one-sided test.
 
 ## One BrowserHive holds one browser
 
-BrowserHive (v9) has no queue and no pool: a `Capture` call is one round trip,
-and a server that is already capturing refuses with `RESOURCE_EXHAUSTED`.
+BrowserHive has no queue and no pool: `POST /captures` is one round trip, and a
+server that is already capturing refuses with `429 Busy`.
 Picking a free server is therefore `crawl_host`'s job. It reads the list from
 `u/admin/browserhive_endpoints`, tries them in turn — a busy one means "next",
 an unreachable one is skipped for the rest of that call — and when every one is
@@ -132,7 +132,6 @@ catalog.
 pnpm run windmill:capture-ledger-token   # waggle_token / waggle_api_url /
                                  # browserhive_endpoints / browserhive_tls_ca /
                                  # ts_compile_url
-pnpm run windmill:push-proto     # BrowserHive's proto (a resource)
 ```
 
 `u/admin/ts_compile_url` is where `compile_scripts` sends the catalog (default
@@ -140,8 +139,8 @@ pnpm run windmill:push-proto     # BrowserHive's proto (a resource)
 override with `TS_COMPILE_URL`). `pnpm run doctor` checks that the worker can reach its
 `/healthz`.
 
-`u/admin/browserhive_tls_ca` is the CA certificate (PEM) for the gRPC leg to
-BrowserHive, and **an empty value means plaintext**. The variable is written even
+`u/admin/browserhive_tls_ca` is the CA certificate (PEM) for `https://` endpoints
+of BrowserHive, and **an empty value means plaintext**. The variable is written even
 when it is empty, on purpose: if it were simply absent, `getVariable` would throw,
 and a script that reads "could not fetch it" as "no TLS wanted" turns a read
 failure into a plaintext connection. There is no "TLS with the system roots"
@@ -149,7 +148,9 @@ mode — BrowserHive's TLS assumes a private CA, and needing a public certificat
 would mean the server is on the public internet. The development stack is
 plaintext.
 
-The proto is a **resource** rather than a variable because it is 16,315 bytes and
-the variable limit sits between 10,000 and 20,000. `pnpm run proto:check` diffs it
-against capture-ledger's copy — a contract copied by hand rots silently, so it gets a
-guard.
+Nothing else is copied from BrowserHive. `crawl_host` speaks its HTTP API
+(`POST /captures` with a JSON body, since BrowserHive v12) through `fetch`, so
+there is no contract file to keep in sync — until v0.22 this repo carried a copy of
+BrowserHive's gRPC `.proto` as a Windmill resource, with a guard to catch it rotting.
+The endpoints are therefore `http(s)://` URLs; `crawl_host` refuses the old
+`host:port` form and names the variable.

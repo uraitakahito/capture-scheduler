@@ -8,7 +8,7 @@
  * curl には `-w '%{http_code} %{exitcode}'` を付け、終わり方を 2 つの数で受ける。
  * 2026-09-19 に worker の中で実測した終わり方:
  *
- *   BrowserHive の口 (HTTP/2 で GET)   415 0   gRPC は POST しか受けないが、答えるのは生きている証拠
+ *   BrowserHive の口 (GET /status)     200 0   server が答え、browser も抱えている証拠 (v12 から HTTP)
  *   名前が引けない                     000 6   **止めたコンテナもこれ** —— 名前ごと消える (refused にならない)
  *   口が閉じている                     000 7
  *   答えない                           000 28  (--max-time の切れ)。**止めた直後の数秒もこれ** ——
@@ -47,27 +47,34 @@ const DOWN: Readonly<Record<number, (endpoints: string) => string>> = {
 };
 
 /**
- * BrowserHive の口ごとの答え。答えれば status は問わない (gRPC の口に GET なので 415 が普通)。
+ * BrowserHive の口ごとの答え。`GET /status` が 200 なら ✓ —— 答えるのは、server が
+ * 起動し切って browser を抱えている証拠 (browser に繋げない server は起動を拒む)。
  *
  * 落ちた口は、終わり方の同じものをまとめて名指しする —— 2 台とも止まっているときに、
- * 同じ直し方を 2 度読ませない。
+ * 同じ直し方を 2 度読ませない。答えたが 200 でない口は、status を添えて別に言う。
  */
 export const readBrowserhiveProbes = (
   probes: readonly { endpoint: string; answer: CurlAnswer }[],
 ): Verdict => {
   const down = new Map<number, string[]>();
+  const odd: string[] = [];
   for (const { endpoint, answer } of probes) {
-    if (answer.rc === 0 && answer.http !== "000") continue;
+    if (answer.rc === 0 && answer.http === "200") continue;
+    if (answer.rc === 0) {
+      odd.push(`${endpoint}/status → http=${answer.http}`);
+      continue;
+    }
     down.set(answer.rc, [...(down.get(answer.rc) ?? []), endpoint]);
   }
-  if (down.size === 0) return { ok: true };
+  if (down.size === 0 && odd.length === 0) return { ok: true };
   const parts = [...down].map(([rc, endpoints]) => {
     const say = DOWN[rc];
     return say === undefined
       ? `${endpoints.join("・")} → curl rc=${String(rc)}`
       : say(endpoints.join("・"));
   });
-  return { ok: false, need: parts.join("。") };
+  // 落ちた口と、答えたが 200 でない口は別の直し方なので、両方とも言う。
+  return { ok: false, need: [...parts, ...odd].join("。") };
 };
 
 /**

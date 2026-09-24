@@ -40,7 +40,7 @@ export const SECTIONS = {
   digFailures: {
     title: "失敗を掘る",
     page: "windmill-ui",
-    anchor: "失敗を掘る--実例-2-つ",
+    anchor: "失敗を掘る--実例-1-つ",
   },
 } as const satisfies Record<string, Section>;
 

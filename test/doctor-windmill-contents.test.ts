@@ -8,7 +8,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  readProto,
   readPush,
   readVariables,
   readWorkspace,
@@ -98,41 +97,6 @@ describe("readPush", () => {
     ]);
     expect(need(verdict)).toMatch(
       /^Windmill に無い: f\/waggle\/crawl_host \(script\)・f\/waggle\/crawl_level \(flow\)。repo と中身が違う: f\/waggle\/plan_level → /,
-    );
-  });
-});
-
-describe("readProto", () => {
-  const repo = 'syntax = "proto3";\nmessage A {}\n';
-
-  it("同じなら ✓", () => {
-    expect(readProto({ status: 200, body: JSON.stringify({ proto: repo }) }, repo)).toEqual({
-      ok: true,
-    });
-  });
-
-  it("無ければ、無いと言って push-proto を名指しする", () => {
-    const verdict = readProto(
-      { status: 404, body: "Not found: Resource u/admin/browserhive_proto not found" },
-      repo,
-    );
-    expect(need(verdict)).toMatch(/^Windmill に proto が無い → pnpm run windmill:push-proto/);
-  });
-
-  it("違えば、古いと言って行数を添える (無いとは言わない)", () => {
-    const verdict = readProto(
-      { status: 200, body: JSON.stringify({ proto: 'syntax = "proto3";\n' }) },
-      repo,
-    );
-    expect(need(verdict)).toMatch(
-      /^Windmill の proto が repo の capture\.proto と違う \(Windmill 2 行・repo 3 行\)/,
-    );
-    expect(need(verdict)).not.toMatch(/無い/);
-  });
-
-  it("形の違う答えは、そのまま出す", () => {
-    expect(need(readProto({ status: 200, body: "{}" }, repo))).toBe(
-      "u/admin/browserhive_proto → 200 {}",
     );
   });
 });

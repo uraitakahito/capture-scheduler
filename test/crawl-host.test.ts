@@ -1,11 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { loadSync } from "@grpc/proto-loader";
 import {
-  assertKnowsManifestOutcome,
   captureHost,
+  describeRefusal,
   parseEndpoints,
   ServerUnavailable,
-  toTarget,
+  type Answer,
   type BusyRetry,
   type Endpoint,
 } from "../windmill/f/waggle/crawl_host.js";
@@ -13,8 +12,8 @@ import {
 /**
  * 1 ホストぶんの取り込み。**礼儀と、口の選び方と、結果の判定。**
  *
- * `captureHost` は口 (`Endpoint`) を引数で受け、`call()` は `client[method](req, opts, cb)` を
- * 呼ぶだけなので、偽物はただのオブジェクトで足りる —— gRPC も Windmill も要らない。
+ * `captureHost` は口 (`Endpoint`) を引数で受け、`Endpoint.capture` は答え (`Answer`) を返す
+ * だけなので、偽物はただの関数で足りる —— HTTP も Windmill も要らない。
  *
  * **fake timer は使わない。** capture 系の sleep はここで race される形になりうるし、
  * browserhive で一度それに溶かしている (PR #253)。実タイマーの ms スケールで回す
@@ -45,9 +44,9 @@ const CAPTURE = {
 /** busy の待ち。既定の 0.5〜1.5 秒では試験が秒単位になる。 */
 const FAST: BusyRetry = { minMs: 1, maxMs: 2 };
 
-/** gRPC の誤りの形。実物は `code` を持った Error なので、それに寄せる。 */
-const grpcError = (code: number, message: string): Error =>
-  Object.assign(new Error(message), { code });
+/** deadline に当たった fetch。`AbortSignal.timeout` が投げる形 (name が TimeoutError)。 */
+const deadlineError = (): Error =>
+  Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
 
 /** 1 回の `Capture` が返す report の中身。`responses` で順に指定し、最後のものが以後ずっと返る。 */
 interface Reply {
@@ -55,19 +54,20 @@ interface Reply {
   errorType?: string;
   links?: string;
   /**
-   * 応答の manifest の結末。省くと「書けた」(`outcome: "location"`)。`null` は欄の無い応答。
-   * 形は proto-loader (`oneofs: true`, `defaults: true`) が実際に返すもの。
+   * 応答の manifest の結末。省くと「書けた」(`{ location }`)。`null` は欄の無い応答。
+   * 形は model の union そのまま。
    */
-  manifest?: { outcome?: string; location?: string; error?: string } | null;
+  manifest?: { location?: string; error?: string } | null;
 }
 
 /**
- * 偽の BrowserHive の口。`capture(req, opts, cb)` だけを持つ。
+ * 偽の BrowserHive の口。
  *
- * - `busyTimes`: 先頭から何回 `RESOURCE_EXHAUSTED` を返すか (走行中の口)
- * - `down`: 常に `UNAVAILABLE` (居ない口)
- * - `error`: この誤りをそのまま返す
- * - `failOn`: この URL は code の無い誤りで落とす (投入そのものの失敗)
+ * - `busyTimes`: 先頭から何回 429 (`Busy`) を返すか (走行中の口)
+ * - `down`: 常に届かない (fetch が投げる形)
+ * - `error`: この誤りをそのまま投げる (deadline など)
+ * - `refuse`: この答えをそのまま返す (400 / 500 など、200 でない答え)
+ * - `failOn`: この URL は 400 で断る (投入そのものの失敗)
  */
 const fakeEndpoint = (
   target: string,
@@ -76,6 +76,7 @@ const fakeEndpoint = (
     busyTimes?: number;
     down?: boolean;
     error?: Error;
+    refuse?: Answer;
     failOn?: string[];
     calls?: Call[];
     seen?: unknown[];
@@ -86,22 +87,36 @@ const fakeEndpoint = (
   let n = 0;
   return {
     target,
-    client: {
-      capture: (req: { url: string }, _opts: unknown, cb: (e: unknown, r?: unknown) => void) => {
-        options.calls?.push({ target, url: req.url, at: Date.now() });
-        options.seen?.push(req);
-        if (options.down === true) return cb(grpcError(14, "no connection established"));
-        if (busyLeft > 0) {
-          busyLeft -= 1;
-          return cb(grpcError(8, "a capture is already running on this browser"));
-        }
-        if (options.error !== undefined) return cb(options.error);
-        if (options.failOn?.includes(req.url) === true) return cb(new Error("投げられなかった"));
-        const reply = responses[Math.min(n, responses.length - 1)] ?? {};
-        n += 1;
-        const status = reply.status ?? "CAPTURE_STATUS_SUCCESS";
-        cb(null, {
-          taskId: `task-${req.url}@${target}`,
+    capture: (req: unknown) => {
+      const { url } = req as { url: string };
+      options.calls?.push({ target, url, at: Date.now() });
+      options.seen?.push(req);
+      if (options.down === true) return Promise.reject(new TypeError("fetch failed"));
+      if (busyLeft > 0) {
+        busyLeft -= 1;
+        return Promise.resolve({
+          status: 429,
+          errorType: "Busy",
+          body: { message: "a capture is already running on this browser" },
+        });
+      }
+      if (options.error !== undefined) return Promise.reject(options.error);
+      if (options.refuse !== undefined) return Promise.resolve(options.refuse);
+      if (options.failOn?.includes(url) === true) {
+        return Promise.resolve({
+          status: 400,
+          errorType: "ValidationException",
+          body: { message: "投げられなかった" },
+        });
+      }
+      const reply = responses[Math.min(n, responses.length - 1)] ?? {};
+      n += 1;
+      const status = reply.status ?? "success";
+      return Promise.resolve({
+        status: 200,
+        errorType: null,
+        body: {
+          taskId: `task-${url}@${target}`,
           report: {
             status,
             artifacts: { links: reply.links ?? "s3://b/x.links.json" },
@@ -111,11 +126,11 @@ const fakeEndpoint = (
           },
           manifest:
             reply.manifest === undefined
-              ? { outcome: "location", location: `s3://b/task-${req.url}.result.json` }
+              ? { location: `s3://b/task-${url}.result.json` }
               : reply.manifest,
-        });
-      },
-    } as unknown as Record<string, unknown>,
+        },
+      });
+    },
   };
 };
 
@@ -156,7 +171,7 @@ describe("間隔をどこに置くか", () => {
 });
 
 describe("結果の判定", () => {
-  it("SUCCESS なら captured、taskId と時刻を運ぶ", async () => {
+  it("success なら captured、taskId と時刻を運ぶ", async () => {
     const [result] = await run([fakeEndpoint("bh-1")], ["a"]);
 
     expect(result!.status).toBe("captured");
@@ -166,17 +181,17 @@ describe("結果の判定", () => {
     expect(result!.finishedAt).toBeDefined();
   });
 
-  it("SUCCESS でなければ失敗として、理由に status と message を残す", async () => {
-    // 1 往復で答えが返るので、「まだ終わっていない」状態は存在しない。SUCCESS でない
+  it("success でなければ失敗として、理由に status と message を残す", async () => {
+    // 1 往復で答えが返るので、「まだ終わっていない」状態は存在しない。success でない
     // report はそれ自体が失敗。taskId は必ず載せる —— capture-ledger が manifest から
     // 拾い直す鍵で、落とすと成果物が S3 に在っても永久に台帳へ入らない。
     const endpoint = fakeEndpoint("bh-1", {
-      responses: [{ status: "CAPTURE_STATUS_HTTP_ERROR", errorType: "ERROR_TYPE_HTTP" }],
+      responses: [{ status: "http_error", errorType: "http" }],
     });
     const [result] = await run([endpoint], ["a"]);
 
     expect(result!.status).toBe("failed");
-    expect(result!.skipReason).toBe("CAPTURE_STATUS_HTTP_ERROR: boom");
+    expect(result!.skipReason).toBe("http_error: boom");
     expect(result!.taskId).toBe("task-a@bh-1");
   });
 });
@@ -194,7 +209,7 @@ describe("成果物の場所", () => {
   });
 
   it("失敗していれば linksLocation を付けない", async () => {
-    const endpoint = fakeEndpoint("bh-1", { responses: [{ status: "CAPTURE_STATUS_FAILED" }] });
+    const endpoint = fakeEndpoint("bh-1", { responses: [{ status: "failed" }] });
     const [result] = await run([endpoint], ["a"]);
     expect(result).not.toHaveProperty("linksLocation");
   });
@@ -208,7 +223,7 @@ describe("manifest の結末", () => {
   it("書けた場所をそのまま運ぶ", async () => {
     const location = "s3://b/elsewhere/x y+z.result.json";
     const [result] = await run(
-      [fakeEndpoint("bh-1", { responses: [{ manifest: { outcome: "location", location } }] })],
+      [fakeEndpoint("bh-1", { responses: [{ manifest: { location } }] })],
       ["a"],
     );
     expect(result!.manifestLocation).toBe(location);
@@ -218,7 +233,7 @@ describe("manifest の結末", () => {
   it("書けなかった理由を運ぶ", async () => {
     const error = "s3://b/t_.result.json: not written within 10000ms";
     const [result] = await run(
-      [fakeEndpoint("bh-1", { responses: [{ manifest: { outcome: "error", error } }] })],
+      [fakeEndpoint("bh-1", { responses: [{ manifest: { error } }] })],
       ["a"],
     );
     expect(result!.manifestError).toBe(error);
@@ -233,10 +248,10 @@ describe("manifest の結末", () => {
     expect(result).not.toHaveProperty("manifestLocation");
   });
 
-  // proto3 の oneof は空文字でも「立っている」。値だけを見る実装はここで場所を運んでしまう。
+  // 空の場所を「書けた」と読む実装はここで場所を運んでしまう。
   it("空の場所は書けたと扱わない", async () => {
     const [result] = await run(
-      [fakeEndpoint("bh-1", { responses: [{ manifest: { outcome: "location", location: "" } }] })],
+      [fakeEndpoint("bh-1", { responses: [{ manifest: { location: "" } }] })],
       ["a"],
     );
     expect(result).not.toHaveProperty("manifestLocation");
@@ -253,34 +268,6 @@ describe("manifest の結末", () => {
   });
 });
 
-describe("proto の写し", () => {
-  /**
-   * **本物の proto を、crawl_host.ts と同じ設定で読んで確かめる。** 鍵の綴り
-   * (`browserhive.v1.ManifestOutcome`) を試験の中で書き写すだけだと、実装と試験が同じ
-   * 綴り違いをしたときに緑で通る —— 読み込みの結果に在ることを見る。
-   */
-  it("vendor した proto は ManifestOutcome を知っている", () => {
-    const definition = loadSync("proto/browserhive/v1/capture.proto", {
-      keepCase: false,
-      longs: String,
-      enums: String,
-      defaults: true,
-      oneofs: true,
-    });
-    expect(() => assertKnowsManifestOutcome(definition)).not.toThrow();
-  });
-
-  // v10.0.0 より前の写し。応答は読めてしまうので、ここで止めないと黙って台帳から欠ける。
-  it("ManifestOutcome を知らない写しは、push-proto を名指しして止める", () => {
-    expect(() =>
-      assertKnowsManifestOutcome({
-        "browserhive.v1.CaptureService": {},
-        "browserhive.v1.CaptureResponse": {},
-      }),
-    ).toThrow(/windmill:push-proto/);
-  });
-});
-
 describe("1 件の失敗", () => {
   it("残りを止めない", async () => {
     // 木の 1 枝が折れても、他の枝は進めてよい。ここで投げると段が丸ごと落ちる。
@@ -288,10 +275,10 @@ describe("1 件の失敗", () => {
 
     expect(results).toHaveLength(3);
     expect(results.map((r) => r.status)).toEqual(["captured", "failed", "captured"]);
-    expect(results[1]!.skipReason).toBe("投げられなかった");
+    expect(results[1]!.skipReason).toBe("400 ValidationException: 投げられなかった");
   });
 
-  it("投入そのものが落ちたときは taskId が無い", async () => {
+  it("投入そのものが断られたときは taskId が無い", async () => {
     // **これは取りこぼしではない。** 投入が通っていないので id は存在しない。
     // capture-ledger 側も「taskId を持つもの」だけを拾い直すので、対象にならないのが正しい。
     const [page] = await run([fakeEndpoint("bh-1", { failOn: ["a"] })], ["a"]);
@@ -299,9 +286,20 @@ describe("1 件の失敗", () => {
     expect(page!.taskId).toBeUndefined();
   });
 
+  it("server の失敗 (500) も 1 ページの失敗で、名前と status を理由に残す", async () => {
+    // 生成 server の InternalFailure は本文が空 (`{}`)。名前と status だけが手掛かり。
+    const endpoint = fakeEndpoint("bh-1", {
+      refuse: { status: 500, errorType: "InternalFailure", body: {} },
+    });
+    const [page] = await run([endpoint], ["a"]);
+    expect(page!.status).toBe("failed");
+    expect(page!.skipReason).toBe("500 InternalFailure");
+    expect(page!.taskId).toBeUndefined();
+  });
+
   it("deadline を過ぎたら 1 ページの失敗で、taskId は無い", async () => {
     // server が固まって deadline に当たった。答えを受け取っていないので id も無い。
-    const endpoint = fakeEndpoint("bh-1", { error: grpcError(4, "Deadline exceeded") });
+    const endpoint = fakeEndpoint("bh-1", { error: deadlineError() });
     const [page] = await run([endpoint], ["a"]);
     expect(page!.status).toBe("failed");
     expect(page!.skipReason).toContain("deadline");
@@ -309,9 +307,27 @@ describe("1 件の失敗", () => {
   });
 });
 
+describe("断られた答えの読み方", () => {
+  it("status と error の名前と message を 1 行に", () => {
+    expect(
+      describeRefusal({
+        status: 400,
+        errorType: "ValidationException",
+        body: { message: "1 validation error detected", fieldList: [{ path: "/viewport/width" }] },
+      }),
+    ).toBe("400 ValidationException: 1 validation error detected");
+  });
+
+  it("本文が JSON でなければ、先頭だけを添える", () => {
+    expect(
+      describeRefusal({ status: 502, errorType: null, body: "<html>bad gateway</html>" }),
+    ).toBe("502: <html>bad gateway</html>");
+  });
+});
+
 describe("口を選ぶ", () => {
   /**
-   * **BrowserHive は browser 1 台に口 1 つ。** 走行中の口は RESOURCE_EXHAUSTED で断るので、
+   * **BrowserHive は browser 1 台に口 1 つ。** 走行中の口は 429 (`Busy`) で断るので、
    * 空いている口を探すのはこちらの仕事。
    */
   it("busy の口は飛ばして次の口に投げる", async () => {
@@ -372,6 +388,16 @@ describe("口を選ぶ", () => {
     // 2 台のうちどちらを見に行けばよいか、名指しで分かること。
     await expect(run([fakeEndpoint("bh-1", { down: true })], ["a"])).rejects.toThrow("bh-1");
   });
+
+  it("deadline は口を飛ばす理由にしない —— 投入は通っているかもしれない", async () => {
+    // 固まった口の次の口で撮り直すと、相手に 2 回目が届く。1 ページの失敗として返す。
+    const calls: Call[] = [];
+    const stuck = fakeEndpoint("bh-1", { error: deadlineError(), calls });
+    const ok = fakeEndpoint("bh-2", { calls });
+    const [page] = await run([stuck, ok], ["a"]);
+    expect(calls.map((c) => c.target)).toEqual(["bh-1"]);
+    expect(page!.status).toBe("failed");
+  });
 });
 
 describe("一過性の失敗の再試行", () => {
@@ -383,7 +409,7 @@ describe("一過性の失敗の再試行", () => {
     const calls: Call[] = [];
     const endpoint = fakeEndpoint("bh-1", {
       calls,
-      responses: [{ status: "CAPTURE_STATUS_FAILED", errorType: "ERROR_TYPE_CONNECTION" }, {}],
+      responses: [{ status: "failed", errorType: "connection" }, {}],
     });
     const [result] = await run([endpoint], ["a"], 40);
 
@@ -396,13 +422,13 @@ describe("一過性の失敗の再試行", () => {
     const calls: Call[] = [];
     const endpoint = fakeEndpoint("bh-1", {
       calls,
-      responses: [{ status: "CAPTURE_STATUS_TIMEOUT", errorType: "ERROR_TYPE_TIMEOUT" }],
+      responses: [{ status: "timeout", errorType: "timeout" }],
     });
     const [result] = await run([endpoint], ["a"]);
 
     expect(calls).toHaveLength(2);
     expect(result!.status).toBe("failed");
-    expect(result!.skipReason).toBe("CAPTURE_STATUS_TIMEOUT: boom");
+    expect(result!.skipReason).toBe("timeout: boom");
     expect(result!.taskId).toBe("task-a@bh-1");
   });
 
@@ -411,7 +437,7 @@ describe("一過性の失敗の再試行", () => {
     const calls: Call[] = [];
     const endpoint = fakeEndpoint("bh-1", {
       calls,
-      responses: [{ status: "CAPTURE_STATUS_HTTP_ERROR", errorType: "ERROR_TYPE_HTTP" }],
+      responses: [{ status: "http_error", errorType: "http" }],
     });
     const [result] = await run([endpoint], ["a"]);
 
@@ -419,12 +445,12 @@ describe("一過性の失敗の再試行", () => {
     expect(result!.status).toBe("failed");
   });
 
-  it("書き込み先の失敗 (ARTIFACT_SINK) は再試行しない —— 壊れた保管庫にページを撮り直さない", async () => {
+  it("書き込み先の失敗 (artifact_sink) は再試行しない —— 壊れた保管庫にページを撮り直さない", async () => {
     // v10.0.0 から、答えない保管庫はこの型で返る。撮り直しても同じ保管庫に書くだけ。
     const calls: Call[] = [];
     const endpoint = fakeEndpoint("bh-1", {
       calls,
-      responses: [{ status: "CAPTURE_STATUS_FAILED", errorType: "ERROR_TYPE_ARTIFACT_SINK" }],
+      responses: [{ status: "failed", errorType: "artifact_sink" }],
     });
     const [result] = await run([endpoint], ["a"]);
 
@@ -433,32 +459,11 @@ describe("一過性の失敗の再試行", () => {
   });
 });
 
-describe("宛先の正規化", () => {
-  it("scheme を落とす", () => {
-    // gRPC の宛先は URL ではなく `host:port`。scheme を残したまま渡すと
-    // `http` という名前の host を DNS に引きに行く。
-    expect(toTarget("http://browserhive-1.capture-ledger:50051")).toBe(
-      "browserhive-1.capture-ledger:50051",
-    );
-    expect(toTarget("https://bh:50051")).toBe("bh:50051");
-  });
-
-  it("末尾のスラッシュを落とす", () => {
-    expect(toTarget("browserhive-1.capture-ledger:50051/")).toBe(
-      "browserhive-1.capture-ledger:50051",
-    );
-  });
-
-  it("すでに host:port ならそのまま", () => {
-    expect(toTarget("localhost:50051")).toBe("localhost:50051");
-  });
-});
-
 describe("口の一覧の読み方", () => {
-  it("文字列の JSON 配列を、正規化した宛先の配列にする", () => {
-    expect(parseEndpoints('["http://bh-1:50051/", "bh-2:50051"]')).toEqual([
-      "bh-1:50051",
-      "bh-2:50051",
+  it("URL の JSON 配列を、末尾の / を落として返す", () => {
+    expect(parseEndpoints('["http://bh-1:50051/", "https://bh-2:50051"]')).toEqual([
+      "http://bh-1:50051",
+      "https://bh-2:50051",
     ]);
   });
 
@@ -467,20 +472,24 @@ describe("口の一覧の読み方", () => {
     expect(() => parseEndpoints("browserhive-1.capture-ledger:50051")).toThrow("JSON");
   });
 
+  it("scheme の無い宛先は落ちる —— v11 までの host:port", () => {
+    // gRPC 時代の綴りのまま v12 の口に向けると `http` という名前の host を引きに行く前に止める。
+    expect(() => parseEndpoints('["browserhive-1.capture-ledger:50051"]')).toThrow("http(s)://");
+  });
+
   it("空の配列は落ちる", () => {
     // 黙って空にすると「口が 1 つも無い」が「全部 busy」と同じ待ちに化ける。
     expect(() => parseEndpoints("[]")).toThrow("空でない");
   });
 
   it("文字列でない要素は落ちる", () => {
-    expect(() => parseEndpoints('[{"target":"bh-1:50051"}]')).toThrow("空でない");
+    expect(() => parseEndpoints('[{"target":"http://bh-1:50051"}]')).toThrow("空でない");
   });
 });
 
 describe("取り込む形式", () => {
   it("渡された 6 つをそのまま送る", async () => {
-    // **6 つ全部を送る。** proto3 では未設定と false が別物で、落とすと
-    // 「指定なし」として届く。何を立てるかを決めるのは capture-ledger 側。
+    // **6 つ全部を送る。** 何を立てるかを決めるのは capture-ledger 側。
     const seen: unknown[] = [];
     const capture = {
       formats: { png: true, webp: false, html: true, links: false, mhtml: false, wacz: true },
@@ -539,7 +548,9 @@ describe("成果物の送り先", () => {
  * 送らなければページの中では何も走らず、それでも取り込みは成功してアーカイブも出る。
  *
  * この層は中身を見ない。見ているのは「台帳が渡したものが、2 つの口に正しく分かれて、
- * 並びを保ったまま本文に載るか」だけ。
+ * 並びを保ったまま本文に載るか」だけ。欄の綴りは BrowserHive の model (`Script` は
+ * id / source / sha256 / options、`behaviors` と `preload` は素の配列) —— 届く形は
+ * e2e が本物の server で確かめる。
  */
 describe("ページで走らせるスクリプト", () => {
   const formats = { png: false, webp: false, html: false, links: false, mhtml: false, wacz: true };
@@ -562,8 +573,8 @@ describe("ページで走らせるスクリプト", () => {
       FAST,
     );
     return seen[0] as {
-      behaviors?: { behaviors: { items: Record<string, unknown>[] } };
-      preload?: { items: Record<string, unknown>[] };
+      behaviors?: Record<string, unknown>[];
+      preload?: Record<string, unknown>[];
     };
   };
 
@@ -572,8 +583,8 @@ describe("ページで走らせるスクリプト", () => {
     // preload は遷移の前・全フレーム。混ぜると、どちらで走ったのかを誰も言えない。
     const req = await sendWith([script("autoscroll", "behavior"), script("hide", "preload")]);
 
-    expect(req.behaviors?.behaviors.items.map((i) => i["id"])).toEqual(["autoscroll"]);
-    expect(req.preload?.items.map((i) => i["id"])).toEqual(["hide"]);
+    expect(req.behaviors?.map((i) => i["id"])).toEqual(["autoscroll"]);
+    expect(req.preload?.map((i) => i["id"])).toEqual(["hide"]);
   });
 
   it("並びを保つ —— 並びがそのまま実行順", async () => {
@@ -582,29 +593,29 @@ describe("ページで走らせるスクリプト", () => {
       script("a", "behavior"),
       script("c", "behavior"),
     ]);
-    expect(req.behaviors?.behaviors.items.map((i) => i["id"])).toEqual(["b", "a", "c"]);
+    expect(req.behaviors?.map((i) => i["id"])).toEqual(["b", "a", "c"]);
   });
 
   it("version は送らない —— 版は台帳の言葉", async () => {
-    // BrowserHive の `Script` は id / source / sha256 / options_json しか持たない。
+    // BrowserHive の `Script` は id / source / sha256 / options しか持たない。
     // どの版が走ったかは `crawls.scripts` とサーバのログが答える。
     const req = await sendWith([script("autoscroll", "behavior")]);
-    expect(req.behaviors?.behaviors.items[0]).toEqual({
+    expect(req.behaviors?.[0]).toEqual({
       id: "autoscroll",
       source: "/* autoscroll */",
       sha256: "e".repeat(64),
     });
   });
 
-  it("options は JSON の文字列にして載せ、空なら載せない", async () => {
-    // proto では optional な文字列。`"{}"` を送ることと省くことは受け側では同じなので、
+  it("options は JSON の document のまま載せ、空なら載せない", async () => {
+    // model では任意の document。`{}` を送ることと省くことは受け側では同じなので、
     // 意味の無い欄を本文に増やさない。
     const req = await sendWith([
       script("autoscroll", "behavior", { maxSteps: 60 }),
       script("autofetch", "behavior"),
     ]);
-    expect(req.behaviors?.behaviors.items[0]?.["optionsJson"]).toBe('{"maxSteps":60}');
-    expect(req.behaviors?.behaviors.items[1]).not.toHaveProperty("optionsJson");
+    expect(req.behaviors?.[0]?.["options"]).toEqual({ maxSteps: 60 });
+    expect(req.behaviors?.[1]).not.toHaveProperty("options");
   });
 
   it("空なら、どちらの鍵も送らない", async () => {
@@ -617,41 +628,6 @@ describe("ページで走らせるスクリプト", () => {
   it("片方しか無ければ、その口だけを送る", async () => {
     const req = await sendWith([script("hide", "preload")]);
     expect(req).not.toHaveProperty("behaviors");
-    expect(req.preload?.items).toHaveLength(1);
-  });
-
-  /**
-   * **本物の proto に通す。** 偽の client は受け取った object をそのまま返すので、
-   * 上の試験は「こちらが組んだ形」しか見ていない —— 欄の綴りが違っても、入れ子の
-   * 深さが違っても緑になる。序列化して戻すと、proto が知らない欄は**黙って消える**ので、
-   * 消えなかったことが「この形で届く」の証拠になる。
-   */
-  it("組んだ本文が、vendor した proto をそのまま通る", async () => {
-    const definition = loadSync("proto/browserhive/v1/capture.proto", {
-      keepCase: false,
-      longs: String,
-      enums: String,
-      defaults: true,
-      oneofs: true,
-    });
-    const method = (
-      definition["browserhive.v1.CaptureService"] as unknown as Record<
-        string,
-        { requestSerialize: (v: unknown) => Buffer; requestDeserialize: (b: Buffer) => unknown }
-      >
-    )["Capture"]!;
-
-    const sent = await sendWith([
-      script("autoscroll", "behavior", { maxSteps: 60 }),
-      script("hide", "preload"),
-    ]);
-    const back = method.requestDeserialize(method.requestSerialize(sent)) as typeof sent;
-
-    expect(back.behaviors?.behaviors.items[0]).toMatchObject({
-      id: "autoscroll",
-      source: "/* autoscroll */",
-      optionsJson: '{"maxSteps":60}',
-    });
-    expect(back.preload?.items[0]).toMatchObject({ id: "hide" });
+    expect(req.preload).toHaveLength(1);
   });
 });

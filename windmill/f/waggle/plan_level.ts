@@ -24,7 +24,7 @@
  *
  * ## 並列度は BrowserHive の口の数で頭を押さえる
  *
- * BrowserHive は browser 1 台に口 1 つで、走行中の口は `RESOURCE_EXHAUSTED` で断る
+ * BrowserHive は browser 1 台に口 1 つで、走行中の口は `429 Busy` で断る
  * (`crawl_host.ts`)。口より多くのホストを同時に回しても、余ったぶんは busy を引いて
  * 待つだけで相手から見た並列度は増えない。だから for-loop に渡す `parallelism` は
  * `min(host_parallelism, 口の数)` —— 決めるのはここで、flow の式には置かない。
