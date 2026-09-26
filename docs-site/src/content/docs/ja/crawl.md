@@ -89,6 +89,8 @@ BrowserHive は queue も pool も持たない。`POST /captures` は 1 往復�
   `timeout` / `internal`）はもう一度だけ試す。そのホストへの他のアクセスと同じ間隔を
   空けてから。書き込み先の失敗（`artifact_sink`）は試し直さない —— 壊れているのは
   保管庫で、ページを撮り直しても同じ保管庫に書くだけ。
+  方針を守れなかった失敗（`policy`。BrowserHive v18.0.0 から）も試し直さない ——
+  `deny` に当たる WebSocket を開いた頁は、撮り直しても同じ WebSocket を開き、handshake は止められない。
 
 ## 設定は変数から読む
 
