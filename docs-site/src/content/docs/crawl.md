@@ -99,7 +99,9 @@ Two consequences:
   transient error (`connection`, `timeout`, `internal`) is tried once more,
   after the same gap as any other request to that host. A failure to store the
   artifacts (`artifact_sink`) is not — what is broken is the store, and capturing
-  the page again would only write to the same store.
+  the page again would only write to the same store. Nor is a failure to keep the
+  URL policy (`policy`, from BrowserHive v18.0.0): a page that opened a WebSocket
+  matching `deny` would open it again, and the handshake cannot be stopped.
 
 ## Settings come from variables, not arguments
 

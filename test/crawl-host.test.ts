@@ -445,6 +445,19 @@ describe("一過性の失敗の再試行", () => {
     expect(result!.status).toBe("failed");
   });
 
+  it("方針を守れなかった失敗 (policy) は再試行しない —— 撮り直しても同じ要求が相手に届く", async () => {
+    // BrowserHive v18.0.0 から。deny に当たる WebSocket を開いた頁は、撮り直しても同じ WebSocket を開く。
+    const calls: Call[] = [];
+    const endpoint = fakeEndpoint("bh-1", {
+      calls,
+      responses: [{ status: "failed", errorType: "policy" }],
+    });
+    const [result] = await run([endpoint], ["a"]);
+
+    expect(calls).toHaveLength(1);
+    expect(result!.status).toBe("failed");
+  });
+
   it("書き込み先の失敗 (artifact_sink) は再試行しない —— 壊れた保管庫にページを撮り直さない", async () => {
     // v10.0.0 から、答えない保管庫はこの型で返る。撮り直しても同じ保管庫に書くだけ。
     const calls: Call[] = [];
