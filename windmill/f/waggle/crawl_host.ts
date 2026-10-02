@@ -55,7 +55,8 @@ type ErrorType =
   | "signing"
   | "internal"
   | "artifact_sink"
-  | "cancelled";
+  | "cancelled"
+  | "policy";
 
 /**
  * 何をどう取り込むか。**capture-ledger が決めて、dispatch の payload で渡す。**
@@ -174,6 +175,9 @@ const BUSY_RETRY: BusyRetry = { minMs: 500, maxMs: 1500 };
  * 最悪 65 秒)。保管庫が壊れているときにページごと撮り直すと、1 ページあたり撮影と 65 秒を
  * 捨て、相手へのアクセスも 1 回増える —— 直すべきは保管庫で、ページではない。
  * v9 までは同じ事故が `timeout` や `internal` を名乗っていたので、ここで再試行されていた。
+ *
+ * `policy` (方針を守れなかった。BrowserHive v18.0.0 から) も**入れない**。`deny` に当たる WebSocket を
+ * 開く頁は、撮り直しても同じ WebSocket を開き、止められない handshake が相手にもう 1 回届く。
  */
 const MAX_ATTEMPTS = 2;
 const RETRYABLE: ReadonlySet<string> = new Set<ErrorType>(["connection", "timeout", "internal"]);
