@@ -9,14 +9,13 @@ name: audit
 # 何も赤くならなかった。
 #
 # schedule と workflow_dispatch は default branch (main) に在る workflow でしか動かない。
-# develop に入った時点で効くのは pull_request と push。
 #
 # Security:
 #   - permissions は contents:read だけ。secret を 1 つも参照しない。
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
   schedule:
     - cron: "17 21 * * *"
