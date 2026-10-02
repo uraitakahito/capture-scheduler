@@ -6,22 +6,19 @@ name: docs
 #   /capture-scheduler/ja/   → 日本語
 #
 # Security:
-#   - 引き金は main への push と手動のみ。**pull_request では走らせない** ——
-#     fork のコードを Pages の権限付きでビルドすることになる。PR 側の読み取り専用の
-#     guard は site.yaml。
+#   - 引き金はリリースのタグ (v*) の push と手動のみ。公開する docs は、出した版の docs にする。
+#     main への push では走らせない —— main には、まだ出していない変更も入る。
+#     github-pages の環境も、v* のタグからの deploy だけを許す。
+#     公開し直すときは、タグを指して起こす (gh workflow run docs.yaml --ref vX.Y.Z)。
+#   - **pull_request では走らせない** —— fork のコードを、Pages の権限付きでビルドすることになる。
+#     PR 側の読み取り専用の guard は site.yaml。
 #   - 権限は job ごとに分ける: build は contents:read、deploy は pages:write と
 #     id-token:write (deploy-pages の OIDC に要る)。
 #   - secret を 1 つも参照しない。
 
 on:
   push:
-    branches: [main]
-    paths:
-      - "windmill/**"
-      - "docs-site/**"
-      - "scripts/check-doc-refs.mjs"
-      - "package.json"
-      - ".github/workflows/docs.yaml"
+    tags: ["v*"]
   workflow_dispatch:
 
 # 配信は 1 度に 1 つ。cancel-in-progress にしないのは、公開されているものの
