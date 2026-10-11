@@ -26,7 +26,7 @@
     "audit": "pnpm audit --audit-level=low",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "pnpm run audit && pnpm run format:check && pnpm run check-env && pnpm run typecheck && pnpm test && pnpm run check:ci-parity && pnpm run site:check",
+    "check": "pnpm run audit && pnpm run format:check && pnpm run check-env && pnpm run check:terms && pnpm run typecheck && pnpm test && pnpm run check:ci-parity && pnpm run site:check",
     "clean:scripts": "rm -rf dist",
     "build:scripts": "pnpm run clean:scripts && tsc -p tsconfig.scripts.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -41,6 +41,7 @@
     "site:preview": "pnpm --filter capture-scheduler-docs-site run preview",
     "site:check": "pnpm run site:build && pnpm run build:scripts && node dist/scripts/check-doc-refs.js",
     "check:ci-parity": "pnpm run build:scripts && node dist/scripts/check-ci-parity.js",
+    "check:terms": "pnpm run build:scripts && node dist/scripts/check-terms.js",
     "docs:shots": "pnpm run build:scripts && node dist/scripts/docs-shots.js"
   },
   "devDependencies": {

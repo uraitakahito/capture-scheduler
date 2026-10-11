@@ -3,9 +3,9 @@ title: リンクを辿る
 description: 1 段の流れ —— ホストで束ね、ホスト間は並列、ホスト内は逐次、間隔は完了の後
 ---
 
-capture-ledger の `POST /api/crawls` が種を受け取り（URL の配列か、`capture_targets` の
-有効な行を種にする `fromTargets`）、**1 段ずつ** flow に投げる。flow は
-`f/waggle/crawl_level` で、1 回の実行が 1 段。
+capture-ledger の `POST /api/crawls` が起点を受け取り（URL の配列か、`capture_targets` の有効な行を起点にする `fromTargets`）、
+**1 段ずつ** flow に投げる。
+flow は `f/waggle/crawl_level` で、1 回の実行が 1 段。
 
 ```
 plan_level       ホストで束ね、robots.txt を 1 ホスト 1 回引く

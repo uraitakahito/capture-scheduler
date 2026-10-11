@@ -2,7 +2,7 @@ summary: capture-ledger に取り込みを 1 回起こす
 description: |
   capture-ledger の POST /api/crawls を fromTargets で叩き、終わるまで見届ける。
 
-  capture_targets の有効な行がそのまま種になる。深さは capture-ledger が 0 にするので
+  capture_targets の有効な行がそのまま起点になる。深さは capture-ledger が 0 にするので
   リンクは辿らない —— 以前の POST /api/runs と同じことを、クロールの語彙でやる。
 
   走行中なら 409 が返るので、そのときは何もせず緑で終わる (再試行しない)。
@@ -23,7 +23,7 @@ schema:
   properties:
     limit:
       type: number
-      description: 種にする対象の上限。省くと enabled な行を全部
+      description: 起点にする対象の上限。省くと enabled な行を全部
       default: null
       minimum: 1
     poll_interval_ms:

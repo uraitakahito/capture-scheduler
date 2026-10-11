@@ -174,7 +174,7 @@ schema:
       description: capture-ledger が発行したクロールの id
     depth:
       type: integer
-      description: この段の深さ。種が 0
+      description: この段の深さ。起点が 0
       minimum: 0
     frontier:
       type: array
