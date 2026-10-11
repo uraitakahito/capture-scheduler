@@ -45,3 +45,11 @@ minimumReleaseAgeExclude:
 #             なければこの行を消す。
 overrides:
   "windmill-cli>esbuild@0.28.0": "^0.28.1"
+
+  # @expressive-code/core 0.44.2（2026-10-11 の時点で最新。starlight が連れてくる）が、
+  # postcss-nested を ^6.0.1 で要求している。postcss-nested 6 が連れてくる postcss-selector-parser 6 は、
+  # GHSA-rj75-hqrm-r3gf（moderate、修正版は 7.1.6）の対象で、6 系に修正版は無い。
+  # 7 に上げても、docs の build の出力（CSS と HTML）は変わらなかった。
+  #
+  # **外す条件: @expressive-code/core が、postcss-nested を 7 以上で要求する版を出したとき。**
+  "@expressive-code/core>postcss-nested": "^7.0.2"
