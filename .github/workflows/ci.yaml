@@ -36,6 +36,11 @@ jobs:
       - name: Env check
         run: pnpm run check-env
 
+      # seed の旧い訳語が、docs・注記・Windmill の説明に戻っていないか。
+      # 中身は scripts/check-terms.ts。この注記には、探す字そのものを書かない（検査に掛かる）。
+      - name: seed を「起点」と書いているか
+        run: pnpm run check:terms
+
       # script は Windmill の worker (bun) が動かすので、ここでは型だけ見る。
       #
       # **設定を写さない。** 以前ここには tsc の引数が直書きされていて、
