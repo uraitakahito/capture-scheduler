@@ -41,8 +41,8 @@ const ISSUER = process.env["E2E_ISSUER_URL"] ?? "http://127.0.0.1:9099";
 /**
  * capture-ledger のスタックの capture-fixtures。**宛先が 2 つ要る。**
  *
- * `FIXTURES` は**取り込む側**が引く名前 —— 種の URL に載り、BrowserHive のコンテナが
- * これを解決する。`FIXTURES_HOST` は**この試験自身**が叩く口で、loopback。
+ * `FIXTURES` は**取り込む側**が引く名前 —— 起点の URL に載り、
+ * BrowserHive のコンテナがこれを解決する。`FIXTURES_HOST` は**この試験自身**が叩く口で、loopback。
  *
  * 分けるのは macOS 26 の制限のため: Apple 署名でないバイナリ (node) はコンテナの
  * subnet へ TCP を張れず、DNS 名は引けるのに `EHOSTUNREACH` になる
@@ -203,7 +203,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
     const started = await fetch(`${WAGGLE}/api/crawls`, {
       method: "POST",
       headers: { ...auth(), "content-type": "application/json" },
-      // 種は 1 枚、辿らない。届いた要求はこの 1 枚のぶんだけになる。
+      // 起点は 1 枚、辿らない。届いた要求はこの 1 枚のぶんだけになる。
       body: JSON.stringify({ seeds: [`${FIXTURES}/responsive-images`], maxDepth: 0 }),
     });
     const startedBody = await started.text();

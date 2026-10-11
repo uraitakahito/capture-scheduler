@@ -66,7 +66,7 @@ respect_robots    = (渡されていない)     ← schema には default: true
 
 [試験](/testing/) の代わりにはならない。
 
-## flow test の UI は、この種のバグを隠す
+## flow test の UI は、こうしたバグを隠す
 
 Windmill の flow エディタは flow 全体・1 step・途中まで、を実行できる。書いている
 最中には役に立つ。だが**守りにはならない**:

@@ -14,9 +14,9 @@ enabled: true
 
 止めたいときは `enabled: false` にして `pnpm run windmill:push`。
 
-`trigger_crawl` は capture-ledger の `POST /api/crawls` を `fromTargets` で叩き
-（`capture_targets` の有効な行が種、深さは 0）、`GET /api/crawls/:id` を
-**終わるまで**見に行く。待つことに意味がある —— API は **202** を返して即座に
+`trigger_crawl` は capture-ledger の `POST /api/crawls` を `fromTargets` で叩き（`capture_targets` の有効な行が起点、深さは 0）、
+`GET /api/crawls/:id` を**終わるまで**見に行く。
+待つことに意味がある —— API は **202** を返して即座に
 戻るので、そこで終わりにすると取り込みが失敗しても job は緑になる。実行履歴に
 赤を残せるのは、ここで throw したときだけ。
 
