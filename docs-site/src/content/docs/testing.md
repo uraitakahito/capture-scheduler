@@ -47,15 +47,15 @@ is busy — exists so tests run on **real timers at millisecond scale**; fake
 timers were tried against capture-style sleeps elsewhere in this workspace and
 cost a round trip.
 
-## The end-to-end test starts a real crawl
+## The end-to-end tests start real crawls
 
-One test, about 40 seconds. It goes through capture-ledger's API — **not** Windmill's
-run endpoint — because the point is to carry the arguments capture-ledger actually sends:
+Each test starts a crawl through capture-ledger's API — **not** Windmill's run endpoint —
+because the point is to carry the arguments capture-ledger actually sends:
 `crawl_id`, `depth`, `frontier`, `per_host_delay_ms`, `host_parallelism`,
 `capture_formats`, `signing`, `scripts`, and `artifact_sink` where capture-ledger serves
 the sink. **`respect_robots` is not among them.**
 
-It asserts four things:
+The first one asserts four things:
 
 1. **capture-fixtures never received `/links/hidden`**, which its robots.txt disallows. The
    verdict comes from the _other end's_ request log, because the ledger can only
@@ -73,6 +73,25 @@ Breaking `?? true` in `plan_level.ts` and deploying turns **both** the unit test
 and the e2e red, and the e2e shows capture-fixtures receiving the forbidden page. That pair
 was checked once on purpose: if only one layer goes red, the other is watching
 something it thinks it is watching and is not.
+
+### What runs inside the page
+
+The rest look at the scripts a crawl runs in the page, again from capture-fixtures' request
+log, which counts every request by its full URL, query string included.
+
+- **Catalog scripts run, and only when asked.** With the default catalog, autofetch requests
+  `/assets/hero-2x.svg`, which a 1280px browser at DPR 1 never asks for itself. The control sends
+  `scripts: []` to the same page, and nobody requests it.
+- **A script that does not type-check fails the level at compile**, with the diagnostics in the
+  crawl's `error`: once through the catalog (the ledger's CLI adds and removes a broken script),
+  once as an inline script.
+- **An inline script runs in the order it was asked for.** It fetches
+  `/plain-html?inline=<token>&state=<document.readyState>`, which leaves a mark in the log:
+  `loading` when it ran before navigation, `complete` after load.
+- **The same inline script asked again as `preload` runs before navigation.** Both crawls send the
+  same source, so the second one hits ts-compile-service's cache. A cache that remembered whole
+  answers handed back the first crawl's `behavior`, and the mark said `complete`; that is how
+  ts-compile-service v0.2.2 and earlier behave, and this test is red against them.
 
 ## The nightly loop refuses to guess
 
