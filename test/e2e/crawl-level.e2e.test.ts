@@ -448,10 +448,12 @@ describe("クロールが flow を通って索引まで終わる", () => {
     // control —— 取り込みは届いている。0 なら下の判定は空振り
     expect(counts["/assets/hero.svg"], "取り込みが届いていない").toBeGreaterThan(0);
     expect(
-      counts[mark(run, "complete")],
+      counts[mark(run, "complete")] ?? 0,
       "その場の JS が、読み込みの後に走っていない",
     ).toBeGreaterThan(0);
-    expect(counts["/assets/hero-2x.svg"], "目録の autofetch が走っていない").toBeGreaterThan(0);
+    expect(counts["/assets/hero-2x.svg"] ?? 0, "目録の autofetch が走っていない").toBeGreaterThan(
+      0,
+    );
   });
 
   /**
@@ -478,7 +480,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
     expect(first["state"], String(first["error"])).toBe("succeeded");
     // control —— 印の仕組みそのものが効いている。0 なら下の判定は空振り
     expect(
-      (await requestCounts())[mark(run, "complete")],
+      (await requestCounts())[mark(run, "complete")] ?? 0,
       "読み込みの後の印が付かない",
     ).toBeGreaterThan(0);
 
@@ -486,7 +488,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
     const second = await crawl("preload");
     expect(second["state"], String(second["error"])).toBe("succeeded");
     const counts = await requestCounts();
-    expect(counts[mark(run, "loading")], "遷移の前に走っていない").toBeGreaterThan(0);
+    expect(counts[mark(run, "loading")] ?? 0, "遷移の前に走っていない").toBeGreaterThan(0);
     expect(
       counts[mark(run, "complete")] ?? 0,
       "読み込みの後に走った —— 変換の cache が phase を取り違えた",
