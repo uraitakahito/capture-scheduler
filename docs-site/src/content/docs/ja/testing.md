@@ -44,14 +44,14 @@ vitest は必ず「No test files found, exiting with code 1」を先に出し、
 あるのは、**実タイマーの ms スケール**で書くため。fake timer は、この workspace の
 別の場所で capture 系の sleep に対して試して一往復溶かしている。
 
-## e2e は本物のクロールを 1 本起こす
+## e2e は本物のクロールを起こす
 
-1 件、約 40 秒。Windmill の実行の口ではなく **capture-ledger の API** を通す —— 目的が
+どの試験も、Windmill の実行の口ではなく **capture-ledger の API** でクロールを起こす —— 目的が
 「capture-ledger が実際に送る引数」を運ぶことだから: `crawl_id` / `depth` / `frontier` /
 `per_host_delay_ms` / `host_parallelism` / `capture_formats` / `signing` / `scripts` と、
 受け口を出している配備では `artifact_sink` で、**`respect_robots` は入っていない**。
 
-見ているのは 4 つ:
+最初の試験が見ているのは 4 つ:
 
 1. **capture-fixtures が `/links/hidden` を一度も受け取っていない**こと。robots.txt が禁じている
    ページで、判定は**相手のリクエストログ**から採る —— 台帳は「記録したこと」しか
@@ -67,6 +67,22 @@ vitest は必ず「No test files found, exiting with code 1」を先に出し、
 `plan_level.ts` の `?? true` を消して配備すると、**単体と e2e が両方赤くなり**、
 e2e のほうは capture-fixtures が禁じられたページを受け取ったことを示す。この対は一度わざと
 確かめてある: 片方しか赤くならないなら、もう片方は見ているつもりで見ていない。
+
+### ページの中で走るもの
+
+残りは、クロールがページの中で走らせるスクリプトを見る。判定はやはり capture-fixtures の
+リクエストログで、query を含む URL ごとに全部の要求を数えている。
+
+- **目録のスクリプトは、頼んだときだけ走る。** 既定の目録なら autofetch が `/assets/hero-2x.svg` を
+  取りに行く（1280px・DPR 1 のブラウザは自分では要求しない）。対照は同じページに `scripts: []` を
+  送り、誰も要求しない。
+- **型の通らないスクリプトは、compile の段でクロールごと落ちる。** 診断はクロールの `error` に残る。
+  目録の物（台帳の CLI で壊れたスクリプトを足して消す）と、その場の JS の両方で見る。
+- **その場の JS は、頼んだ順に走る。** `/plain-html?inline=<token>&state=<document.readyState>` を
+  取りに行き、ログに印を残す。遷移の前に走れば `loading`、読み込みの後なら `complete`。
+- **同じその場の JS を `preload` で頼み直すと、遷移の前に走る。** 2 本とも同じ source なので、
+  2 本目は ts-compile-service の cache に当たる。答えごと覚えていた cache は 1 本目の `behavior` を
+  返し、印は `complete` になった。ts-compile-service v0.2.2 までがその形で、この試験はそれに対して赤い。
 
 ## 日次のループは推測しない
 

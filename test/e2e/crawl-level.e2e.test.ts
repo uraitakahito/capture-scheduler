@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it, expect, beforeAll } from "vitest";
@@ -61,6 +62,50 @@ const auth = () => ({ authorization: `Bearer ${token}` });
 
 const json = async (res: Response): Promise<Record<string, unknown>> =>
   (await res.json()) as Record<string, unknown>;
+
+/** 1 本起こして crawlId を返す。202 でなければ、台帳の本文を理由に落とす。 */
+const startCrawl = async (body: Record<string, unknown>): Promise<string> => {
+  const res = await fetch(`${WAGGLE}/api/crawls`, {
+    method: "POST",
+    headers: { ...auth(), "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  expect(res.status, text).toBe(202);
+  return String((JSON.parse(text) as Record<string, unknown>)["crawlId"]);
+};
+
+/** 走り終えるまで待ち、`GET /api/crawls/:id` の答えを返す。 */
+const finished = async (crawlId: string): Promise<Record<string, unknown>> => {
+  let got: Record<string, unknown> = { state: "running" };
+  for (let i = 0; i < 100 && got["state"] === "running"; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    got = await json(await fetch(`${WAGGLE}/api/crawls/${crawlId}`, { headers: auth() }));
+  }
+  return got;
+};
+
+/** capture-fixtures の要求ログ。**query を含む URL ごと**に数える（404 の道も数える）。 */
+const requestCounts = async (): Promise<Record<string, number>> =>
+  (await json(await fetch(`${FIXTURES_HOST}/__request-counts`))) as Record<string, number>;
+
+const resetFixtures = async (): Promise<void> => {
+  await fetch(`${FIXTURES_HOST}/__reset`, { method: "POST" });
+};
+
+/**
+ * 走った口を、ページの中から印に残すその場の JS。`run` は試験ごとの token、`state` は走ったときの
+ * `document.readyState` —— 遷移の前に走れば `loading`、読み込みの後なら `complete` になる。
+ *
+ * **同じ文字列を behavior でも preload でも送れる形にする**（await を使わない IIFE）。読み込みの後なら、
+ * BrowserHive がスクリプトの後でネットワークが静まるのを待つので、要求は撮り終える前に届く。
+ */
+const probe = (run: string): string =>
+  `(() => {\n  void fetch("/plain-html?inline=${run}&state=" + document.readyState);\n})();\n`;
+
+/** `probe(run)` が付ける印の URL。 */
+const mark = (run: string, state: "loading" | "complete"): string =>
+  `/plain-html?inline=${run}&state=${state}`;
 
 beforeAll(async () => {
   // issuer は起動のたびに鍵を作り直すので、その場で採る。
@@ -272,7 +317,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
   /**
    * **目録を空にしたクロールは、何も走らせずに成功する。**
    *
-   * 上の試験の対照。同じページ・同じ条件で、台帳に `scriptIds: []` (「何も走らせない」という意思) を渡す。
+   * 上の試験の対照。同じページ・同じ条件で、台帳に `scripts: []` (「何も走らせない」という意思) を渡す。
    * compile の段は空の目録を 200 で通し (ts-compile-service v0.2.1 から)、BrowserHive はページの中で
    * 何も走らせない。その証拠は fixtures の request log に在る —— autofetch が居なければ hero-2x.svg は
    * 誰も要求しない。これが無いと、上の試験の hero-2x.svg が本当に autofetch の仕業かを、走らなかった
@@ -290,7 +335,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
       body: JSON.stringify({
         seeds: [`${FIXTURES}/responsive-images`],
         maxDepth: 0,
-        scriptIds: [],
+        scripts: [],
       }),
     });
     const startedBody = await started.text();
@@ -363,5 +408,117 @@ describe("クロールが flow を通って索引まで終わる", () => {
     } finally {
       ledger("rm", "broken");
     }
+  });
+
+  /**
+   * **その場の JS は、目録の物と同じ道でページの中まで届く。** 台帳は目録を通さずに行の写しを作り
+   * (`inline-<name>`・版 1)、flow は区別せずに変換して BrowserHive へ渡す。並びは頼んだとおり。
+   */
+  it("その場の JS と目録を並べると、頼んだ順に写り、どちらもページの中で走る", async () => {
+    await resetFixtures();
+    const run = randomUUID().slice(0, 8);
+    const got = await finished(
+      await startCrawl({
+        seeds: [`${FIXTURES}/responsive-images`],
+        maxDepth: 0,
+        scripts: [
+          { inline: { name: "probe", phase: "behavior", source: probe(run) } },
+          { catalog: "autofetch" },
+        ],
+      }),
+    );
+    expect(got["state"], String(got["error"])).toBe("succeeded");
+    const scripts = got["scripts"] as {
+      id: string;
+      jsSha256: string | null;
+      inline?: { name: string; phase: string; source: string };
+    }[];
+    // 頼んだ並びのまま写る。その場の物にだけ、頼んだ要素が返る
+    expect(scripts.map((script) => script.id)).toEqual(["inline-probe", "autofetch"]);
+    expect(scripts[0]?.inline).toEqual({ name: "probe", phase: "behavior", source: probe(run) });
+    expect(scripts[1]).not.toHaveProperty("inline");
+    // どちらも変換され、走った JS の hash が報告で台帳に戻っている
+    for (const script of scripts) {
+      expect(script.jsSha256, `${script.id}: JS の hash が台帳に戻っていない`).toMatch(
+        /^[0-9a-f]{64}$/,
+      );
+    }
+
+    const counts = await requestCounts();
+    // control —— 取り込みは届いている。0 なら下の判定は空振り
+    expect(counts["/assets/hero.svg"], "取り込みが届いていない").toBeGreaterThan(0);
+    expect(
+      counts[mark(run, "complete")] ?? 0,
+      "その場の JS が、読み込みの後に走っていない",
+    ).toBeGreaterThan(0);
+    expect(counts["/assets/hero-2x.svg"] ?? 0, "目録の autofetch が走っていない").toBeGreaterThan(
+      0,
+    );
+  });
+
+  /**
+   * **同じ JS を、遷移の前で頼み直す。** 2 本とも同じ source なので、2 本目は ts-compile-service の
+   * cache に当たる。cache が答えごと覚えていた版 (v0.2.2 まで) は 1 本目の phase (behavior) を返し、
+   * crawl_host は読み込みの後で走らせる —— どこにも誤りが出ないまま、印は complete になる。
+   *
+   * 印の token は 2 本で 1 つにする。変えると source が変わって cache に当たらず、この試験は何も
+   * 言わない。どちらのクロールの印かは、間の `/__reset` で分ける。
+   */
+  it("同じ JS を遷移の前で頼み直すと、遷移の前に走る", async () => {
+    const run = randomUUID().slice(0, 8);
+    const crawl = async (phase: "behavior" | "preload") =>
+      finished(
+        await startCrawl({
+          seeds: [`${FIXTURES}/plain-html`],
+          maxDepth: 0,
+          scripts: [{ inline: { name: "probe", phase, source: probe(run) } }],
+        }),
+      );
+
+    await resetFixtures();
+    const first = await crawl("behavior");
+    expect(first["state"], String(first["error"])).toBe("succeeded");
+    // control —— 印の仕組みそのものが効いている。0 なら下の判定は空振り
+    expect(
+      (await requestCounts())[mark(run, "complete")] ?? 0,
+      "読み込みの後の印が付かない",
+    ).toBeGreaterThan(0);
+
+    await resetFixtures();
+    const second = await crawl("preload");
+    expect(second["state"], String(second["error"])).toBe("succeeded");
+    const counts = await requestCounts();
+    expect(counts[mark(run, "loading")] ?? 0, "遷移の前に走っていない").toBeGreaterThan(0);
+    expect(
+      counts[mark(run, "complete")] ?? 0,
+      "読み込みの後に走った —— 変換の cache が phase を取り違えた",
+    ).toBe(0);
+  });
+
+  /**
+   * **型の通らないその場の JS は、compile の段でクロールごと落ちる。** 目録の broken の試験と違い、
+   * CLI で目録に入れて消す手間が無い —— その場の JS は行の写しにだけ在る。
+   */
+  it("型の通らないその場の JS は、compile の段でクロールごと落ちる", async () => {
+    const got = await finished(
+      await startCrawl({
+        seeds: [`${FIXTURES}/plain-html`],
+        maxDepth: 0,
+        scripts: [
+          {
+            inline: {
+              name: "broken",
+              phase: "behavior",
+              source: `(() => {\n  const n: number = "x";\n})();\n`,
+            },
+          },
+        ],
+      }),
+    );
+    expect(got["state"], `stopReason=${String(got["stopReason"])}`).toBe("failed");
+    const reason = String(got["error"]);
+    expect(reason, "落ちた段が compile ではない").toContain("compile 422");
+    expect(reason, "型エラーの code が error に無い").toContain("TS2322");
+    expect(reason, "診断が、その場の JS を名指していない").toContain("inline-broken.ts");
   });
 });

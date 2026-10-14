@@ -34,7 +34,7 @@ export const SECTIONS = {
   e2e: {
     title: "e2e",
     page: "testing",
-    anchor: "e2e-は本物のクロールを-1-本起こす",
+    anchor: "e2e-は本物のクロールを起こす",
   },
   /** smoke が、知らない失敗のときに開かせる節。 */
   digFailures: {
