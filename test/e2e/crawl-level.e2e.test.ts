@@ -431,12 +431,23 @@ describe("クロールが flow を通って索引まで終わる", () => {
     const scripts = got["scripts"] as {
       id: string;
       jsSha256: string | null;
-      inline?: { name: string; phase: string; source: string };
+      inline?: { name: string; phase: string; bytes: number };
     }[];
-    // 頼んだ並びのまま写る。その場の物にだけ、頼んだ要素が返る
+    // 頼んだ並びのまま写る。その場の物にだけ、頼んだ要素が返る（大きさだけ —— source は運ばない）
     expect(scripts.map((script) => script.id)).toEqual(["inline-probe", "autofetch"]);
-    expect(scripts[0]?.inline).toEqual({ name: "probe", phase: "behavior", source: probe(run) });
+    expect(scripts[0]?.inline).toEqual({
+      name: "probe",
+      phase: "behavior",
+      bytes: Buffer.byteLength(probe(run)),
+    });
     expect(scripts[1]).not.toHaveProperty("inline");
+    // 書いた物は、名前の口から取り戻す（capture-ledger v0.59.0。画面の「欄に戻す」が使う）
+    const back = await json(
+      await fetch(`${WAGGLE}/api/crawls/${String(got["crawlId"])}/inline/probe`, {
+        headers: auth(),
+      }),
+    );
+    expect(back["source"], "名前の口が、書いた JS を返さない").toBe(probe(run));
     // どちらも変換され、走った JS の hash が報告で台帳に戻っている
     for (const script of scripts) {
       expect(script.jsSha256, `${script.id}: JS の hash が台帳に戻っていない`).toMatch(
