@@ -521,4 +521,42 @@ describe("クロールが flow を通って索引まで終わる", () => {
     expect(reason, "型エラーの code が error に無い").toContain("TS2322");
     expect(reason, "診断が、その場の JS を名指していない").toContain("inline-broken.ts");
   });
+
+  /**
+   * **型の誤りがいくつあっても、クロールは failed で締まり、次を塞がない。** 束ねた JS を貼ると
+   * 診断は数百件になる。全部を reason に載せると台帳の /failed（2,000 字まで）が 400 で断り、
+   * running の行が残って、次のクロールが全部 409 になる（v0.24.2 まで）。
+   */
+  it("型の誤りが多い JS でも、クロールは failed で締まり、次を塞がない", async () => {
+    // 1 行に 1 件（TS2322）。300 件の診断を全部載せると、reason は 2,000 字を大きく超える
+    const lines = Array.from({ length: 300 }, (_, i) => `  const v${String(i)}: number = "x";`);
+    const got = await finished(
+      await startCrawl({
+        seeds: [`${FIXTURES}/plain-html`],
+        maxDepth: 0,
+        scripts: [
+          {
+            inline: {
+              name: "many",
+              phase: "behavior",
+              source: `(() => {\n${lines.join("\n")}\n})();\n`,
+            },
+          },
+        ],
+      }),
+    );
+    expect(got["state"], "締まらずに running のまま —— 失敗の文を台帳が断った").toBe("failed");
+    const reason = String(got["error"]);
+    expect(reason, "件数が error に無い").toContain("型の誤り 300 件");
+    expect(reason, "最初の診断が、その場の JS の行を名指していない").toContain(
+      "inline-many.ts:2:9 TS2322",
+    );
+    expect(reason.length, "reason が台帳の上限を超えた").toBeLessThanOrEqual(2000);
+
+    // 次を塞がない —— 締まっていなければ、ここは 409 で startCrawl が赤くなる
+    const next = await finished(
+      await startCrawl({ seeds: [`${FIXTURES}/plain-html`], maxDepth: 0, scripts: [] }),
+    );
+    expect(next["state"], String(next["error"])).toBe("succeeded");
+  });
 });

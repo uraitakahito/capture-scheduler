@@ -37,13 +37,27 @@ export const describe = (error: unknown): string => {
   return typeof e.step_id === "string" ? `[${e.step_id}] ${message}` : message;
 };
 
+/**
+ * 台帳の reason の上限 (capture-ledger の `POST /api/crawls/:id/failed` の schema)。
+ * **超えると 400 で断られ、行が running のまま次を全部 409 で塞ぐ** —— running の行を
+ * 締めるのはこの段だけ。
+ */
+export const REASON_MAX = 2000;
+
+/** 上限に収める。切ったら、何字省いたかを末尾に言う (切ったことを隠さない)。末尾のために 32 字空ける。 */
+export const clip = (text: string, max = REASON_MAX): string => {
+  if (text.length <= max) return text;
+  const keep = max - 32;
+  return `${text.slice(0, keep)}…（${String(text.length - keep)} 字を省いた）`;
+};
+
 export async function main(crawl_id: string, error: unknown): Promise<Result> {
   // **設定は変数から読む。** Windmill は schema の既定値を UI からの実行にしか
   // 埋めない —— webhook で起こすと引数は素通りになる (`crawl_host.ts` に詳しい)。
   const waggle_url = await wmill.getVariable("u/admin/waggle_api_url");
   const token = await wmill.getVariable("u/admin/waggle_token");
 
-  const reason = describe(error);
+  const reason = clip(describe(error));
   console.log(`クロール ${crawl_id} を締めます: ${reason}`);
 
   try {

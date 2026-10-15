@@ -41,15 +41,37 @@ export interface Compiled {
   cached: boolean;
 }
 
+/** 変換サービスの診断 1 件 (ts-compile-service の model/main.smithy の Diagnostic)。 */
+interface Diagnostic {
+  file?: string;
+  line?: number;
+  col?: number;
+  code: string;
+  message: string;
+}
+
+/** 失敗の文に載せる診断の数。残りは件数だけ言う。 */
+const SHOWN = 5;
+
+/** 診断 1 件を 1 行に。file は `inline-<name>.ts` のように、どの JS かを名指す。 */
+const oneLine = (d: Diagnostic): string =>
+  `${d.file ?? "?"}:${String(d.line ?? "?")}:${String(d.col ?? "?")} ${d.code} ${d.message}`;
+
 /**
  * 変換サービスの答えを読む。**ok でなければ投げる** —— 422 (型エラー) も 409 (hash 違い) も
- * 400 (形の違反) も、この段が赤くなる理由になる。診断は例外の文に畳んで、fail_crawl が
- * 台帳に報告する reason に載せる。
+ * 400 (形の違反) も、この段が赤くなる理由になる。診断は件数と最初の 5 件に畳んで例外の文に入れ、
+ * fail_crawl が台帳に報告する reason に載せる。
  */
 export const readAnswer = (status: number, errorType: string | null, body: unknown): Compiled => {
   if (status === 200) return body as Compiled;
   const record = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
-  const detail = JSON.stringify(record["diagnostics"] ?? record["fieldList"] ?? body);
+  const diagnostics = record["diagnostics"];
+  // **診断を全部は載せない。** 束ねた JS を貼ると数百件 (async.js で 708 件・9 万字) になり、
+  // 台帳の /failed (reason は 2,000 字まで) が 400 で断って、クロールが running のまま残る
+  const detail = Array.isArray(diagnostics)
+    ? `型の誤り ${String(diagnostics.length)} 件。最初の ${String(Math.min(SHOWN, diagnostics.length))} 件: ` +
+      (diagnostics as Diagnostic[]).slice(0, SHOWN).map(oneLine).join(" / ")
+    : JSON.stringify(record["fieldList"] ?? body);
   throw new Error(`compile ${String(status)} ${errorType ?? ""}: ${detail}`);
 };
 

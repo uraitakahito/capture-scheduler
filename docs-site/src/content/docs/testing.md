@@ -82,8 +82,8 @@ log, which counts every request by its full URL, query string included.
 - **Catalog scripts run, and only when asked.** With the default catalog, autofetch requests
   `/assets/hero-2x.svg`, which a 1280px browser at DPR 1 never asks for itself. The control sends
   `scripts: []` to the same page, and nobody requests it.
-- **A script that does not type-check fails the level at compile**, with the diagnostics in the
-  crawl's `error`: once through the catalog (the ledger's CLI adds and removes a broken script),
+- **A script that does not type-check fails the level at compile**, with the number of
+  diagnostics and the first five in the crawl's `error`: once through the catalog (the ledger's CLI adds and removes a broken script),
   once as an inline script.
 - **An inline script runs in the order it was asked for.** It fetches
   `/plain-html?inline=<token>&state=<document.readyState>`, which leaves a mark in the log:
@@ -92,6 +92,10 @@ log, which counts every request by its full URL, query string included.
   same source, so the second one hits ts-compile-service's cache. A cache that remembered whole
   answers handed back the first crawl's `behavior`, and the mark said `complete`; that is how
   ts-compile-service v0.2.2 and earlier behave, and this test is red against them.
+- **However many type errors a script has, the crawl closes as `failed` and blocks nothing.** The
+  inline script raises hundreds of diagnostics. The test checks that `error` names the count and
+  stays within the ledger's 2,000 characters, and that the next crawl is accepted. Up to v0.24.2
+  the reason carried every diagnostic, the ledger refused it, and the crawl stayed `running`.
 
 ## The nightly loop refuses to guess
 

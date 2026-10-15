@@ -95,6 +95,29 @@ describe("compile_scripts", () => {
     ).toThrow(/compile 400 ValidationException: .*\/scripts\/0\/id/);
   });
 
+  it("診断が多くても、文は件数と最初の 5 件だけ —— 台帳の reason（2,000 字）に収まる", () => {
+    // 束ねた JS をそのまま貼ると、診断は数百件になる（async.js で 708 件）。全部を JSON で載せると
+    // 9 万字になり、台帳の /failed が 400 で断って、クロールが running のまま残る
+    const diagnostics = Array.from({ length: 708 }, (_, i) => ({
+      file: "inline-big.ts",
+      line: i + 1,
+      col: 12,
+      code: "TS2304",
+      message: "Cannot find name 'exports'.",
+    }));
+    let message = "";
+    try {
+      readAnswer(422, "CompileFailed", { message: "708 件の型エラー", diagnostics });
+    } catch (err) {
+      message = (err as Error).message;
+    }
+    expect(message).toMatch(/^compile 422 CompileFailed: 型の誤り 708 件。最初の 5 件: /);
+    expect(message).toContain("inline-big.ts:1:12 TS2304 Cannot find name 'exports'.");
+    expect(message).toContain("inline-big.ts:5:12");
+    expect(message, "6 件目は載せない").not.toContain("inline-big.ts:6:12");
+    expect(message.length).toBeLessThanOrEqual(2000);
+  });
+
   it("変換サービスが居なければ投げる (黙って TS を先へ渡さない)", async () => {
     VARS["u/admin/ts_compile_url"] = "http://127.0.0.1:1";
     try {

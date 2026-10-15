@@ -23,8 +23,9 @@ index_level      台帳に載ったぶんを索引に載せるよう capture-led
 `compile_scripts` は、この flow で唯一、スタックの外のサービスを呼ぶ段 ——
 [ts-compile-service](https://github.com/uraitakahito/ts-compile-service) で、この repo の
 compose の `ts-compile` として動く。1 本でも型が通らなければサービスは 422 を返し、段が投げる。
-flow は `fail_crawl` へ落ち、クロールは診断を reason に載せて `failed` で終わる。型が通らない
-スクリプトはページに届かない。
+flow は `fail_crawl` へ落ち、クロールは診断の件数と最初の 5 件を reason に載せて `failed` で終わる。
+reason は台帳の上限の 2,000 字に切る。超えると台帳が報告を断り、クロールは running のまま残って、
+後のクロールを全部塞ぐ。型が通らないスクリプトはページに届かない。
 
 **繰り返すのは capture-ledger。** この flow は 1 段で終わる。Windmill の while ループに
 繰り返しを持たせようとしたが、`stop_after_if` を付けた最小の flow が
