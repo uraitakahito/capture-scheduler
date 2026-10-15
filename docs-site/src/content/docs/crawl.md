@@ -24,7 +24,9 @@ index_level      ask capture-ledger to index what landed in the ledger
 repositories: [ts-compile-service](https://github.com/uraitakahito/ts-compile-service), which
 runs as the `ts-compile` service of this repo's compose. If a single script fails the type
 check, the service answers 422 and the step throws — the flow drops into `fail_crawl`
-and the crawl ends as `failed`, with the diagnostics in its reason. A script that does
+and the crawl ends as `failed`, with the number of diagnostics and the first five in its reason.
+The reason is cut to the ledger's limit of 2,000 characters: above it the ledger refuses the
+report, and the crawl would stay `running` and block every crawl after it. A script that does
 not type-check never reaches a page.
 
 **capture-ledger does the repeating.** This flow ends after one level. Putting the loop
