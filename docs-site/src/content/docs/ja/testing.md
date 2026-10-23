@@ -44,9 +44,9 @@ vitest は必ず「No test files found, exiting with code 1」を先に出し、
 あるのは、**実タイマーの ms スケール**で書くため。fake timer は、この workspace の
 別の場所で capture 系の sleep に対して試して一往復溶かしている。
 
-## e2e は本物のクロールを起こす
+## e2e は本物のクロールを始める
 
-どの試験も、Windmill の実行の口ではなく **capture-ledger の API** でクロールを起こす —— 目的が
+どの試験も、Windmill の実行の口ではなく **capture-ledger の API** でクロールを始める —— 目的が
 「capture-ledger が実際に送る引数」を運ぶことだから: `crawl_id` / `depth` / `frontier` /
 `per_host_delay_ms` / `host_parallelism` / `capture_formats` / `signing` / `scripts` と、
 受け口を出している配備では `artifact_sink` で、**`respect_robots` は入っていない**。
@@ -85,7 +85,7 @@ e2e のほうは capture-fixtures が禁じられたページを受け取った�
   2 本目は ts-compile-service の cache に当たる。答えごと覚えていた cache は 1 本目の `behavior` を
   返し、印は `complete` になった。ts-compile-service v0.2.2 までがその形で、この試験はそれに対して赤い。
 - **型の誤りがいくつあっても、クロールは failed で締まり、次を塞がない。** 型の誤りを数百件出す
-  その場の JS で起こす。`error` が件数を言い、台帳の上限の 2,000 字に収まることと、続けて起こした
+  その場の JS で始める。`error` が件数を言い、台帳の上限の 2,000 字に収まることと、続けて始めた
   1 本が通ることを見る。v0.24.2 までは診断を全部載せたので台帳が断り、クロールは running のまま残った。
 
 ## 日次のループは推測しない

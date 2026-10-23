@@ -86,16 +86,18 @@ flow の中の 1 段（ここでは `report_level`）を開くと、その段だ
 ## 失敗を掘る —— 実例 1 つ
 
 失敗は段ごとに違う場所で違う理由で起きる。**Runs で段と error を見て、
-中身は各サービスのログへ** というのが掘り方。今日 1 つ踏んだ。
+中身は各サービスのログへ** というのが掘り方。
 
-**`report_level` が capture-ledger の `POST /api/crawls/…/pages` に対して
-`500` を受け取った。** Runs が言うのはここまで —— **500 の中身は
-capture-ledger のログにしか無い**。UI で分かるのは「どの段が・どの宛先に・
-何のステータスで落ちたか」で、原因の特定は宛先側のログに渡す、という切り分けになる。
+**`report_level` が capture-ledger の `POST /api/crawls/…/pages` に届かなかった**
+（`Unable to connect`・`ConnectionRefused`）。Runs が言うのはここまで —— どの段が・どの宛先に
+（`path` の `http://127.0.0.1:9/…`）・何で落ちたか。宛先が API ではないので、原因は
+`u/admin/waggle_api_url` の値の側に在る（この絵は、変数をわざと閉じた口に向けて撮った）。
+宛先に届いたうえで `500` などを受け取ったなら、**中身は capture-ledger のログにしか無い**。
+UI で分かるのは「どの段が・どの宛先に・何で落ちたか」で、原因の特定は宛先側に渡す、という切り分けになる。
 
 <Image
   src={errReport}
-  alt="report_level の失敗 run。Result に POST /api/crawls/…/pages → 500 internal error"
+  alt="report_level の失敗 run。Result に Unable to connect（ConnectionRefused、path は http://127.0.0.1:9/api/crawls/…/pages）"
 />
 
 `crawl_host` の失敗も同じ読み方をする。段ごと落ちるのは BrowserHive に 1 つも届かない

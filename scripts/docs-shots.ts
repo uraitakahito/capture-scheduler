@@ -12,7 +12,7 @@
  *   1. スタックが起動していること (container-compose up -d)
  *   2. workspace crawler が bootstrap 済みで、run 履歴に次の 2 本があること:
  *        - f/waggle/crawl_level の成功
- *        - report_level の失敗 (内容は履歴次第。今日の実物は POST /pages → 500)
+ *        - report_level の失敗 (内容は履歴次第。2026-10-24 に撮ったのは、変数を閉じた口に向けた ConnectionRefused)
  *      無ければ quickstart の手順で 1 本流す。失敗は waggle_api_url を一時的に
  *      曲げると再現できる (2026-09-11 に実際に起きた形)。run の ID は API から
  *      拾うので直書きは無い。

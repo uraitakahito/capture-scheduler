@@ -1,6 +1,6 @@
 ---
 title: capture-scheduler
-description: capture-ledger のクロールを Windmill の上で回す —— 1 段ずつ BrowserHive に撮らせ、毎日 04:00 に起こす
+description: capture-ledger のクロールを Windmill の上で回す —— 1 段ずつ BrowserHive に撮らせ、毎日 04:00 に始める
 ---
 
 capture-scheduler は [capture-ledger](https://uraitakahito.github.io/capture-ledger/) のクロールを
@@ -8,12 +8,12 @@ capture-scheduler は [capture-ledger](https://uraitakahito.github.io/capture-le
 
 - **撮る** —— capture-ledger がクロールを 1 段ずつ webhook で渡してくる。flow はその段の URL を
   ホストで束ね、robots.txt を確かめ、BrowserHive に HTTP で撮らせて、見つけたものを返す。
-  自分が起こしていないクロールも、ここで回る。**BrowserHive を呼ぶのはこの repo の flow だけ** ——
+  自分が始めていないクロールも、ここで回る。**BrowserHive を呼ぶのはこの repo の flow だけ** ——
   capture-ledger はもう BrowserHive と話さない。
-- **起こす** —— 毎日 04:00 に、`capture_targets` の有効な行を起点にしたクロールを capture-ledger に頼み（`POST /api/crawls`）、
+- **始める** —— 毎日 04:00 に、`capture_targets` の有効な行を起点にしたクロールを capture-ledger に頼み（`POST /api/crawls`）、
   終わるまで見届ける。
 
-時刻どおりに起こす仕組みそのものは **Windmill の schedule** で、この repo が持つのはその設定
+時刻どおりに始める仕組みそのものは **Windmill の schedule** で、この repo が持つのはその設定
 （`daily.schedule.yaml`）と、時刻が来たときに走る script だけ。中身の大半は撮る側にある。
 
 ## 境界
@@ -21,7 +21,7 @@ capture-scheduler は [capture-ledger](https://uraitakahito.github.io/capture-le
 |                                |                                                                                                                                                                                       |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **capture-ledger が決める**    | 何を（`capture_targets` か起点の URL）・どこまで（深さ・範囲・上限）・どの間隔で（方針の値）・どの形式で。何が起きたかを記録し、次の段があるかを決める                                |
-| **capture-scheduler が決める** | いつ起こすか（schedule）と、1 段をどう回すか（ホストで束ねる・並列の数を BrowserHive の口の数で頭打ちにする・ホスト内は逐次で完了の後に間隔をあける・robots.txt・空いている口を選ぶ） |
+| **capture-scheduler が決める** | いつ始めるか（schedule）と、1 段をどう回すか（ホストで束ねる・並列の数を BrowserHive の口の数で頭打ちにする・ホスト内は逐次で完了の後に間隔をあける・robots.txt・空いている口を選ぶ） |
 
 だから、この repo に **URL は 1 つも書いていない**。対象も方針の値も、capture-ledger から届く。
 
@@ -37,7 +37,7 @@ capture-ledger が決める。[リンクを辿る](/crawl/) を見ること。
 
 面白い制約が集まっているのはこちら —— **他人のサーバを繰り返し叩く**のがこの道だから。
 
-## 起こす —— 日次は 1 本のクロール
+## 始める —— 日次は 1 本のクロール
 
 日次の仕事は、`capture_targets` の有効な行を起点にしたクロールを capture-ledger に頼む（`fromTargets`）。
 深さは 0 —— 一覧は取り込むが、リンクは辿らない。
