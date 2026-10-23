@@ -1,5 +1,5 @@
 {
-  "case": "F6: windmill のクロールの許可を fga:revoke し、e2e の名前で起こした",
+  "case": "F6: windmill のクロールの許可を fga:revoke し、e2e の名前で始めた",
   "recorded": "2026-09-19 capture-ledger develop 9fe6a03 (v0.43.0 の手前) と Windmill CE v1.806.0 で実測",
   "start": {
     "status": 202,

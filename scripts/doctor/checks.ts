@@ -285,7 +285,7 @@ const acceptsJwt = async (): Promise<Verdict> => {
 // ── windmill にクロールを許可する ──────────────────────────────────────
 
 /**
- * flow のトークン (変数 `u/admin/waggle_token`) で、クロールを起こせるかを capture-ledger に訊く。
+ * flow のトークン (変数 `u/admin/waggle_token`) で、クロールを始められるかを capture-ledger に訊く。
  *
  * **flow が実際に使うトークンで訊く**のが要点 —— 許可が無いことも、トークンが古いことも、
  * 名前が docs とずれていることも、flow が 404 や 401 を踏む前にここで分かる。
@@ -541,7 +541,7 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
   {
     name: "can_submit",
     section: SECTIONS.grant,
-    where: `flow のトークンで GET ${API}/api/me (クロールを起こせるか)`,
+    where: `flow のトークンで GET ${API}/api/me (クロールを始められるか)`,
     // jwt の後に訊く —— issuer を起こし直した後、jwt の新しいトークンが API に鍵を取り直させる。
     // 先に flow の古いトークンが着くと、同じ状態で ✓ と ✗ が入れ替わる (古いトークンは、API が
     // 取り直すまで通る)。

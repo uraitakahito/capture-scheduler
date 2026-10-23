@@ -43,7 +43,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("起こし方", () => {
+describe("始め方", () => {
   it("limit を渡さなければ fromTargets は空のまま", async () => {
     // 空の `fromTargets` が「登録済みの一覧を全部」。上限は capture-ledger 側の既定に委ねる。
     // **`{}` だけを送ってはいけない** —— capture-ledger は「どちらか一方」を要求するので 400 になる。
@@ -121,7 +121,7 @@ describe("失敗したときの言い分", () => {
   });
 
   it("202 でも 409 でもない成功系は失敗として扱う", async () => {
-    // 200 は「起こした」を意味しない。202 だけが受理。
+    // 200 は「始めた」を意味しない。202 だけが受理。
     responding(200, { crawlId: "c1" });
     await expect(main("http://capture-ledger:7070", "tok")).rejects.toThrow(/200/);
   });

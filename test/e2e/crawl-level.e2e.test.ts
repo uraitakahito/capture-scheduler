@@ -53,7 +53,7 @@ const ISSUER = process.env["E2E_ISSUER_URL"] ?? "http://127.0.0.1:9099";
 const FIXTURES = process.env["E2E_FIXTURES_URL"] ?? "http://capture-fixtures.capture-ledger:8080";
 const FIXTURES_HOST = process.env["E2E_FIXTURES_HOST_URL"] ?? "http://127.0.0.1:18085";
 
-/** 取り込みを起こせる主体。capture-ledger 側でクロールの許可 (`fga:grant submitter`) が要る。 */
+/** 取り込みを始められる主体。capture-ledger 側でクロールの許可 (`fga:grant submitter`) が要る。 */
 const SUBJECT = process.env["E2E_SUBJECT"] ?? "e2e";
 
 let token = "";
@@ -63,7 +63,7 @@ const auth = () => ({ authorization: `Bearer ${token}` });
 const json = async (res: Response): Promise<Record<string, unknown>> =>
   (await res.json()) as Record<string, unknown>;
 
-/** 1 本起こして crawlId を返す。202 でなければ、台帳の本文を理由に落とす。 */
+/** 1 本始めて crawlId を返す。202 でなければ、台帳の本文を理由に落とす。 */
 const startCrawl = async (body: Record<string, unknown>): Promise<string> => {
   const res = await fetch(`${WAGGLE}/api/crawls`, {
     method: "POST",
@@ -139,7 +139,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
     // そこで `text()` を呼ぶと後段の `json()` が "Body has already been read" で落ちる
     // (実測)。先に文字列で受けて、それを両方に使う。
     const startedBody = await started.text();
-    // 404 は「無い」とも「起こしてよくない」とも読める —— capture-ledger は列挙を避けるために
+    // 404 は「無い」とも「始めてよくない」とも読める —— capture-ledger は列挙を避けるために
     // 両者を区別せずに答える。許可を疑う先をここに書いておく。
     expect(
       started.status,
