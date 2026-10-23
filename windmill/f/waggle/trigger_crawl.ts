@@ -1,5 +1,5 @@
 /**
- * capture-ledger に取り込みを 1 回起こし、終わるまで見届ける。
+ * capture-ledger に取り込みを 1 回始め、終わるまで見届ける。
  *
  * Windmill が決めるのは「いつ」だけ。「何を・どう投げるか」は capture-ledger の側にある
  * (対象の一覧は `capture_targets`、取り込む形式は `CAPTURE_LEDGER_CAPTURE_FORMATS`)。
@@ -27,7 +27,7 @@
  * 「今回は見送る」であって異常ではないので、**緑で終わる**。再試行してもいけない ——
  * 走っている 1 本が終わるまで、何度投げても同じ答えが返るだけ。
  *
- * 畳んだことで、**手で起こしたクロールとも塞ぎ合う**ようになった。礼儀の観点では
+ * 畳んだことで、**手で始めたクロールとも塞ぎ合う**ようになった。礼儀の観点では
  * それが正しい (同じホストを 2 経路が叩かない) が、日次が見送られる回数は増える。
  */
 
@@ -123,7 +123,7 @@ export async function main(
   }
 
   const { crawlId } = (await started.json()) as { crawlId: string };
-  console.log(`起こしました: ${crawlId}`);
+  console.log(`始めました: ${crawlId}`);
 
   const deadline = Date.now() + timeout_ms;
   for (;;) {

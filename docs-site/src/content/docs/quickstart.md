@@ -161,7 +161,7 @@ Write that permission (on the capture-ledger side, once; `fga:revoke` takes it b
 ```sh
 cd ~/projects/crawler/capture-ledger
 pnpm run fga:grant submitter windmill acme
-# windmill は acme のクロールを起こせます (書いた: user:windmill submitter organization:acme)
+# windmill は acme のクロールを始められます (書いた: user:windmill submitter organization:acme)
 #   = "windmill may start crawls for acme (wrote: …)"
 ```
 
@@ -206,7 +206,7 @@ and checks that it starts with `PK` (a WACZ is a zip):
 
 ```
 点検     doctor の 14 本とも ✓
-起こす   POST /api/crawls → 202  crawl 545e912c-…  https://example.com/
+始める   POST /api/crawls → 202  crawl 545e912c-…  https://example.com/
 待つ     running
 run      http://127.0.0.1:8000/run/01a0ba19-…?workspace=crawler
 終わり   succeeded (max_depth) —— 撮ったページ 1・6 秒

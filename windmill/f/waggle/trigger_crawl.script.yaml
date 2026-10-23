@@ -1,4 +1,4 @@
-summary: capture-ledger に取り込みを 1 回起こす
+summary: capture-ledger に取り込みを 1 回始める
 description: |
   capture-ledger の POST /api/crawls を fromTargets で叩き、終わるまで見届ける。
 
@@ -6,7 +6,7 @@ description: |
   リンクは辿らない —— 以前の POST /api/runs と同じことを、クロールの語彙でやる。
 
   走行中なら 409 が返るので、そのときは何もせず緑で終わる (再試行しない)。
-  手で起こしたクロールとも塞ぎ合う (礼儀の観点ではそれが正しい)。
+  手で始めたクロールとも塞ぎ合う (礼儀の観点ではそれが正しい)。
 
   取り込む形式 (wacz など) は capture-ledger 側の CAPTURE_LEDGER_CAPTURE_FORMATS が決める。
   ここから渡せるのは limit だけ。

@@ -7,7 +7,7 @@
  *
  * flow が途中で落ちると `report_level` に辿り着かないので、capture-ledger は何も知らされない。
  * 行は `running` のまま残り、部分 unique index が**以後のクロールを全部塞ぐ**。
- * 実測で踏んだ: BrowserHive を止めてクロールを起こすと、`crawl_host` が `UNAVAILABLE`
+ * 実測で踏んだ: BrowserHive を止めてクロールを始めると、`crawl_host` が `UNAVAILABLE`
  * で落ちて flow ごと失敗し、行は永久に走行中になった。
  *
  * ## ここでは投げない

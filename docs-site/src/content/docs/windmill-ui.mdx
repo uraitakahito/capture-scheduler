@@ -92,16 +92,19 @@ inputs and result. Steps run independently, so this is where you trace
 
 Failures happen in different steps for different reasons. **Read the step and
 error in Runs, then take the detail to each service's logs** — that is how you
-dig. One happened today.
+dig.
 
-**`report_level` got a `500` back from capture-ledger's
-`POST /api/crawls/…/pages`.** Runs tells you this much — **the content of the
-500 is only in capture-ledger's logs**. The UI shows which step, which target,
-which status; identifying the cause is handed to the target's logs.
+**`report_level` could not reach capture-ledger's `POST /api/crawls/…/pages`**
+(`Unable to connect`, `ConnectionRefused`). Runs tells you this much — which step, which
+target (the `path`, `http://127.0.0.1:9/…`), and how it failed. The target is not the API, so
+the cause is in the value of `u/admin/waggle_api_url` (this picture was taken with the variable
+pointed at a closed port on purpose). Had it reached the API and got a `500` back, **the content
+would be only in capture-ledger's logs**. The UI shows which step, which target and how it
+failed; identifying the cause is handed to the target's side.
 
 <Image
   src={errReport}
-  alt="report_level failure run: Result shows POST /api/crawls/…/pages → 500 internal error"
+  alt="report_level failure run: Result shows Unable to connect (ConnectionRefused, path http://127.0.0.1:9/api/crawls/…/pages)"
 />
 
 A `crawl_host` failure reads the same way. The step fails only when no

@@ -7,7 +7,7 @@
  * 「撮れた」は台帳の succeeded だけでは言わない。その回の archive を台帳の一覧から探し、
  * 署名付き URL で先頭 4 バイトを取り、`PK` (WACZ は zip) であることまで見る。
  *
- * 撮れなかったら、落ちた段と直し方を言う (`smoke/read-crawl.ts`)。**自分が起こしたクロールは
+ * 撮れなかったら、落ちた段と直し方を言う (`smoke/read-crawl.ts`)。**自分が始めたクロールは
  * 必ず締める** —— running のまま残すと、以後の起動が全部 409 になる。flow がまだ走っていれば、
  * Windmill の run を取り消してから締める (`cancelRun`)。
  *
@@ -84,7 +84,7 @@ if (!values["no-doctor"]) {
     console.log("");
     for (const line of formatFixes(results)) console.log(line);
     console.log("");
-    // クロールは起こさない —— 撮れないと分かっている 1 本で running の行を残さない。
+    // クロールは始めない —— 撮れないと分かっている 1 本で running の行を残さない。
     stop("点検", "撮る前に直すものがある (上の ✗)。直して pnpm run smoke をもう一度");
   }
   const skipped = results.filter((r) => r.state === "skip").length;
@@ -96,7 +96,7 @@ if (!values["no-doctor"]) {
   );
 }
 
-// ── 起こす ────────────────────────────────────────────────────────────
+// ── 始める ────────────────────────────────────────────────────────────
 
 /** flow が名乗るのと同じトークン。撮るのも締めるのもこれで。 */
 const token = await windmillFetch(
@@ -185,7 +185,7 @@ if (started.status === 409) {
       ? "走行中のクロールがある (capture-ledger が v0.43.0 より古く、どれかは分からない)"
       : `走行中のクロールがある: ${busy.crawlId} (${busy.startedAt ?? "?"} から)`;
   if (!values["close-running"] || busy.crawlId === undefined) {
-    say("起こす", `POST /api/crawls → 409 —— ${who}`);
+    say("始める", `POST /api/crawls → 409 —— ${who}`);
     stop(
       "直す",
       busy.crawlId === undefined
@@ -193,23 +193,23 @@ if (started.status === 409) {
         : "終わるのを待つか、締めてから撮る: pnpm run smoke --close-running",
     );
   }
-  say("起こす", `409 —— ${who}。--close-running なので締める`);
+  say("始める", `409 —— ${who}。--close-running なので締める`);
   const running = parseCrawl(parse((await ledger(`/api/crawls/${busy.crawlId}`)).body));
   await close(busy.crawlId, "smoke --close-running で締めた", running?.lastJob?.id);
   started = await start();
 }
 if (started.status !== 202) {
   const refused = readRefused(started.status, started.body);
-  say("起こす", refused.evidence);
+  say("始める", refused.evidence);
   stop("直す", refused.fix);
 }
 const crawlId = String((parse(started.body) as { crawlId?: unknown }).crawlId);
-say("起こす", `POST /api/crawls → 202  crawl ${crawlId}  ${url}`);
+say("始める", `POST /api/crawls → 202  crawl ${crawlId}  ${url}`);
 
 /** 待っている間に見た、最後の段の run。Ctrl-C のとき取り消す。 */
 let lastJobId: string | undefined;
 
-// Ctrl-C で抜けても、自分が起こしたクロールは締める。
+// Ctrl-C で抜けても、自分が始めたクロールは締める。
 process.once("SIGINT", () => {
   void close(crawlId, "smoke を Ctrl-C で止めた", lastJobId).finally(() => process.exit(130));
 });

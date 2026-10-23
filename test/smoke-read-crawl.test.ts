@@ -135,7 +135,7 @@ describe("run が失敗し、クロールが running のまま残ったとき (�
   });
 });
 
-describe("起こせなかったとき", () => {
+describe("始められなかったとき", () => {
   it("F7 409 は、走っている 1 本の id と開始時刻を読む", () => {
     const { start } = fixture("f7-busy");
     expect(start.status).toBe(409);

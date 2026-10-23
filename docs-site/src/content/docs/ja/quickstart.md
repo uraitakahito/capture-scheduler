@@ -7,7 +7,7 @@ description: Windmill を立て、1 本撮れるまで
 
 Windmill は capture-ledger のスタックの 2 つを使う。OpenFGA には、下の
 [windmill にクロールを許可する](#windmill-にクロールを許可する)で「windmill は acme のクロールを
-起こしてよい」という許可を書き込む。BrowserHive は、
+始めてよい」という許可を書き込む。BrowserHive は、
 クロールがページを撮りに呼ぶ。始める前に、capture-ledger の
 [クイックスタート](https://uraitakahito.github.io/capture-ledger/ja/quickstart/)の §1〜§5
 （DNS ドメイン、submodule と `.env`、`stack:up`、データベース、OpenFGA の 2 つの ID）を済ませ、
@@ -139,9 +139,9 @@ API の宛先（`u/admin/waggle_api_url`）は、`CAPTURE_LEDGER_API_URL` を書
 ### windmill にクロールを許可する
 
 Windmill は capture-ledger を `windmill` という名前で呼ぶ（トークンの `sub`。組織は `acme`）。
-capture-ledger は、クロールを起こす・段を報告する・索引を渡す・締める、のたびに
-「windmill は acme のクロールを起こしてよいか」を OpenFGA に訊き、許可が無ければ 404 を返す。
-手で起こしたクロールでも、段の報告は windmill の名前で来る。
+capture-ledger は、クロールを始める・段を報告する・索引を渡す・締める、のたびに
+「windmill は acme のクロールを始めてよいか」を OpenFGA に訊き、許可が無ければ 404 を返す。
+手で始めたクロールでも、段の報告は windmill の名前で来る。
 
 ```
 pnpm run fga:grant submitter windmill acme      （あなたが 1 度だけ）
@@ -150,7 +150,7 @@ pnpm run fga:grant submitter windmill acme      （あなたが 1 度だけ）
 OpenFGA   user:windmill  submitter  organization:acme
     ▲
     │ 訊く: user:windmill は organization:acme で can_submit か
-    │      （クロールを起こす・段の報告・索引・締めのたび）
+    │      （クロールを始める・段の報告・索引・締めのたび）
 capture-ledger API   ◄── Windmill（sub=windmill, orgs=[acme] のトークン）
     │
     └─ 行が在れば 202。無ければ 404 {"error":"not found"}
@@ -161,7 +161,7 @@ capture-ledger API   ◄── Windmill（sub=windmill, orgs=[acme] のトーク
 ```sh
 cd ~/projects/crawler/capture-ledger
 pnpm run fga:grant submitter windmill acme
-# windmill は acme のクロールを起こせます (書いた: user:windmill submitter organization:acme)
+# windmill は acme のクロールを始められます (書いた: user:windmill submitter organization:acme)
 ```
 
 `CAPTURE_LEDGER_SUBJECT` / `_ORGANIZATIONS` を変えたなら、その名前で。書けたかどうかは、下の
@@ -178,7 +178,7 @@ pnpm run smoke    # https://example.com/ を 1 本撮り、WACZ を取り出せ�
 
 **doctor** は、このページの見出しごとに「その手が済んでいるか」を、その手が作ったものに訊く。
 立っているかだけでなく、script の中身が repo と同じか、Windmill が持っているトークンで
-クロールを起こせるか、worker の中から API と BrowserHive に届くか、まで見る。✗ は、何を
+クロールを始められるか、worker の中から API と BrowserHive に届くか、まで見る。✗ は、何を
 直すかと、このページのどの節の手かを言う。✗ の点検に頼る点検は走らせず、「先に〇〇を」とだけ
 出す —— 直すものが 1 つなら、✗ も 1 本。
 
@@ -204,7 +204,7 @@ pnpm run smoke    # https://example.com/ を 1 本撮り、WACZ を取り出せ�
 
 ```
 点検     doctor の 14 本とも ✓
-起こす   POST /api/crawls → 202  crawl 545e912c-…  https://example.com/
+始める   POST /api/crawls → 202  crawl 545e912c-…  https://example.com/
 待つ     running
 run      http://127.0.0.1:8000/run/01a0ba19-…?workspace=crawler
 終わり   succeeded (max_depth) —— 撮ったページ 1・6 秒
@@ -213,7 +213,7 @@ run      http://127.0.0.1:8000/run/01a0ba19-…?workspace=crawler
 ```
 
 **撮れなかったら**、smoke が落ちた段と直し方を言う（`原因` と `直す` の 2 行）。言われた手を直して
-smoke をもう一度。自分が起こしたクロールは、失敗しても時間切れでも Ctrl-C でも締めるので、次の 1 本が
+smoke をもう一度。自分が始めたクロールは、失敗しても時間切れでも Ctrl-C でも締めるので、次の 1 本が
 409 で塞がれることはない。Windmill の画面で追うなら、smoke が出す `run` の URL を開く（見方は
 [Windmill UI の「失敗を掘る」](/windmill-ui/#失敗を掘る--実例-1-つ)）。
 
