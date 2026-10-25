@@ -6,5 +6,7 @@ locks:
   f/waggle/crawl_host: 8b0022755df5f7fe3d4c2598a94393798e21dd71fab8a2f72d58123888c551b9
   f/waggle/crawl_level.flow+__flow_hash: 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a
   f/waggle/index_level: 5b53af7f9c30c9aead40b2cb3afdb85bf3ea126993957858033cf94840688d5f
+  f/waggle/inspect_crawl: ec5dad413bfa7ee0e1e0000b7e336dc208ddc83a433b915296281d89ee1e8724
+  f/waggle/inspect_domain: 1f7d1189e4dc52d8fc31ae197cd3fb8ce324f3c207c835d8abc1fc51573318da
   f/waggle/plan_level: b9bba21a0cb4759ee2d91650ebb4cb808720e45f006214345a223c24383fa043
   f/waggle/report_level: e99b71fef3b0e78459dd01e055c8d057f85cf2fd3516be51d5da55b5d1df1188
