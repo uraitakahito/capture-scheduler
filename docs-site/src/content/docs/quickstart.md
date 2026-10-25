@@ -13,9 +13,9 @@ Before you start, finish §1–§5 of capture-ledger's
 submodules and `.env`, `stack:up`, the database, the two OpenFGA ids) and check that the stack is up.
 Its `pnpm run dev:up` does §3 onwards in one go, so §1 and §2 are the only ones you have to type.
 
-**Do not skip the catalog in §4.** BrowserHive holds no roster of its own, so an empty `scripts`
+**Do not skip the scripts in §4.** BrowserHive holds no roster of its own, so an empty `scripts`
 table means a crawl runs nothing inside the page — no scrolling, no lazy loading — and still
-produces a successful archive. The catalog check in `doctor` below says so.
+produces a successful archive. The スクリプト (scripts) check in `doctor` below says so.
 
 ```sh
 curl -s -o /dev/null -w '%{http_code}\n' -H 'authorization: Bearer dev-key' http://127.0.0.1:8090/stores
@@ -236,7 +236,7 @@ Every row was produced for real and checked (2026-09-19).
 
 | What you see                                                                                                                                         | Meaning                                                                                                  | Fix                                                                                       |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| doctor: 目録 ✗ / smoke: 400 `the script catalog is empty`                                                                                            | the catalog is empty — nothing runs inside the page                                                      | in capture-ledger: `pnpm run scripts import .upstream/capture-scripts`                    |
+| doctor: スクリプト ✗ / smoke: 400 `no scripts are registered`                                                                                        | the ledger has no scripts — nothing runs inside the page                                                 | in capture-ledger: `pnpm run scripts import .upstream/capture-scripts`                    |
 | doctor: windmill ✗, and the checks below say "先に windmill を"                                                                                      | Windmill is down                                                                                         | `container-compose up -d` (in this repo)                                                  |
 | doctor: push ✗ "repo と中身が違う"                                                                                                                   | a script was changed but not pushed (or was edited in the Windmill UI)                                   | `pnpm run windmill:push` (`windmill:diff` to just look)                                   |
 | doctor: worker→browserhive ✗ "名前が引けない" ("3 秒で答えない" for a few seconds right after the stop) / smoke: `[cap] BrowserHive に届きません: …` | a BrowserHive container is stopped (a stopped container loses its DNS name too)                          | `pnpm run stack:up` in capture-ledger                                                     |

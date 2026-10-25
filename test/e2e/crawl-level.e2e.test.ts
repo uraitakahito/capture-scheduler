@@ -230,7 +230,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
   /**
    * **台帳に入れたスクリプトが、ページの中で走ったか。**
    *
-   * ここまでの検査は「撮れたか」「記録できたか」しか見ていない。目録が空でも、flow が
+   * ここまでの検査は「撮れたか」「記録できたか」しか見ていない。台帳にスクリプトが無くても、flow が
    * `scripts` を落としても、取り込みは成功しアーカイブも出る —— `complete: true` のまま。
    * その差を外から見分ける手が要る。
    *
@@ -238,7 +238,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
    * 「1280px・DPR 1 の取り込みは要素ごとに 1 候補しか要求しないので、`autofetch` が
    * 無ければ control の `hero.svg` しか届かない」。
    *
-   * つまり **`hero-2x.svg` が相手に届いたこと**が、「目録 → flow → BrowserHive → ページ」の
+   * つまり **`hero-2x.svg` が相手に届いたこと**が、「台帳 → flow → BrowserHive → ページ」の
    * 鎖が全部通った証拠になる。判定を相手のリクエストログで採るのは ① と同じ理由 ——
    * 台帳は「記録したこと」しか言わない。
    */
@@ -256,7 +256,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
       started.status,
       startedBody +
         (started.status === 400
-          ? " —— 目録は埋まっていますか (capture-ledger: pnpm run scripts import .upstream/capture-scripts)"
+          ? " —— 台帳にスクリプトは入っていますか (capture-ledger: pnpm run scripts import .upstream/capture-scripts)"
           : started.status === 409
             ? " —— 走行中のクロールが残っています。**この試験が途中で落ちると必ずこうなる**"
             : ""),
@@ -279,9 +279,9 @@ describe("クロールが flow を通って索引まで終わる", () => {
         }[];
         expect(
           scripts.map((script) => script.id),
-          "目録が autofetch を配っていない",
+          "台帳が autofetch を配っていない",
         ).toContain("autofetch");
-        // 走った JS の hash と変換の記録が、報告で台帳に戻っている。目録の sha256 は TS の物なので、
+        // 走った JS の hash と変換の記録が、報告で台帳に戻っている。台帳のスクリプトの sha256 は TS の物なので、
         // JS の物と同じなら「変換されていない」。
         for (const script of scripts) {
           expect(script.jsSha256, `${script.id}: JS の hash が台帳に戻っていない`).toMatch(
@@ -307,18 +307,18 @@ describe("クロールが flow を通って索引まで終わる", () => {
     expect(counts["/assets/hero.svg"], "取り込みが届いていない").toBeGreaterThan(0);
 
     // **ここが本題。** 1280px・DPR 1 のブラウザは -2x を要求しない。届いているなら、
-    // 目録の autofetch がページの中で走った。
+    // 台帳の autofetch がページの中で走った。
     expect(
       counts["/assets/hero-2x.svg"],
-      "autofetch が走っていない —— 目録・flow の scripts・BrowserHive の受け皿のどれかで切れている",
+      "autofetch が走っていない —— 台帳のスクリプト・flow の scripts・BrowserHive の受け皿のどれかで切れている",
     ).toBeGreaterThan(0);
   });
 
   /**
-   * **目録を空にしたクロールは、何も走らせずに成功する。**
+   * **スクリプトを空にしたクロールは、何も走らせずに成功する。**
    *
    * 上の試験の対照。同じページ・同じ条件で、台帳に `scripts: []` (「何も走らせない」という意思) を渡す。
-   * compile の段は空の目録を 200 で通し (ts-compile-service v0.2.1 から)、BrowserHive はページの中で
+   * compile の段はスクリプトが空でも 200 で通し (ts-compile-service v0.2.1 から)、BrowserHive はページの中で
    * 何も走らせない。その証拠は fixtures の request log に在る —— autofetch が居なければ hero-2x.svg は
    * 誰も要求しない。これが無いと、上の試験の hero-2x.svg が本当に autofetch の仕業かを、走らなかった
    * ときの姿と比べて言えない。
@@ -326,7 +326,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
    * compile の段が空を断る版 (v0.2.0 まで) では、台帳の error に "[compile] compile 400 …" が残って
    * state で落ちる。その文面をそのまま失敗の理由にする。
    */
-  it("目録を空にしたクロールは、何も走らせずに成功する", async () => {
+  it("スクリプトを空にしたクロールは、何も走らせずに成功する", async () => {
     await fetch(`${FIXTURES_HOST}/__reset`, { method: "POST" });
 
     const started = await fetch(`${WAGGLE}/api/crawls`, {
@@ -349,7 +349,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
       if (got["state"] !== "running") break;
     }
     expect(got["state"], String(got["error"])).toBe("succeeded");
-    // 台帳は空の目録を固定した (省略なら autoscroll と autofetch が入る)
+    // 台帳はスクリプトを空で固定した (省略なら autoscroll と autofetch が入る)
     expect(got["scripts"]).toEqual([]);
 
     const counts = (await json(await fetch(`${FIXTURES_HOST}/__request-counts`))) as Record<
@@ -360,20 +360,20 @@ describe("クロールが flow を通って索引まで終わる", () => {
     expect(counts["/assets/hero.svg"], "取り込みが届いていない").toBeGreaterThan(0);
     // **ここが本題。** autofetch が居ないので -2x は誰も要求しない。上の試験の hero-2x.svg が
     // autofetch の仕業である証拠は、この 0 と対にして初めて言える
-    expect(counts["/assets/hero-2x.svg"] ?? 0, "目録が空なのに何かが走った").toBe(0);
+    expect(counts["/assets/hero-2x.svg"] ?? 0, "スクリプトが空なのに何かが走った").toBe(0);
   });
 
   /**
-   * **型が通らないスクリプトを目録に入れると、クロールは compile の段で落ちる。**
+   * **型が通らないスクリプトを台帳に入れると、クロールは compile の段で落ちる。**
    *
-   * 目録は tag を経ずに CLI でも足せる。だから capture-scripts の CI が緑でも、走る前にもう 1 か所の
+   * 台帳のスクリプトは tag を経ずに CLI でも足せる。だから capture-scripts の CI が緑でも、走る前にもう 1 か所の
    * 門番が要る —— flow の `compile` の段 (ts-compile-service)。ここではその門番が本当に段を落とし、
    * 台帳が failed で締められる (fail_crawl) ことを見る。落ちる理由に型エラーの code が載るのは、
    * Windmill の履歴を開かなくても台帳だけで「なぜ落ちたか」が読めるようにするため。
    *
-   * 壊れた 1 本は試験の最後に目録から消す。残すと以後のクロールが全部ここで落ちる。
+   * 壊れた 1 本は試験の最後に台帳から消す。残すと以後のクロールが全部ここで落ちる。
    */
-  it("型が通らないスクリプトを目録に入れると、クロールは compile の段で落ちる", async () => {
+  it("型が通らないスクリプトを台帳に入れると、クロールは compile の段で落ちる", async () => {
     const ledgerDir = process.env["E2E_LEDGER_DIR"] ?? resolve(process.cwd(), "../capture-ledger");
     const broken = fileURLToPath(new URL("./fixtures/broken-script.txt", import.meta.url));
     const ledger = (...args: string[]): string =>
@@ -411,10 +411,10 @@ describe("クロールが flow を通って索引まで終わる", () => {
   });
 
   /**
-   * **その場の JS は、目録の物と同じ道でページの中まで届く。** 台帳は目録を通さずに行の写しを作り
+   * **その場の JS は、台帳のスクリプトと同じ道でページの中まで届く。** 台帳はスクリプトとして登録せずに行の写しを作り
    * (`inline-<name>`・版 1)、flow は区別せずに変換して BrowserHive へ渡す。並びは頼んだとおり。
    */
-  it("その場の JS と目録を並べると、頼んだ順に写り、どちらもページの中で走る", async () => {
+  it("その場の JS と台帳のスクリプトを並べると、頼んだ順に写り、どちらもページの中で走る", async () => {
     await resetFixtures();
     const run = randomUUID().slice(0, 8);
     const got = await finished(
@@ -462,7 +462,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
       counts[mark(run, "complete")] ?? 0,
       "その場の JS が、読み込みの後に走っていない",
     ).toBeGreaterThan(0);
-    expect(counts["/assets/hero-2x.svg"] ?? 0, "目録の autofetch が走っていない").toBeGreaterThan(
+    expect(counts["/assets/hero-2x.svg"] ?? 0, "台帳の autofetch が走っていない").toBeGreaterThan(
       0,
     );
   });
@@ -507,8 +507,8 @@ describe("クロールが flow を通って索引まで終わる", () => {
   });
 
   /**
-   * **型の通らないその場の JS は、compile の段でクロールごと落ちる。** 目録の broken の試験と違い、
-   * CLI で目録に入れて消す手間が無い —— その場の JS は行の写しにだけ在る。
+   * **型の通らないその場の JS は、compile の段でクロールごと落ちる。** 台帳の broken の試験と違い、
+   * CLI で台帳に入れて消す手間が無い —— その場の JS は行の写しにだけ在る。
    */
   it("型の通らないその場の JS は、compile の段でクロールごと落ちる", async () => {
     const got = await finished(

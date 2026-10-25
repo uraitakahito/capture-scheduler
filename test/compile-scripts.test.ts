@@ -63,7 +63,7 @@ describe("compile_scripts", () => {
     nextAnswer = { status: 200, body: compiled };
     const out = await main([script("autoscroll", "ts")]);
     expect(out).toEqual(compiled);
-    // 送ったのは台帳の目録そのもの
+    // 送ったのは台帳のスクリプトそのもの
     expect(received).toEqual({ scripts: [script("autoscroll", "ts")] });
   });
 

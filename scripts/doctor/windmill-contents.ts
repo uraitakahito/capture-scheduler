@@ -1,5 +1,5 @@
 /**
- * Windmill の中身の読み分け —— workspace・push・変数・目録。
+ * Windmill の中身の読み分け —— workspace・push・変数・スクリプト。
  *
  * どれも「在るか」だけでなく「repo と同じか」を見る。push を忘れたことは、flow が走って
  * 古い script が動くまで何も言わない。
@@ -107,7 +107,7 @@ export const VARIABLES = [
 ] as const;
 
 /**
- * `GET /api/scripts` の答え。**目録が空なら ✗。**
+ * `GET /api/scripts` の答え。**台帳にスクリプトが無ければ ✗。**
  *
  * 空でもクロールは始められてしまう時期が在った —— ページの中で何も走らず、スクロールも
  * 遅延読み込みも起きないまま `complete: true` のアーカイブが出る。capture-ledger は
@@ -131,7 +131,7 @@ export const readCatalog = (answer: Answer): Verdict => {
   return {
     ok: false,
     need:
-      "目録が空 —— 撮れてもページの中では何も走らない (クロールは 400 で断られる) → " +
+      "台帳にスクリプトが無い —— 撮れてもページの中では何も走らない (クロールは 400 で断られる) → " +
       "cd ../capture-ledger && pnpm run scripts import .upstream/capture-scripts",
   };
 };

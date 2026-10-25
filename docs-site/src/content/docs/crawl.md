@@ -114,25 +114,25 @@ runs**, so a webhook run gets nothing — the BrowserHive target arrived
 
 What does arrive as arguments is what capture-ledger decides for that crawl and always
 sends: the URLs, the delay, `capture_formats` / `signing`, and **`scripts`** — the
-TypeScript to run inside each page. The catalog keeps it as written (its `sha256` is over the
+TypeScript to run inside each page. The ledger keeps it as written (its `sha256` is over the
 TypeScript bytes); `compile_scripts` turns it into JavaScript and re-hashes it, and BrowserHive
 checks the JavaScript's hash. The two hashes meet at that one step. `report_level` then carries
 the JavaScript hash, with the compiler version and the host-types tag the service answered
 with, back to capture-ledger (`compiled` in the level report). The ledger writes them next to
 the TypeScript hash on the crawl, and refuses a later level that reports a different hash
-(409). An empty catalog (`scripts: []` on the crawl) is a valid level too: the service answers
+(409). An empty script list (`scripts: []` on the crawl) is a valid level too: the service answers
 200 with no scripts, the page runs nothing, and the report still carries `typescript` and
 `hostTypes`. A script written on the spot (an `inline` element of `scripts`) travels the same
 way: capture-ledger pins it on the crawl as `inline-<name>`, and the flow compiles and injects it
-like a catalog one.
+like a registered one.
 
 `scripts` is required for the same reason `capture_formats` is. BrowserHive v11.0.0
 holds no roster of its own: send nothing and nothing runs inside the page, and the
 capture still succeeds and still produces an archive. A forgotten argument would be a
 crawl that never scrolled, indistinguishable from one that did. This flow only carries
 them — what runs, in what order, and in which of BrowserHive's two injection points
-(`behavior` after load, `preload` before navigation) is decided by capture-ledger's
-catalog.
+(`behavior` after load, `preload` before navigation) is decided by
+capture-ledger.
 
 ```sh
 pnpm run windmill:capture-ledger-token   # waggle_token / waggle_api_url /
@@ -140,7 +140,7 @@ pnpm run windmill:capture-ledger-token   # waggle_token / waggle_api_url /
                                  # ts_compile_url
 ```
 
-`u/admin/ts_compile_url` is where `compile_scripts` sends the catalog (default
+`u/admin/ts_compile_url` is where `compile_scripts` sends the scripts (default
 `http://ts-compile.capture-scheduler:8080`, the `ts-compile` service of this repo's compose;
 override with `TS_COMPILE_URL`). `pnpm run doctor` checks that the worker can reach its
 `/healthz`.

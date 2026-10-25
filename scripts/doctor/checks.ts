@@ -291,7 +291,7 @@ const acceptsJwt = async (): Promise<Verdict> => {
  * 名前が docs とずれていることも、flow が 404 や 401 を踏む前にここで分かる。
  */
 /**
- * 目録に 1 本でも入っているか。**flow のトークンで訊く** —— 見えるかどうかは許可の
+ * 台帳にスクリプトが 1 本でも入っているか。**flow のトークンで訊く** —— 見えるかどうかは許可の
  * 問題でもあるので、can_submit と同じ資格で確かめる。
  */
 const catalogFilled = async (): Promise<Verdict> => {
@@ -549,7 +549,7 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
     probe: flowCanSubmit,
   },
   {
-    name: "目録",
+    name: "スクリプト",
     section: SECTIONS.grant,
     where: `flow のトークンで GET ${API}/api/scripts (走らせるものが在るか)`,
     // can_submit の後。許可が無ければ 404 しか返らないので、先に訊いても何も分からない。

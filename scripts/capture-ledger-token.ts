@@ -77,7 +77,7 @@ const ENDPOINTS_PATH = "u/admin/browserhive_endpoints";
  */
 const TLS_CA_PATH = "u/admin/browserhive_tls_ca";
 const TLS_CA_PEM = optional("CAPTURE_LEDGER_BROWSERHIVE_TLS_CA_PEM", "");
-/** 目録の TS を JS にする変換サービス。flow の `compile` の段が読む。 */
+/** TS のスクリプトを JS にする変換サービス。flow の `compile` の段が読む。 */
 const TS_COMPILE_PATH = "u/admin/ts_compile_url";
 const TS_COMPILE_URL = tsCompileUrl();
 

@@ -75,7 +75,7 @@ export async function main(
     body: JSON.stringify({
       depth,
       results,
-      // 走った JS の hash と変換の記録。台帳は目録の各要素に写し、段ごとに同じ値かを見る
+      // 走った JS の hash と変換の記録。台帳は固定したスクリプトの各要素に写し、段ごとに同じ値かを見る
       // (違えば 409)。台帳側では必須 —— 載せ忘れは 400 で、この段が落ちる
       compiled: {
         typescript: compiled.typescript,

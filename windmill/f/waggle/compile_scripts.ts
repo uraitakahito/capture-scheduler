@@ -3,7 +3,7 @@
  *
  * ## なぜ flow の段なのか
  *
- * 目録が持つのは書いたままの TS のバイト列で、BrowserHive が評価するのは JS。その間のどこかで
+ * 台帳が持つのは書いたままの TS のバイト列で、BrowserHive が評価するのは JS。その間のどこかで
  * 変換しなければならず、ここがその 1 か所。`crawl_host` は運ぶだけのまま (「flow は運ぶだけで中身を
  * 見ない」は変えていない —— 変換するのはこの段で、それも中身を見ずに送るだけ)。
  *
@@ -21,7 +21,7 @@
  */
 import * as wmill from "windmill-client";
 
-/** 目録の 1 本。`crawl_host.ts` の CrawlScript と同じ形。入力は TS、出力は JS。 */
+/** スクリプト 1 本。`crawl_host.ts` の CrawlScript と同じ形。入力は TS、出力は JS。 */
 export interface CrawlScript {
   id: string;
   version: number;
