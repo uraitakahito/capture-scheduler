@@ -1,0 +1,30 @@
+summary: あるドメインを落としたクロールを引く
+description: |
+  台帳 (capture-ledger) の GET /api/decisions を引き、そのドメインとその下を
+  どのクロールのどの規則が落としたか (撮るだけにしたか・辿ったか) を表に描く。
+
+  クロールの通り道には居ない。走らせても何も変わらない。
+lock: "!inline f/waggle/inspect_domain.script.lock"
+kind: script
+schema:
+  properties:
+    domain:
+      type: string
+      description: 小文字のホスト名。その下のサブドメインも当たる (例 ads.example.com)
+      default: null
+      originalType: string
+    days:
+      type: integer
+      description: 何日前に始めたクロールまで見るか (1〜3650)
+      default: 90
+    action:
+      type: string
+      description: skip は落とした、capture は撮るだけにした、follow は撮って辿った
+      default: skip
+      enum:
+        - skip
+        - capture
+        - follow
+      originalType: enum
+  required:
+    - domain

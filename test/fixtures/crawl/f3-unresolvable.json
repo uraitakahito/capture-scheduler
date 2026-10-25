@@ -10,7 +10,7 @@
   "crawl": {
     "crawlId": "bba6b700-b226-45a3-bb81-5ef1172c380d",
     "seeds": ["http://nonexistent.invalid/"],
-    "scope": "same-origin",
+    "rules": [{ "follow": "same-origin" }],
     "state": "succeeded",
     "stopReason": "max_depth",
     "maxDepth": 0,

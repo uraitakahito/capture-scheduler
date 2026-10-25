@@ -53,6 +53,22 @@ const ISSUER = process.env["E2E_ISSUER_URL"] ?? "http://127.0.0.1:9099";
 const FIXTURES = process.env["E2E_FIXTURES_URL"] ?? "http://capture-fixtures.capture-ledger:8080";
 const FIXTURES_HOST = process.env["E2E_FIXTURES_HOST_URL"] ?? "http://127.0.0.1:18085";
 
+/**
+ * Windmill の口。調べ物の script (`f/waggle/inspect_*`) を走らせるのに使う —— doctor・smoke と同じく、
+ * この repo の `.env`・`.env.local` の `WINDMILL_*` で叩く。試験の process にはどちらも読まれていない
+ * ので、ここで読む。**`.env.local` が先**: `loadEnvFile` は既に在る値を上書きしないので、先に読んだ
+ * 値が勝つ (`--env-file-if-exists=.env --env-file-if-exists=.env.local` と同じ勝ち方)。
+ */
+for (const file of [".env.local", ".env"]) {
+  try {
+    process.loadEnvFile(fileURLToPath(new URL(`../../${file}`, import.meta.url)));
+  } catch {
+    // 無ければ素通り。WINDMILL_TOKEN が要る試験だけが、無いと言って落ちる
+  }
+}
+const WINDMILL = process.env["WINDMILL_URL"] ?? "http://127.0.0.1:8000";
+const WORKSPACE = process.env["WINDMILL_WORKSPACE"] ?? "crawler";
+
 /** 取り込みを始められる主体。capture-ledger 側でクロールの許可 (`fga:grant submitter`) が要る。 */
 const SUBJECT = process.env["E2E_SUBJECT"] ?? "e2e";
 
@@ -91,6 +107,34 @@ const requestCounts = async (): Promise<Record<string, number>> =>
 
 const resetFixtures = async (): Promise<void> => {
   await fetch(`${FIXTURES_HOST}/__reset`, { method: "POST" });
+};
+
+/** Windmill で script を 1 本走らせ、終わるまで待って結果を返す。失敗した run は、その中身で落とす。 */
+const runScript = async (path: string, args: Record<string, unknown>): Promise<unknown> => {
+  const token = process.env["WINDMILL_TOKEN"];
+  expect(token, "WINDMILL_TOKEN が無い —— pnpm run windmill:bootstrap").toBeTruthy();
+  const headers = { authorization: `Bearer ${String(token)}` };
+  const run = await fetch(`${WINDMILL}/api/w/${WORKSPACE}/jobs/run/p/${path}`, {
+    method: "POST",
+    headers: { ...headers, "content-type": "application/json" },
+    body: JSON.stringify(args),
+  });
+  const id = await run.text();
+  expect(
+    run.ok,
+    `${path} を走らせられない: ${String(run.status)} ${id} (push してありますか)`,
+  ).toBe(true);
+  for (let i = 0; i < 60; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const job = await json(
+      await fetch(`${WINDMILL}/api/w/${WORKSPACE}/jobs_u/get/${id}`, { headers }),
+    );
+    if (job["type"] === "CompletedJob") {
+      expect(job["success"], JSON.stringify(job["result"])).toBe(true);
+      return job["result"];
+    }
+  }
+  throw new Error(`${path} の run ${id} が 60 秒で終わらない`);
 };
 
 /**
@@ -569,5 +613,97 @@ describe("クロールが flow を通って索引まで終わる", () => {
       await startCrawl({ seeds: [`${FIXTURES}/plain-html`], maxDepth: 0, scripts: [] }),
     );
     expect(next["state"], String(next["error"])).toBe("succeeded");
+  });
+});
+
+/**
+ * **規則の並びで、辿る・撮るだけ・落とすを分ける。** capture-fixtures の `/links/rules` は、規則の決め方
+ * ごとにリンクを 1 本ずつ持つ頁 (同じホストのリーフ・暦の罠・落とすドメイン・外のホスト)。
+ *
+ * 判定は 3 か所で見る。**相手が受け取った物**は capture-fixtures のリクエストログ、**取りに行ったが届かな
+ * かった物** (外の 2 本はどちらも `.invalid` で、相手のログには来ない) は台帳の失敗、**台帳が決めた物**は
+ * 判断の口と、それを Windmill で描く調べ物の script。
+ */
+describe("規則の並びで辿る", () => {
+  const RULES = [
+    { skip: "skipped.invalid" },
+    { skip: `${FIXTURES}/links/trap/` },
+    { follow: "same-host" },
+    { capture: "any" },
+  ];
+
+  it("前方一致とドメインで落とし、外は撮るだけにする。台帳の判断と Windmill の調べ物が同じことを言う", async () => {
+    await resetFixtures();
+    const crawlId = await startCrawl({
+      seeds: [`${FIXTURES}/links/rules`],
+      maxDepth: 2,
+      maxPages: 20,
+      rules: RULES,
+      // 規則だけを見る。台帳のスクリプトは走らせない (速く、台帳の中身に左右されない)
+      scripts: [],
+    });
+    const crawl = await finished(crawlId);
+    expect(crawl["state"], `stopReason=${String(crawl["stopReason"])}`).toBe("succeeded");
+
+    // ① 相手が受け取った物。台帳は「記録したこと」しか言わない
+    const paths = Object.keys(await requestCounts());
+    expect(paths).toContain("/links/rules");
+    expect(paths, "同じホストを辿る規則で、リーフを取っていない").toContain("/links/leaf/1");
+    expect(
+      paths.filter((path) => path.startsWith("/links/trap/")),
+      "前方一致で落としたはずの暦に触れた",
+    ).toEqual([]);
+
+    // ② 外の 2 本。撮るだけの外へは撮りに行き (届かずに失敗)、落としたドメインへは行かない
+    const failures = (crawl["failures"] as { url: string }[]).map((failure) => failure.url);
+    expect(failures, "撮るだけの外へ撮りに行っていない").toContain("http://outside.invalid/page");
+    expect(failures, "落としたはずのドメインへ撮りに行った").not.toContain(
+      "http://skipped.invalid/page",
+    );
+
+    // ③ 台帳が残した判断。どの規則も別々の URL 1 本ずつ。/links/rules に robots で禁じた頁は無い
+    const decided = await json(
+      await fetch(`${WAGGLE}/api/crawls/${crawlId}/decisions`, { headers: auth() }),
+    );
+    const byRule: Record<string, number> = {};
+    for (const row of decided["decisions"] as { rule: number; links: number }[]) {
+      byRule[String(row.rule)] = (byRule[String(row.rule)] ?? 0) + row.links;
+    }
+    expect(byRule).toEqual({ "1": 1, "2": 1, "3": 1, "4": 1 });
+    expect(decided["robots"]).toEqual([]);
+
+    // ④ Windmill で調べ物の script を走らせると、落としたドメインの表にこのクロールが居る
+    const result = (await runScript("f/waggle/inspect_domain", {
+      domain: "skipped.invalid",
+      days: 1,
+    })) as { render_all: Record<string, unknown>[] };
+    const table = result.render_all.find((item) => "table-row-object" in item)?.[
+      "table-row-object"
+    ] as Record<string, unknown>[] | undefined;
+    expect(
+      (table ?? []).slice(1).map((row) => row["クロール"]),
+      JSON.stringify(result),
+    ).toContain(crawlId.slice(0, 8));
+  });
+
+  it("前の規則に覆われた規則で頼むと、400 で名指されてクロールは立たない", async () => {
+    const res = await fetch(`${WAGGLE}/api/crawls`, {
+      method: "POST",
+      headers: { ...auth(), "content-type": "application/json" },
+      body: JSON.stringify({
+        seeds: [`${FIXTURES}/links/rules`],
+        rules: [{ follow: "any" }, { skip: "skipped.invalid" }],
+        scripts: [],
+      }),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "rules that can never match",
+      rules: [{ rule: 2, coveredBy: 1 }],
+    });
+    const running = await json(
+      await fetch(`${WAGGLE}/api/crawls?state=running`, { headers: auth() }),
+    );
+    expect(running["crawls"], "断ったのにクロールが立っている").toEqual([]);
   });
 });

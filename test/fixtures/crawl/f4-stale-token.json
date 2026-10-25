@@ -10,7 +10,7 @@
   "crawl": {
     "crawlId": "0309613d-86c2-4bf3-980c-cc8293f86aa5",
     "seeds": ["https://example.com/"],
-    "scope": "same-origin",
+    "rules": [{ "follow": "same-origin" }],
     "state": "running",
     "stopReason": null,
     "maxDepth": 0,
