@@ -54,8 +54,8 @@ describe("本物の点検の並び", () => {
         "worker→ts-compile",
         "workspace",
         "変数",
-        // 目録は can_submit の子。親が飛ばされれば、こちらも飛ばされる。
-        "目録",
+        // スクリプトは can_submit の子。親が飛ばされれば、こちらも飛ばされる。
+        "スクリプト",
       ].sort(),
     );
     for (const r of skipped) expect(r).toMatchObject({ reason: "先に windmill を" });

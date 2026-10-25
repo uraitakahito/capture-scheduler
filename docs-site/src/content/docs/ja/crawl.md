@@ -10,7 +10,7 @@ flow は `f/waggle/crawl_level` で、1 回の実行が 1 段。
 ```
 plan_level       ホストで束ね、robots.txt を 1 ホスト 1 回引く
   ↓
-compile_scripts  目録の TypeScript を型検査して JavaScript にする（ts-compile-service）
+compile_scripts  TypeScript のスクリプトを型検査して JavaScript にする（ts-compile-service）
   ↓
 for-each         ホストごとに並列（parallelism = host_parallelism）
   crawl_host       1 ホスト内は逐次。完了 → 間隔 → 次
@@ -102,21 +102,21 @@ Windmill は schema の既定値を **UI からの実行にしか埋めない**�
 
 引数で届くのは、そのクロールについて capture-ledger が決めて**必ず送る**もの —— URL と
 間隔、`capture_formats` / `signing`、そして **`scripts`**（ページの中で走らせる TypeScript）。
-目録が持つのは書いたままの TS で、`sha256` はそのバイト列に打たれている。`compile_scripts` が
+台帳が持つのは書いたままの TS で、`sha256` はそのバイト列に打たれている。`compile_scripts` が
 JS にして hash を打ち直し、BrowserHive は JS の hash を照合する。2 つの hash はその 1 段で継がれる。
 `report_level` はその JS の hash を、サービスが名乗った compiler の版と受け皿の型の tag と一緒に
 capture-ledger へ運ぶ（段の報告の `compiled`）。台帳はそれをクロールの TS の hash の隣に書き、
-後の段が違う hash を報告すれば 409 で断る。目録が空のクロール（`scripts: []`）も 1 段として通る。
+後の段が違う hash を報告すれば 409 で断る。スクリプトが空のクロール（`scripts: []`）も 1 段として通る。
 サービスは 200 で scripts 無しを返し、ページでは何も走らず、報告には typescript と hostTypes が付く。
 その場で書いた JS（`scripts` の `inline` の要素）も同じ道を通る。capture-ledger がクロールに
-`inline-<name>` で固定し、flow は目録の物と同じく変換して差し込む。
+`inline-<name>` で固定し、flow は台帳のスクリプトと同じく変換して差し込む。
 
 `scripts` を必須にしてあるのは `capture_formats` と同じ理由。BrowserHive v11.0.0 は
 走らせるものの顔ぶれを持たないので、送らなければページの中では何も走らず、**それでも
 取り込みは成功してアーカイブも出る**。渡し忘れは「一度もスクロールしなかったクロール」に
 なり、した側と見分けが付かない。この flow は運ぶだけで、何を・どの順で・どちらの口
-（読み込み後の `behavior` か、遷移前の `preload` か）で走らせるかは capture-ledger の
-目録が決める。
+（読み込み後の `behavior` か、遷移前の `preload` か）で走らせるかは capture-ledger が
+決める。
 
 ```sh
 pnpm run windmill:capture-ledger-token   # waggle_token / waggle_api_url /
@@ -124,7 +124,7 @@ pnpm run windmill:capture-ledger-token   # waggle_token / waggle_api_url /
                                  # ts_compile_url
 ```
 
-`u/admin/ts_compile_url` は `compile_scripts` が目録を送る宛先（既定は
+`u/admin/ts_compile_url` は `compile_scripts` がスクリプトを送る宛先（既定は
 `http://ts-compile.capture-scheduler:8080`、この repo の compose の `ts-compile`。
 `TS_COMPILE_URL` で変えられる）。`pnpm run doctor` が worker からその `/healthz` に届くかを見る。
 

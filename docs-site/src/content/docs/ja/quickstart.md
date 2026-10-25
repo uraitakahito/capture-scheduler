@@ -14,9 +14,9 @@ Windmill は capture-ledger のスタックの 2 つを使う。OpenFGA には�
 スタックが動いていることを確かめる。向こうの `pnpm run dev:up` は §3 以降をまとめて
 やるので、手で打つのは §1 と §2 だけでもよい。
 
-**§4 の目録を忘れないこと。** BrowserHive は走らせるものの顔ぶれを持たないので、
+**§4 のスクリプトを忘れないこと。** BrowserHive は走らせるものの顔ぶれを持たないので、
 `scripts` 表が空だと、クロールはページの中で何も走らせない —— スクロールも遅延読み込みも
-起きないまま、成功したアーカイブが出る。下の `doctor` の**目録**がそれを言う。
+起きないまま、成功したアーカイブが出る。下の `doctor` の**スクリプト**がそれを言う。
 
 ```sh
 curl -s -o /dev/null -w '%{http_code}\n' -H 'authorization: Bearer dev-key' http://127.0.0.1:8090/stores
@@ -234,7 +234,7 @@ smoke は capture-ledger v0.43.0 以上を前提にする（最後の段の run 
 
 | 見えたもの                                                                                                                                      | 意味                                                                                      | 直す                                                                  |
 | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| doctor の目録が ✗ ／ smoke が 400 `the script catalog is empty`                                                                                 | 目録が空。ページの中で何も走らない                                                        | capture-ledger で `pnpm run scripts import .upstream/capture-scripts` |
+| doctor のスクリプトが ✗ ／ smoke が 400 `no scripts are registered`                                                                             | 台帳にスクリプトが無い。ページの中で何も走らない                                          | capture-ledger で `pnpm run scripts import .upstream/capture-scripts` |
 | doctor の windmill が ✗ で、下の点検が「先に windmill を」                                                                                      | Windmill が落ちている                                                                     | `container-compose up -d`（この repo で）                             |
 | doctor の push が ✗「repo と中身が違う」                                                                                                        | script を直したが push していない（または Windmill の UI で直した）                       | `pnpm run windmill:push`（違いを見るだけなら `windmill:diff`）        |
 | doctor の worker→browserhive が ✗「名前が引けない」（止めた直後の数秒は「3 秒で答えない」）／smoke の原因が `[cap] BrowserHive に届きません: …` | BrowserHive のコンテナが止まっている（止めたコンテナは名前ごと消える）                    | capture-ledger で `pnpm run stack:up`                                 |

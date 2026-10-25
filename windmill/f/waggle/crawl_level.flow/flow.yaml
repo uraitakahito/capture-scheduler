@@ -37,7 +37,7 @@ value:
           host_parallelism:
             type: javascript
             expr: flow_input.host_parallelism
-    # **目録の TS を JS にする。** 台帳が持つのは書いたままの TS (sha256 は TS のバイト列)。
+    # **TS のスクリプトを JS にする。** 台帳が持つのは書いたままの TS (sha256 は TS のバイト列)。
     # BrowserHive が評価するのは JS (sha256 は JS のバイト列)。その継ぎ目がこの段で、
     # 変換するのは ts-compile-service —— 型が通らなければ 422 でこの段が落ち、failure_module が
     # クロールを failed で締める。通らない TS を黙って走らせない。
@@ -81,7 +81,7 @@ value:
                 signing:
                   type: javascript
                   expr: flow_input.signing
-                # compile の段が返した JS の目録。flow_input.scripts (TS) を直接渡さない ——
+                # compile の段が返した、JS にしたスクリプト。flow_input.scripts (TS) を直接渡さない ——
                 # 渡すと BrowserHive はページの中で TS を評価しようとして失敗する (試験が赤くなる)。
                 scripts:
                   type: javascript
@@ -219,10 +219,10 @@ schema:
       description: WACZ に署名するか。capture-ledger が決めて必ず送る
     scripts:
       # ページの中で走らせるもの。**flow は運ぶだけで中身を見ない** —— 何を走らせるかも
-      # 並びも capture-ledger が目録から決める。BrowserHive は顔ぶれを持たないので、
+      # 並びも capture-ledger が決める。BrowserHive は顔ぶれを持たないので、
       # ここが空なら本当にページの中では何も走らない。
       type: array
-      description: ページの中で走らせるスクリプト。capture-ledger が目録から解決して必ず送る
+      description: ページの中で走らせるスクリプト。capture-ledger が解決して必ず送る
       items:
         type: object
         properties:

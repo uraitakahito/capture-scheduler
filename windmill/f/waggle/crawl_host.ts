@@ -76,7 +76,7 @@ export interface CaptureSettings {
   };
   signing: boolean;
   /**
-   * ページの中で走らせるもの。**capture-ledger が目録から解決して、並びごと渡す。**
+   * ページの中で走らせるもの。**capture-ledger が解決して、並びごと渡す。**
    *
    * BrowserHive v11.0.0 から、サーバは走らせるものの顔ぶれを持たない —— 送らなければ
    * ページでは何も走らず、それでも取り込みは成功してアーカイブも出る。**この層は
@@ -96,7 +96,7 @@ export interface CaptureSettings {
 }
 
 /**
- * 走らせるもの 1 本。台帳の目録から解決済みで、ここを素通りして BrowserHive へ行く。
+ * 走らせるもの 1 本。台帳が解決済みで、ここを素通りして BrowserHive へ行く。
  *
  * `phase` が入る口を決める。`behavior` は読み込みの後・主フレーム・1 回、
  * `preload` は遷移の**前**・iframe を含む全フレーム・遷移のたび。BrowserHive では
@@ -397,7 +397,7 @@ const captureOnAny = async (
 };
 
 /**
- * 目録の 1 本を、BrowserHive の `Script` の形にする。
+ * スクリプト 1 本を、BrowserHive の `Script` の形にする。
  *
  * **`version` は送らない。** あちらは `id` / `source` / `sha256` / `options` しか
  * 持たない —— 版は台帳の言葉で、走る側には関係が無い。どの版が走ったかは
@@ -589,7 +589,7 @@ export async function main(
   capture_formats: CaptureSettings["formats"],
   signing: boolean,
   /**
-   * ページの中で走らせるもの。capture-ledger が目録から解決して、**並びごと**渡す。
+   * ページの中で走らせるもの。capture-ledger が解決して、**並びごと**渡す。
    *
    * **省けない。** 省ける形にすると、渡し忘れが「何も走らないクロール」として
    * 黙って成功する。空配列を渡すことは意思表示として通る。
