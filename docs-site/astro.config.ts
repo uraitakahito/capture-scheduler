@@ -38,6 +38,11 @@ export default defineConfig({
         { label: "Schedule", translations: { ja: "いつ走るか" }, slug: "schedule" },
         { label: "The UI", translations: { ja: "管理画面" }, slug: "windmill-ui" },
         {
+          label: "Inspecting what was dropped",
+          translations: { ja: "落とした物を Windmill で調べる" },
+          slug: "inspect",
+        },
+        {
           label: "Windmill CE",
           translations: { ja: "Windmill CE" },
           slug: "windmill-ce",

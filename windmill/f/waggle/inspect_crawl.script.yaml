@@ -1,0 +1,18 @@
+summary: クロール 1 本で、規則がリンクをどう決めたかを読む
+description: |
+  台帳 (capture-ledger) の GET /api/crawls/:id/decisions を引き、規則ごとの数と、
+  落とした物 (規則と robots.txt・ホスト名ごと) を表に描く。
+
+  クロールの通り道には居ない。走らせても何も変わらない。run の中身は 30 日で消えるが、
+  台帳の行はクロールがある限り残るので、走らせ直せばよい。
+lock: "!inline f/waggle/inspect_crawl.script.lock"
+kind: script
+schema:
+  properties:
+    crawl:
+      type: string
+      description: クロールの id。前の 8 字 (dashboard と run の画面に出る形) でもよい
+      default: null
+      originalType: string
+  required:
+    - crawl

@@ -20,7 +20,7 @@ The on-time part is **Windmill's schedule** itself; this repository holds its se
 
 |                               |                                                                                                                                                                                                                                    |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **capture-ledger decides**    | what (`capture_targets` or seed URLs), how far (depth, scope, limits), how politely (the policy values) and in which formats; it records what happened and decides whether there is another level                                  |
+| **capture-ledger decides**    | what (`capture_targets` or seed URLs), how far (depth, rules, limits), how politely (the policy values) and in which formats; it records what happened and decides whether there is another level                                  |
 | **capture-scheduler decides** | when to start (the schedule) and how to carry a level out (grouping by host, capping parallelism at the number of BrowserHive endpoints, one page at a time per host with a pause after each, robots.txt, picking a free endpoint) |
 
 So this repository contains **no URLs**. The targets and the policy values arrive from capture-ledger.
