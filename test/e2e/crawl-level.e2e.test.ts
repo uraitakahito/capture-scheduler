@@ -285,6 +285,9 @@ describe("クロールが flow を通って索引まで終わる", () => {
    * つまり **`hero-2x.svg` が相手に届いたこと**が、「台帳 → flow → BrowserHive → ページ」の
    * 鎖が全部通った証拠になる。判定を相手のリクエストログで採るのは ① と同じ理由 ——
    * 台帳は「記録したこと」しか言わない。
+   *
+   * autofetch は capture-scripts v0.5.0 から既定に入らない（カタログの `default: false`。台帳 v0.64.0 は
+   * 全部の版を無効にして持つ）ので、名指して頼む。名指せば、台帳は最新版を配る。
    */
   it("台帳に入れたスクリプトが、ページの中で走る", async () => {
     await fetch(`${FIXTURES_HOST}/__reset`, { method: "POST" });
@@ -293,14 +296,18 @@ describe("クロールが flow を通って索引まで終わる", () => {
       method: "POST",
       headers: { ...auth(), "content-type": "application/json" },
       // 起点は 1 枚、辿らない。届いた要求はこの 1 枚のぶんだけになる。
-      body: JSON.stringify({ seeds: [`${FIXTURES}/responsive-images`], maxDepth: 0 }),
+      body: JSON.stringify({
+        seeds: [`${FIXTURES}/responsive-images`],
+        maxDepth: 0,
+        scripts: [{ catalog: "autofetch" }],
+      }),
     });
     const startedBody = await started.text();
     expect(
       started.status,
       startedBody +
         (started.status === 400
-          ? " —— 台帳にスクリプトは入っていますか (capture-ledger: pnpm run scripts import .upstream/capture-scripts)"
+          ? " —— 台帳に autofetch は入っていますか (capture-ledger: pnpm run scripts import .upstream/capture-scripts)"
           : started.status === 409
             ? " —— 走行中のクロールが残っています。**この試験が途中で落ちると必ずこうなる**"
             : ""),
@@ -323,8 +330,8 @@ describe("クロールが flow を通って索引まで終わる", () => {
         }[];
         expect(
           scripts.map((script) => script.id),
-          "台帳が autofetch を配っていない",
-        ).toContain("autofetch");
+          "台帳が名指した autofetch を配っていない",
+        ).toEqual(["autofetch"]);
         // 走った JS の hash と変換の記録が、報告で台帳に戻っている。台帳のスクリプトの sha256 は TS の物なので、
         // JS の物と同じなら「変換されていない」。
         for (const script of scripts) {
@@ -393,7 +400,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
       if (got["state"] !== "running") break;
     }
     expect(got["state"], String(got["error"])).toBe("succeeded");
-    // 台帳はスクリプトを空で固定した (省略なら autoscroll と autofetch が入る)
+    // 台帳はスクリプトを空で固定した (省略なら台帳の既定が入る)
     expect(got["scripts"]).toEqual([]);
 
     const counts = (await json(await fetch(`${FIXTURES_HOST}/__request-counts`))) as Record<
@@ -405,6 +412,50 @@ describe("クロールが flow を通って索引まで終わる", () => {
     // **ここが本題。** autofetch が居ないので -2x は誰も要求しない。上の試験の hero-2x.svg が
     // autofetch の仕業である証拠は、この 0 と対にして初めて言える
     expect(counts["/assets/hero-2x.svg"] ?? 0, "スクリプトが空なのに何かが走った").toBe(0);
+  });
+
+  /**
+   * **`scripts` を省いたクロールに、autofetch は入らない。**
+   *
+   * 上の 2 本のもう 1 つの対照。autofetch は capture-scripts v0.5.0 から既定に入らず、台帳は全部の版を
+   * 無効にして持つ。だから何も名指さないクロール —— 毎朝の定期のクロールも —— は走らせない。
+   * 台帳が固定した顔ぶれと、相手のリクエストログの両方で見る: 顔ぶれに居なくても、ページの中で
+   * 走っていれば hero-2x.svg が届く。
+   */
+  it("scripts を省いたクロールに、autofetch は入らない", async () => {
+    await fetch(`${FIXTURES_HOST}/__reset`, { method: "POST" });
+
+    const started = await fetch(`${WAGGLE}/api/crawls`, {
+      method: "POST",
+      headers: { ...auth(), "content-type": "application/json" },
+      body: JSON.stringify({ seeds: [`${FIXTURES}/responsive-images`], maxDepth: 0 }),
+    });
+    const startedBody = await started.text();
+    expect(started.status, startedBody).toBe(202);
+    const crawlId = String((JSON.parse(startedBody) as Record<string, unknown>)["crawlId"]);
+
+    let got: Record<string, unknown> = {};
+    for (let i = 0; i < 100; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      got = await json(await fetch(`${WAGGLE}/api/crawls/${crawlId}`, { headers: auth() }));
+      if (got["state"] !== "running") break;
+    }
+    expect(got["state"], String(got["error"])).toBe("succeeded");
+    const ids = (got["scripts"] as { id: string }[]).map((script) => script.id);
+    // 既定は空ではない（空なら台帳は 400 で断る）。その中に autofetch が居ない
+    expect(ids.length, "既定のスクリプトが走っていない").toBeGreaterThan(0);
+    expect(
+      ids,
+      "既定に autofetch が入っている —— 台帳は capture-scripts v0.5.0 以降を取り込んだか",
+    ).not.toContain("autofetch");
+
+    const counts = (await json(await fetch(`${FIXTURES_HOST}/__request-counts`))) as Record<
+      string,
+      number
+    >;
+    // control —— 取り込みは届いている
+    expect(counts["/assets/hero.svg"], "取り込みが届いていない").toBeGreaterThan(0);
+    expect(counts["/assets/hero-2x.svg"] ?? 0, "既定のスクリプトの中で autofetch が走った").toBe(0);
   });
 
   /**

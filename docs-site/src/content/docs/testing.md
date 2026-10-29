@@ -79,9 +79,10 @@ something it thinks it is watching and is not.
 The rest look at the scripts a crawl runs in the page, again from capture-fixtures' request
 log, which counts every request by its full URL, query string included.
 
-- **Registered scripts run, and only when asked.** With the default scripts, autofetch requests
-  `/assets/hero-2x.svg`, which a 1280px browser at DPR 1 never asks for itself. The control sends
-  `scripts: []` to the same page, and nobody requests it.
+- **Registered scripts run, and only when asked.** Named, autofetch requests
+  `/assets/hero-2x.svg`, which a 1280px browser at DPR 1 never asks for itself. Two controls go to
+  the same page: one sends `scripts: []`, the other no `scripts`, leaving the choice to the ledger's
+  defaults, which leave out autofetch (from capture-scripts v0.5.0). Nobody requests it in either.
 - **A script that does not type-check fails the level at compile**, with the number of
   diagnostics and the first five in the crawl's `error`: once through the ledger (its CLI adds and removes a broken script),
   once as an inline script.

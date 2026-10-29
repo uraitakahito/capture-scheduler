@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  readCatalog,
   readPush,
   readVariables,
   readWorkspace,
@@ -98,6 +99,39 @@ describe("readPush", () => {
     expect(need(verdict)).toMatch(
       /^Windmill に無い: f\/waggle\/crawl_host \(script\)・f\/waggle\/crawl_level \(flow\)。repo と中身が違う: f\/waggle\/plan_level → /,
     );
+  });
+});
+
+describe("readCatalog", () => {
+  const listed = (scripts: unknown[]) => ({ status: 200, body: JSON.stringify({ scripts }) });
+
+  it("既定に入るスクリプトが 1 つでも在れば ✓ —— 既定に入らない物が並んでいても", () => {
+    expect(
+      readCatalog(
+        listed([
+          { id: "autofetch", enabled: false },
+          { id: "autoscroll", enabled: true },
+        ]),
+      ),
+    ).toEqual({ ok: true });
+  });
+
+  it("enabled の無い行 (台帳 v0.64.0 より前) は、既定に数える", () => {
+    expect(readCatalog(listed([{ id: "autoscroll" }]))).toEqual({ ok: true });
+  });
+
+  it("全部が既定に入らなければ ✗ —— 何も名指さないクロールは 400 で断られる", () => {
+    expect(need(readCatalog(listed([{ id: "autofetch", enabled: false }])))).toMatch(
+      /^台帳のスクリプトが全部、既定に入らない .*、pnpm run scripts enable <id>$/,
+    );
+  });
+
+  it("空なら、取り込みを言う", () => {
+    expect(need(readCatalog(listed([])))).toMatch(/^台帳にスクリプトが無い .* scripts import /);
+  });
+
+  it("404 は許可を疑う", () => {
+    expect(need(readCatalog({ status: 404, body: "" }))).toMatch(/can_submit/);
   });
 });
 
