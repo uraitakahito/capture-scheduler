@@ -107,12 +107,18 @@ export const VARIABLES = [
 ] as const;
 
 /**
- * `GET /api/scripts` の答え。**台帳にスクリプトが無ければ ✗。**
+ * `GET /api/scripts` の答え。**既定で走るスクリプトが台帳に無ければ ✗。**
  *
  * 空でもクロールは始められてしまう時期が在った —— ページの中で何も走らず、スクロールも
  * 遅延読み込みも起きないまま `complete: true` のアーカイブが出る。capture-ledger は
  * いまそれを 400 で止めるが、**止まるのは頼んだ後**。doctor は「全部 ✓ なら、クロールを
  * 始めれば最後まで走る」と名乗っているので、頼む前にここで言う。
+ *
+ * 台帳 v0.64.0 から、一覧は既定に入らないスクリプト（capture-scripts のカタログの `default: false`）も
+ * `enabled: false` で載せる。名指せば走るが、何も名指さないクロール（毎朝の定期のクロールも）は
+ * 走らせない —— 載っている物が全部 `enabled: false` なら、そのクロールは 400 で断られる。`enabled` の
+ * 無い行（v0.64.0 より前の台帳は、有効な物だけを載せていた）は既定に数える。頼む前に言えるのは
+ * ここまで —— 札のある物しか無い台帳は、起点しだいで既定が空になる。
  *
  * 404 は「許可が無い」—— 口そのものは webhook の設定に依らず出るので、
  * 在るかどうかではなく can_submit を疑う先になる。
@@ -127,12 +133,25 @@ export const readCatalog = (answer: Answer): Verdict => {
   if (!Array.isArray(scripts)) {
     return { ok: false, need: `GET /api/scripts → ${shown(answer)}` };
   }
-  if (scripts.length > 0) return { ok: true };
+  if (scripts.length === 0) {
+    return {
+      ok: false,
+      need:
+        "台帳にスクリプトが無い —— 撮れてもページの中では何も走らない (クロールは 400 で断られる) → " +
+        "cd ../capture-ledger && pnpm run scripts import .upstream/capture-scripts",
+    };
+  }
+  const isDefault = (script: unknown): boolean =>
+    typeof script !== "object" ||
+    script === null ||
+    !("enabled" in script) ||
+    script.enabled !== false;
+  if (scripts.some(isDefault)) return { ok: true };
   return {
     ok: false,
     need:
-      "台帳にスクリプトが無い —— 撮れてもページの中では何も走らない (クロールは 400 で断られる) → " +
-      "cd ../capture-ledger && pnpm run scripts import .upstream/capture-scripts",
+      "台帳のスクリプトが全部、既定に入らない (enabled: false) —— 何も名指さないクロールは 400 で断られる → " +
+      "cd ../capture-ledger && pnpm run scripts list で見て、pnpm run scripts enable <id>",
   };
 };
 
