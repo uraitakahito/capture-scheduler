@@ -173,8 +173,22 @@ pnpm run fga:grant submitter windmill acme
 ```sh
 cd ~/projects/crawler/capture-scheduler
 pnpm run doctor   # 14 本の点検。全部 ✓ なら、クロールが最後まで走る設定になっている
-pnpm run smoke    # https://example.com/ を 1 本撮り、WACZ を取り出せたら「撮れた」
+pnpm run smoke    # capture-fixtures の頁を 1 本撮り、WACZ を取り出せたら「撮れた」
 ```
+
+smoke が既定で撮るのは、capture-ledger のスタックにいる
+[capture-fixtures](https://github.com/uraitakahito/capture-fixtures) の頁
+（`http://capture-fixtures.capture-ledger:8080/plain-html`）。`example.com` のような例示の名前は、
+網によって答えが変わる（ルータが `127.0.0.1` を返すことがある）ので使わない。capture-fixtures は
+`dev:up` では立ち上がらないので、smoke の前に立ち上げておく:
+
+```sh
+cd ~/projects/crawler/capture-ledger
+pnpm run stack:up --profile capture-fixtures capture-fixtures
+```
+
+立ち上げる前にその名前を引いていると、立ち上げてから 1 分ほど引けないことがある（「無い」という答えを
+DNS が覚えるため）。
 
 **doctor** は、このページの見出しごとに「その手が済んでいるか」を、その手が作ったものに訊く。
 立っているかだけでなく、script の中身が repo と同じか、Windmill が持っているトークンで
@@ -204,12 +218,12 @@ pnpm run smoke    # https://example.com/ を 1 本撮り、WACZ を取り出せ�
 
 ```
 点検     doctor の 14 本とも ✓
-始める   POST /api/crawls → 202  crawl 545e912c-…  https://example.com/
+始める   POST /api/crawls → 202  crawl 545e912c-…  http://capture-fixtures.capture-ledger:8080/plain-html
 待つ     running
 run      http://127.0.0.1:8000/run/01a0ba19-…?workspace=crawler
 終わり   succeeded (max_depth) —— 撮ったページ 1・6 秒
 取り出す archive 928d640f-… の先頭が PK (WACZ = zip)
-撮れた   https://example.com/
+撮れた   http://capture-fixtures.capture-ledger:8080/plain-html
 ```
 
 **撮れなかったら**、smoke が落ちた段と直し方を言う（`原因` と `直す` の 2 行）。言われた手を直して
@@ -219,7 +233,7 @@ smoke をもう一度。自分が始めたクロールは、失敗しても時�
 
 ```sh
 cd ~/projects/crawler/capture-scheduler
-pnpm run smoke https://example.org/   # 撮る URL を変える
+pnpm run smoke http://capture-fixtures.capture-ledger:8080/links/hub   # 撮る URL を変える
 pnpm run smoke --timeout 300          # 待つ上限（秒。既定 180）
 pnpm run smoke --no-doctor            # 点検を飛ばす（直した直後の撮り直し）
 pnpm run smoke --close-running        # 409 のとき、走っている 1 本を締めてから撮る

@@ -9,7 +9,7 @@
   },
   "crawl": {
     "crawlId": "2b6581c0-2e44-4393-ba86-a70aa1346cf3",
-    "seeds": ["https://example.com/"],
+    "seeds": ["https://site.test/"],
     "rules": [{ "follow": "same-origin" }],
     "state": "running",
     "stopReason": null,

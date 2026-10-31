@@ -97,7 +97,7 @@ const DETAIL: CrawlDetail = {
     { skip: "http://capture-fixtures.capture-ledger:8080/links/trap/" },
     { follow: "same-host" },
     { capture: "any" },
-    { skip: "tracker.example.net" },
+    { skip: "tracker.third-site.test" },
   ],
   state: "succeeded",
   stopReason: "max_depth",
@@ -186,7 +186,12 @@ describe("クロール 1 本の判断を描く", () => {
       },
       { 規則: "3. 撮って辿る", 当てる物: "same-host", "URL の数": 1, 印: "" },
       { 規則: "4. 撮るだけ", 当てる物: "any", "URL の数": 1, 印: "" },
-      { 規則: "5. 落とす", 当てる物: "tracker.example.net", "URL の数": 0, 印: "当たっていない" },
+      {
+        規則: "5. 落とす",
+        当てる物: "tracker.third-site.test",
+        "URL の数": 0,
+        印: "当たっていない",
+      },
       { 規則: "どれにも当たらない（落とす）", 当てる物: "", "URL の数": 1, 印: "" },
     ]);
   });
