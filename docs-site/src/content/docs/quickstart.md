@@ -174,8 +174,21 @@ command to type, with the names capture-ledger actually saw.
 ```sh
 cd ~/projects/crawler/capture-scheduler
 pnpm run doctor   # 14 checks; all ✓ means a crawl is set up to run to the end
-pnpm run smoke    # captures https://example.com/ once; "撮れた" (captured) once the WACZ comes back
+pnpm run smoke    # captures a capture-fixtures page once; "撮れた" (captured) once the WACZ comes back
 ```
+
+By default smoke captures a page of [capture-fixtures](https://github.com/uraitakahito/capture-fixtures)
+in the capture-ledger stack (`http://capture-fixtures.capture-ledger:8080/plain-html`). Example names
+such as `example.com` are not used: their answers differ by network (a router may answer `127.0.0.1`).
+`dev:up` does not start capture-fixtures, so start it before smoke:
+
+```sh
+cd ~/projects/crawler/capture-ledger
+pnpm run stack:up --profile capture-fixtures capture-fixtures
+```
+
+If the name was looked up before it was started, it may not resolve for about a minute after the
+start (the DNS remembers the "no such name" answer).
 
 **doctor** asks, for each heading of this page, whether that step is done — by asking the things
 the step created. It goes past "is it up": whether the scripts match the repo, whether the token
@@ -206,12 +219,12 @@ and checks that it starts with `PK` (a WACZ is a zip):
 
 ```
 点検     doctor の 14 本とも ✓
-始める   POST /api/crawls → 202  crawl 545e912c-…  https://example.com/
+始める   POST /api/crawls → 202  crawl 545e912c-…  http://capture-fixtures.capture-ledger:8080/plain-html
 待つ     running
 run      http://127.0.0.1:8000/run/01a0ba19-…?workspace=crawler
 終わり   succeeded (max_depth) —— 撮ったページ 1・6 秒
 取り出す archive 928d640f-… の先頭が PK (WACZ = zip)
-撮れた   https://example.com/
+撮れた   http://capture-fixtures.capture-ledger:8080/plain-html
 ```
 
 **When it fails**, smoke names the step that failed and how to fix it (the `原因` cause and
@@ -221,7 +234,7 @@ timeout, on Ctrl-C — so the next run is never blocked by a 409. To follow it i
 
 ```sh
 cd ~/projects/crawler/capture-scheduler
-pnpm run smoke https://example.org/   # capture a different URL
+pnpm run smoke http://capture-fixtures.capture-ledger:8080/links/hub   # capture a different URL
 pnpm run smoke --timeout 300          # how long to wait (seconds, default 180)
 pnpm run smoke --no-doctor            # skip the checks (re-running right after a fix)
 pnpm run smoke --close-running        # on 409, close the running crawl first, then capture

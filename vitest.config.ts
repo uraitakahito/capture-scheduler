@@ -23,6 +23,7 @@ export default defineConfig({
           include: ["test/**/*.test.ts"],
           exclude: ["test/e2e/**"],
           environment: "node",
+          setupFiles: ["./test/no-dns.ts"],
           clearMocks: true,
         },
       },

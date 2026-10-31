@@ -53,7 +53,7 @@ function stop(label: string, text: string): never {
 }
 
 const url = (() => {
-  const raw = positionals[0] ?? "https://example.com/";
+  const raw = positionals[0] ?? "http://capture-fixtures.capture-ledger:8080/plain-html";
   try {
     return new URL(raw).href;
   } catch {

@@ -381,7 +381,7 @@ describe("口を選ぶ", () => {
   it("全部居なければ 1 ページの失敗にせず、段ごと落とす", async () => {
     const a = fakeEndpoint("bh-1", { down: true });
     const b = fakeEndpoint("bh-2", { down: true });
-    await expect(run([a, b], ["https://example.com/a"])).rejects.toThrow(ServerUnavailable);
+    await expect(run([a, b], ["https://site.test/a"])).rejects.toThrow(ServerUnavailable);
   });
 
   it("居ない口の名前を誤りに載せる", async () => {

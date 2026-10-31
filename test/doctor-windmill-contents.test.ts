@@ -48,10 +48,10 @@ describe("readWorkspace", () => {
   it("workspace が在って non_member なら、token の持ち主が member でないと言う", () => {
     const verdict = readWorkspace({
       workspace: "crawler",
-      whoami: whoami({ non_member: true, email: "someone@example.com" }),
+      whoami: whoami({ non_member: true, email: "someone@site.test" }),
       exists: true,
     });
-    expect(need(verdict)).toMatch(/^someone@example\.com は workspace crawler の member でない/);
+    expect(need(verdict)).toMatch(/^someone@site\.test は workspace crawler の member でない/);
   });
 
   it("読めない答えは、そのまま出す", () => {

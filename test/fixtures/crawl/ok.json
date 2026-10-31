@@ -1,5 +1,5 @@
 {
-  "case": "何も壊さず https://example.com/ を 1 本",
+  "case": "何も壊さず https://site.test/ を 1 本",
   "recorded": "2026-09-19 capture-ledger develop 9fe6a03 (v0.43.0 の手前) と Windmill CE v1.806.0 で実測",
   "start": {
     "status": 202,
@@ -9,7 +9,7 @@
   },
   "crawl": {
     "crawlId": "7269f0fb-486c-4c87-8ba2-37e01f772c17",
-    "seeds": ["https://example.com/"],
+    "seeds": ["https://site.test/"],
     "rules": [{ "follow": "same-origin" }],
     "state": "succeeded",
     "stopReason": "max_depth",

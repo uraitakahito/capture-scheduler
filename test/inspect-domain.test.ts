@@ -133,6 +133,6 @@ describe("台帳を引く", () => {
         } as Response),
       ),
     );
-    await expect(main("ADS.example.com")).rejects.toThrow('400 {"error":"invalid domain"}');
+    await expect(main("ADS.site.test")).rejects.toThrow('400 {"error":"invalid domain"}');
   });
 });
