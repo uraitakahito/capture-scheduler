@@ -12,7 +12,7 @@ import {
   windmillToken,
   WORKSPACE,
 } from "./helpers/stack.js";
-import { datapackageOf, membersContaining, readWacz } from "./helpers/wacz.js";
+import { membersContaining, readWacz, settingsOf } from "./helpers/wacz.js";
 
 /**
  * **クロールごとの値 —— 変数とシークレット —— が、台帳 → flow → crawl_host → BrowserHive → 頁 と運ばれ、
@@ -126,7 +126,7 @@ describe("クロールごとの値 —— 変数とシークレット", () => {
     // ③ WACZ の settings。値は記録に残る物 (settings.variables)、secrets は空の列
     const archive = await api.archiveOf(seed, String(got["startedAt"]));
     const members = await readWacz(await api.signedUrl(archive.id));
-    const settings = (datapackageOf(members)["settings"] ?? {}) as Record<string, unknown>;
+    const settings = settingsOf(members);
     expect(settings["variables"]).toEqual({ probe: value });
     expect(settings["secrets"]).toEqual([]);
     expect(membersContaining(members, value), "値が WACZ のどこにも無い").toContain(
@@ -175,7 +175,7 @@ describe("クロールごとの値 —— 変数とシークレット", () => {
     // ③ WACZ: settings.secrets に名前だけ。値は全 member のどこにも無い
     const archive = await api.archiveOf(seed, String(got["startedAt"]));
     const members = await readWacz(await api.signedUrl(archive.id));
-    const settings = (datapackageOf(members)["settings"] ?? {}) as Record<string, unknown>;
+    const settings = settingsOf(members);
     expect(settings["secrets"]).toEqual([SECRET_NAME]);
     expect(settings["variables"]).toEqual({});
     expect(membersContaining(members, value), "シークレットの値が WACZ に残っている").toEqual([]);

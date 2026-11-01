@@ -29,6 +29,20 @@ export const datapackageOf = (members: WaczMembers): Record<string, unknown> => 
   return JSON.parse(strFromU8(raw)) as Record<string, unknown>;
 };
 
+/**
+ * BrowserHive が書く `settings` (profile の #settings)。datapackage.json の最上位ではなく、producer の名前空間
+ * `browserhive:capture` の下に在る (v22.0.0 の実物で確かめた。`conformsTo` もそこ)。
+ */
+export const settingsOf = (members: WaczMembers): Record<string, unknown> => {
+  const capture = datapackageOf(members)["browserhive:capture"] as
+    | { settings?: Record<string, unknown> }
+    | undefined;
+  if (capture?.settings === undefined) {
+    throw new Error("datapackage.json に browserhive:capture.settings が無い");
+  }
+  return capture.settings;
+};
+
 /** member を文字に。gzip (`.gz`) は解いてから。 */
 export const textOf = (name: string, bytes: Uint8Array): string => {
   const plain = name.endsWith(".gz") ? gunzipSync(Buffer.from(bytes)) : Buffer.from(bytes);
