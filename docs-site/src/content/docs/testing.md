@@ -17,6 +17,12 @@ these and a crawl fails only at its level report, staying `running`. It lives ou
 deliberately: vitest prints "No test files found, exiting with code 1" whenever a global setup
 throws, and no message written inside can survive that.
 
+The endpoints can be overridden through environment variables (`E2E_WAGGLE_URL`, `E2E_ISSUER_URL`,
+`E2E_FIXTURES_URL`, `E2E_FIXTURES_HOST_URL`, `E2E_SUBJECT`, `E2E_LEDGER_DIR`; the defaults are at the top
+of `test/e2e/helpers/stack.ts` and `crawl-level.e2e.test.ts`). The test that drives the ledger's CLI
+assumes a capture-ledger checkout at `../capture-ledger`, so when running from a git worktree pass
+`E2E_LEDGER_DIR=<capture-ledger checkout>` (without it the test fails with `spawnSync pnpm ENOENT`).
+
 ## Why both layers
 
 The defects this repository actually produced fall into two groups that **do not

@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { describe, it, expect, beforeAll } from "vitest";
+import { afterAll, describe, it, expect, beforeAll } from "vitest";
 
 import { jobArgsTree } from "./helpers/jobs.js";
 import {
@@ -75,6 +75,15 @@ let api: ReturnType<typeof ledger>;
 
 beforeAll(async () => {
   api = ledger(await mintToken());
+});
+
+/** 置いた変数は消す。残しても害は無い (値は毎回無作為) が、台帳の broken の試験と同じく後を残さない。 */
+afterAll(async () => {
+  if ((process.env["WINDMILL_TOKEN"] ?? "") === "") return;
+  await fetch(`${WINDMILL}/api/w/${WORKSPACE}/variables/delete/${SECRET_PATH}`, {
+    method: "DELETE",
+    headers: { authorization: `Bearer ${windmillToken()}` },
+  });
 });
 
 describe("クロールごとの値 —— 変数とシークレット", () => {

@@ -17,6 +17,12 @@ pnpm run check       # audit / format / env / typecheck / 単体 / CI との一�
 vitest は必ず「No test files found, exiting with code 1」を先に出し、中に書いたどんなメッセージも
 その後ろに隠れるため。
 
+相手の口は環境変数で差し替えられる（`E2E_WAGGLE_URL`・`E2E_ISSUER_URL`・`E2E_FIXTURES_URL`・
+`E2E_FIXTURES_HOST_URL`・`E2E_SUBJECT`・`E2E_LEDGER_DIR`。既定は `test/e2e/helpers/stack.ts` と
+`crawl-level.e2e.test.ts` の先頭）。台帳の CLI を打つ試験は capture-ledger の checkout が `../capture-ledger` に
+在る前提なので、git worktree から流すときは `E2E_LEDGER_DIR=<capture-ledger の checkout>` を付ける
+（無いと `spawnSync pnpm ENOENT` で落ちる）。
+
 ## なぜ二層とも要るのか
 
 この repo が実際に出した不具合は、**重ならない 2 つの層**に分かれる。
