@@ -136,6 +136,11 @@ API の宛先（`u/admin/waggle_api_url`）は、`CAPTURE_LEDGER_API_URL` を書
 変わるので、そのときは `windmill:capture-ledger-token` をやり直します。issuer を起こし直したときも
 同じ（[トークンの経路](#トークンの経路)）。
 
+スクリプトが `catalog.json` の `params` で `kind: secret` と宣言した名前は、人が Windmill の変数
+`f/waggle_secrets/<名前>` に置く（置き方は[リンクを辿る](/crawl/)の「シークレットは Windmill の変数」）。
+フォルダ `f/waggle_secrets` は `windmill:push` が作る。宣言したスクリプトを使うクロールは、変数が無ければ
+台帳が 400 で名指して始めない。
+
 ### windmill にクロールを許可する
 
 Windmill は capture-ledger を `windmill` という名前で呼ぶ（トークンの `sub`。組織は `acme`）。
@@ -172,7 +177,7 @@ pnpm run fga:grant submitter windmill acme
 
 ```sh
 cd ~/projects/crawler/capture-scheduler
-pnpm run doctor   # 14 本の点検。全部 ✓ なら、クロールが最後まで走る設定になっている
+pnpm run doctor   # 15 本の点検。全部 ✓ なら、クロールが最後まで走る設定になっている
 pnpm run smoke    # capture-fixtures の頁を 1 本撮り、WACZ を取り出せたら「撮れた」
 ```
 
@@ -217,7 +222,7 @@ DNS が覚えるため）。
 見る:
 
 ```
-点検     doctor の 14 本とも ✓
+点検     doctor の 15 本とも ✓
 始める   POST /api/crawls → 202  crawl 545e912c-…  http://capture-fixtures.capture-ledger:8080/plain-html
 待つ     running
 run      http://127.0.0.1:8000/run/01a0ba19-…?workspace=crawler

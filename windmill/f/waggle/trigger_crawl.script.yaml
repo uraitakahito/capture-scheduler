@@ -9,7 +9,8 @@ description: |
   手で始めたクロールとも塞ぎ合う (礼儀の観点ではそれが正しい)。
 
   取り込む形式 (wacz など) は capture-ledger 側の CAPTURE_LEDGER_CAPTURE_FORMATS が決める。
-  ここから渡せるのは limit だけ。
+  ここから渡せるのは limit と、スクリプトが読むクロールごとの variables (名前 → 値) だけ。
+  シークレットは渡さない —— スクリプトが宣言した名前を台帳が Windmill の変数 (f/waggle_secrets/<名前>) に結ぶ。
 lock: "!inline f/waggle/trigger_crawl.script.lock"
 kind: script
 schema:
@@ -19,6 +20,7 @@ schema:
     - waggle_url
     - token
     - limit
+    - variables
     - timeout_ms
   properties:
     limit:
@@ -40,6 +42,11 @@ schema:
       default: null
       format: password
       originalType: string
+    variables:
+      type: object
+      description: スクリプトが読むクロールごとの変数 (名前 → 値)。catalog.json の params で宣言した名前だけ。省けば送らない
+      default: null
+      format: resource-record
     waggle_url:
       type: string
       description: コンテナから見た capture-api の URL

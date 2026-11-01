@@ -2,12 +2,16 @@ import { describe, it, expect } from "vitest";
 import {
   captureHost,
   describeRefusal,
+  given,
   parseEndpoints,
+  resolveSecrets,
+  SECRETS_FOLDER,
   ServerUnavailable,
   type Answer,
   type BusyRetry,
   type Endpoint,
 } from "../windmill/f/waggle/crawl_host.js";
+import { SECRETS_FOLDER_NAME } from "../scripts/doctor/windmill-contents.js";
 
 /**
  * 1 ホストぶんの取り込み。**礼儀と、口の選び方と、結果の判定。**
@@ -642,5 +646,140 @@ describe("ページで走らせるスクリプト", () => {
     const req = await sendWith([script("hide", "preload")]);
     expect(req).not.toHaveProperty("behaviors");
     expect(req.preload).toHaveLength(1);
+  });
+});
+
+/**
+ * **クロールごとの値を運ぶ。** 変数は台帳が固定した名前 → 値、シークレットは `main` が Windmill の
+ * 変数から解いた名前 → 値。この層は中身を見ず、要求の `variables` / `secrets` に載せるだけ。
+ * 頁の中では受け皿の `__bh.vars` / `__bh.secrets` になる (BrowserHive v22.0.0)。
+ */
+describe("クロールごとの値", () => {
+  const formats = { png: false, webp: false, html: false, links: false, mhtml: false, wacz: true };
+  const sendWith = async (extra: {
+    variables?: Record<string, string>;
+    secrets?: Record<string, string>;
+  }) => {
+    const seen: unknown[] = [];
+    await captureHost(
+      [fakeEndpoint("bh-1", { seen })],
+      "m",
+      ["a"],
+      "c1",
+      { formats, signing: false, scripts: [], ...extra },
+      0,
+      0,
+      FAST,
+    );
+    return seen[0] as { variables?: unknown; secrets?: unknown };
+  };
+
+  it("変数とシークレットを、名前 → 値のまま別々の欄に載せる", async () => {
+    const req = await sendWith({
+      variables: { query: "個人情報" },
+      secrets: { api_token: "s3cr3t-value-1234" },
+    });
+    expect(req.variables).toEqual({ query: "個人情報" });
+    expect(req.secrets).toEqual({ api_token: "s3cr3t-value-1234" });
+  });
+
+  it("空なら鍵ごと送らない —— v21 までの BrowserHive は知らない欄を 400 で断る", async () => {
+    const req = await sendWith({ variables: {}, secrets: {} });
+    expect(req).not.toHaveProperty("variables");
+    expect(req).not.toHaveProperty("secrets");
+  });
+
+  it("渡されなければ載せない", async () => {
+    const req = await sendWith({});
+    expect(req).not.toHaveProperty("variables");
+    expect(req).not.toHaveProperty("secrets");
+  });
+
+  it("シークレットの値は結果に出ない", async () => {
+    // 値が在るのは BrowserHive への要求の本文だけ。PageResult に写れば、台帳の行と Windmill の
+    // run の履歴に残る。
+    const results = await captureHost(
+      [fakeEndpoint("bh-1")],
+      "m",
+      ["a"],
+      "c1",
+      { formats, signing: false, scripts: [], secrets: { api_token: "s3cr3t-value-1234" } },
+      0,
+      0,
+      FAST,
+    );
+    expect(JSON.stringify(results)).not.toContain("s3cr3t-value-1234");
+  });
+});
+
+describe("flow が省いた入力", () => {
+  // Windmill CE の実測: flow の schema に在って台帳が送らなかった欄は null で届く (undefined ではない)。
+  it("null も undefined も「無い」", () => {
+    expect(given(null)).toBeUndefined();
+    expect(given(undefined)).toBeUndefined();
+  });
+
+  it("値はそのまま", () => {
+    const sink = { url: "http://capture-ledger:7070/api/sink/c1", token: "tok" };
+    expect(given(sink)).toBe(sink);
+    expect(given({})).toEqual({});
+  });
+});
+
+describe("シークレットを解く", () => {
+  const reads = (values: Record<string, string>) => {
+    const asked: string[] = [];
+    const read = (path: string): Promise<string> => {
+      asked.push(path);
+      const value = values[path];
+      return value === undefined
+        ? Promise.reject(new Error(`Variable ${path} not found`))
+        : Promise.resolve(value);
+    };
+    return { asked, read };
+  };
+
+  it("名前 → path を、名前 → 値にする", async () => {
+    const { asked, read } = reads({ [`${SECRETS_FOLDER}api_token`]: "s3cr3t-value-1234" });
+    await expect(
+      resolveSecrets({ api_token: `${SECRETS_FOLDER}api_token` }, read),
+    ).resolves.toEqual({ api_token: "s3cr3t-value-1234" });
+    expect(asked).toEqual([`${SECRETS_FOLDER}api_token`]);
+  });
+
+  it("フォルダの外の path は読まずに投げ、名前と path を言う", async () => {
+    // 台帳が path を組むので届かないはず。届いたら運ぶ途中で入れ替わったか台帳が壊れたかで、
+    // 黙って他の変数 (waggle_token など) を読んで頁に渡してはいけない。
+    const { asked, read } = reads({ "u/admin/waggle_token": "the-ledger-token" });
+    await expect(resolveSecrets({ api_token: "u/admin/waggle_token" }, read)).rejects.toThrow(
+      /secret api_token: u\/admin\/waggle_token は f\/waggle_secrets\/ の下ではない/,
+    );
+    expect(asked).toEqual([]);
+  });
+
+  it("前方一致で似せた path も外", async () => {
+    // "f/waggle_secrets_x/…" や "f/waggle_secretsx" のような綴りは、フォルダの区切りまで見ないと通る。
+    const { read } = reads({});
+    await expect(resolveSecrets({ a: "f/waggle_secretsx/a" }, read)).rejects.toThrow(/下ではない/);
+    await expect(resolveSecrets({ a: "xf/waggle_secrets/a" }, read)).rejects.toThrow(/下ではない/);
+  });
+
+  it("無い変数は読みが投げたまま (段ごと落ちる)", async () => {
+    const { read } = reads({});
+    await expect(resolveSecrets({ gone: `${SECRETS_FOLDER}gone` }, read)).rejects.toThrow(
+      /not found/,
+    );
+  });
+
+  it("空なら何も読まない", async () => {
+    const { asked, read } = reads({});
+    await expect(resolveSecrets({}, read)).resolves.toEqual({});
+    expect(asked).toEqual([]);
+  });
+
+  it("doctor が見るフォルダの名前と同じ", () => {
+    // crawl_host (bun で走る) と doctor (node) は import し合えないので、定数が 2 つ在る。
+    // 片方だけ直すと、doctor は ✓ なのに crawl_host が断る (または逆) になる。
+    expect(SECRETS_FOLDER).toBe(`f/${SECRETS_FOLDER_NAME}/`);
   });
 });

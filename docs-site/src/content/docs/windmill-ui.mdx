@@ -169,7 +169,10 @@ BrowserHive's `.proto` lived there, under the States tab).
 
 Open `trigger_crawl` and there is a Run form. The schema descriptions read in
 Japanese (`waggle_url` = the capture-api as seen from a container, `token` =
-the dev issuer's JWT, omit `limit` to seed every enabled row).
+the dev issuer's JWT, omit `limit` to seed every enabled row). `variables` takes the variables a
+script declared in its `params`, as name → value JSON (leave it out and nothing is sent; an unknown
+name is refused by the ledger with a 400 that names it). The picture below was taken before the
+`variables` field existed.
 
 <Image src={trigger} alt="The trigger_crawl Run form: Waggle Url, Token, Limit inputs" />
 
@@ -183,13 +186,14 @@ webhook, which is why `daily` passes values from variables instead.
 schedule). Variables are provisioned by a separate script. Confuse the two and
 push stays green while the flow dies on its first `getVariable`.
 
-| Path                            | Contents                                                                                                                                                  | Provisioned by                  |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| `u/admin/waggle_token`          | JWT for capture-ledger (secret)                                                                                                                           | `windmill:capture-ledger-token` |
-| `u/admin/waggle_api_url`        | Where the capture-ledger API is (default: the gateway of the `default` network)                                                                           | same                            |
-| `u/admin/browserhive_endpoints` | JSON array of BrowserHive URLs, one per BrowserHive (default `["http://browserhive-1.capture-ledger:50051","http://browserhive-2.capture-ledger:50051"]`) | same                            |
-| `u/admin/browserhive_tls_ca`    | CA for `https://` endpoints (empty = plaintext `http://`)                                                                                                 | same                            |
-| `u/admin/ts_compile_url`        | Where ts-compile-service is (default `http://ts-compile.capture-scheduler:8080`)                                                                          | same                            |
+| Path                            | Contents                                                                                                                                                  | Provisioned by                                                                             |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `u/admin/waggle_token`          | JWT for capture-ledger (secret)                                                                                                                           | `windmill:capture-ledger-token`                                                            |
+| `u/admin/waggle_api_url`        | Where the capture-ledger API is (default: the gateway of the `default` network)                                                                           | same                                                                                       |
+| `u/admin/browserhive_endpoints` | JSON array of BrowserHive URLs, one per BrowserHive (default `["http://browserhive-1.capture-ledger:50051","http://browserhive-2.capture-ledger:50051"]`) | same                                                                                       |
+| `u/admin/browserhive_tls_ca`    | CA for `https://` endpoints (empty = plaintext `http://`)                                                                                                 | same                                                                                       |
+| `u/admin/ts_compile_url`        | Where ts-compile-service is (default `http://ts-compile.capture-scheduler:8080`)                                                                          | same                                                                                       |
+| `f/waggle_secrets/<name>`       | A secret a script declared in the `params` of its `catalog.json`. `crawl_host` resolves it and hands it to BrowserHive only ([Following links](/crawl/))  | **a person** (`pnpm run windmill:cli variable add`); the folder comes from `windmill:push` |
 
 The endpoints are `http(s)://` URLs since BrowserHive v12. `crawl_host` refuses
 the `host:port` form of v11 and names this variable, and

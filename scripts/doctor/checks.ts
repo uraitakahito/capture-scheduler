@@ -1,5 +1,5 @@
 /**
- * doctor の点検 14 本 (e2e のときは 16 本)。**クイックスタートの手の順に並べてある。**
+ * doctor の点検 15 本 (e2e のときは 17 本)。**クイックスタートの手の順に並べてある。**
  *
  * 1 本ずつ「クイックスタートのどの手が済んでいるか」を、その手が作るものに訊く。立っているか
  * だけでなく、**クロールが最後まで走る設定か**まで見る —— 外れていても、API に POST すれば
@@ -35,8 +35,10 @@ import { SECTIONS } from "./sections.js";
 import {
   readCatalog,
   readPush,
+  readSecretsFolder,
   readVariables,
   readWorkspace,
+  SECRETS_FOLDER_NAME,
   VARIABLES,
   type Answer,
   type Deployed,
@@ -461,6 +463,16 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
     where: "script の中身が repo と同じか・flow と schedule が在るか",
     needs: ["workspace"],
     probe: pushed,
+  },
+  {
+    name: "シークレットのフォルダ",
+    section: SECTIONS.bringUp,
+    // push が作る物なので、push と同じ節・同じ親。別の点検にしてあるのは、✗ の直し方が
+    // 「folder.meta.yaml を git に置いて push」で、script の差とは違う話だから。
+    where: `folders/exists/${SECRETS_FOLDER_NAME} (スクリプトのシークレットの置き場。push が作る)`,
+    needs: ["workspace"],
+    probe: async () =>
+      readSecretsFolder(await windmill(inWorkspace(`folders/exists/${SECRETS_FOLDER_NAME}`))),
   },
   {
     name: "capture-ledger api",

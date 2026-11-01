@@ -9,13 +9,19 @@ pnpm run test:e2e    # 1 end-to-end test, needs the stack
 pnpm run check       # audit, format, env, typecheck, unit tests, CI parity, docs site
 ```
 
-`pretest:e2e` runs doctor with `--e2e` first and names what is missing — the 14 checks of
+`pretest:e2e` runs doctor with `--e2e` first and names what is missing — the 15 checks of
 [the quickstart's "Check it"](/quickstart/#check-it-take-one-capture), plus capture-fixtures and
-the crawl permission for `e2e`, the name the test uses (`fga:grant submitter e2e acme`): 16 in
+the crawl permission for `e2e`, the name the test uses (`fga:grant submitter e2e acme`): 17 in
 all. It checks not just that things are up but that a crawl can run to the end — miss any of
 these and a crawl fails only at its level report, staying `running`. It lives outside vitest
 deliberately: vitest prints "No test files found, exiting with code 1" whenever a global setup
 throws, and no message written inside can survive that.
+
+The endpoints can be overridden through environment variables (`E2E_WAGGLE_URL`, `E2E_ISSUER_URL`,
+`E2E_FIXTURES_URL`, `E2E_FIXTURES_HOST_URL`, `E2E_SUBJECT`, `E2E_LEDGER_DIR`; the defaults are at the top
+of `test/e2e/helpers/stack.ts` and `crawl-level.e2e.test.ts`). The test that drives the ledger's CLI
+assumes a capture-ledger checkout at `../capture-ledger`, so when running from a git worktree pass
+`E2E_LEDGER_DIR=<capture-ledger checkout>` (without it the test fails with `spawnSync pnpm ENOENT`).
 
 ## Why both layers
 
@@ -52,8 +58,8 @@ cost a round trip.
 Each test starts a crawl through capture-ledger's API — **not** Windmill's run endpoint —
 because the point is to carry the arguments capture-ledger actually sends:
 `crawl_id`, `depth`, `frontier`, `per_host_delay_ms`, `host_parallelism`,
-`capture_formats`, `signing`, `scripts`, and `artifact_sink` where capture-ledger serves
-the sink. **`respect_robots` is not among them.**
+`capture_formats`, `signing`, `scripts`, `variables`, `secrets`, and `artifact_sink` where
+capture-ledger serves the sink. **`respect_robots` is not among them.**
 
 The first one asserts four things:
 
@@ -97,6 +103,18 @@ log, which counts every request by its full URL, query string included.
   inline script raises hundreds of diagnostics. The test checks that `error` names the count and
   stays within the ledger's 2,000 characters, and that the next crawl is accepted. Up to v0.24.2
   the reason carried every diagnostic, the ledger refused it, and the crawl stayed `running`.
+- **A per-crawl variable reaches the page.** The value sent as `variables` on `POST /api/crawls` is
+  read by an inline script (declared through `params`) from `__bh.vars` and fetched as
+  `/plain-html?var=<value>`. The same value appears in the ledger's `GET /api/crawls/:id` under
+  `variables` and in the WACZ's `datapackage.json` under `settings.variables`.
+- **A secret reaches the page and leaves no trace in the records.** The test puts a random value in
+  `f/waggle_secrets/e2e_probe`; the inline script sends only the length of `__bh.secrets.e2e_probe`
+  as `/plain-html?len=<length>`. The value itself is in none of the WACZ members, the ledger's
+  answers, or the arguments of the Windmill runs; `settings.secrets` carries the name only. The
+  control is a capture that sends the same value as a variable — the same search finds it in that
+  WACZ.
+- **A required secret missing from Windmill is refused by the ledger with a 400 that names it, and
+  no crawl row is created.**
 
 ## The nightly loop refuses to guess
 

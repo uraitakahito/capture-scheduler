@@ -56,6 +56,8 @@ describe("本物の点検の並び", () => {
         "変数",
         // スクリプトは can_submit の子。親が飛ばされれば、こちらも飛ばされる。
         "スクリプト",
+        // シークレットのフォルダは push と同じく workspace の子。
+        "シークレットのフォルダ",
       ].sort(),
     );
     for (const r of skipped) expect(r).toMatchObject({ reason: "先に windmill を" });
@@ -69,9 +71,9 @@ describe("本物の点検の並び", () => {
     expect(stateOf(results, "can_submit")).toMatchObject({ state: "skip", reason: "先に jwt を" });
   });
 
-  it("点検は 14 本で、e2e のときだけ 2 本増える", () => {
-    expect(CHECKS.filter((c) => c.e2eOnly !== true)).toHaveLength(14);
-    expect(CHECKS).toHaveLength(16);
+  it("点検は 15 本で、e2e のときだけ 2 本増える", () => {
+    expect(CHECKS.filter((c) => c.e2eOnly !== true)).toHaveLength(15);
+    expect(CHECKS).toHaveLength(17);
   });
 
   it("親は必ず子より前に並ぶ (報告がクイックスタートの順に読め、循環も無い)", () => {

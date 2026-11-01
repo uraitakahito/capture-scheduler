@@ -97,6 +97,35 @@ export const readPush = (items: readonly Deployed[]): Verdict => {
   };
 };
 
+/**
+ * スクリプトのシークレット (`catalog.json` の `params` の `kind: secret`) を置くフォルダの名前。
+ * 人が `wmill variable add f/waggle_secrets/<名前> --value … --secret` で置き、`crawl_host` が解く。
+ *
+ * フォルダそのものは `windmill/f/waggle_secrets/folder.meta.yaml` が正で、`windmill:push` が作る。
+ * **API や UI で作ってはいけない** —— `wmill sync push` は手元に folder.meta.yaml の無いフォルダを
+ * リモートから消す (2026-11-01 に dry-run で確かめた)。`crawl_host.ts` の `SECRETS_FOLDER` と同じ名前
+ * (食い違いは `test/crawl-host.test.ts` が止める)。
+ */
+export const SECRETS_FOLDER_NAME = "waggle_secrets";
+
+/**
+ * `folders/exists/<name>` の答え。無ければ push を言う —— 変数と違って、フォルダは git の物。
+ * 変数 (`u/admin/*`) が `windmill:capture-ledger-token` なのに対し、こちらは `windmill:push`。
+ */
+export const readSecretsFolder = (answer: Answer): Verdict => {
+  const exists = answer.status === 200 ? parse(answer.body) : undefined;
+  if (exists === true) return { ok: true };
+  if (exists === false) {
+    return {
+      ok: false,
+      need:
+        `フォルダ f/${SECRETS_FOLDER_NAME} が無い → pnpm run windmill:push ` +
+        `(windmill/f/${SECRETS_FOLDER_NAME}/folder.meta.yaml が作る。API や UI で作った物は次の push で消える)`,
+    };
+  }
+  return { ok: false, need: `folders/exists/${SECRETS_FOLDER_NAME} → ${shown(answer)}` };
+};
+
 /** flow と点検が読む変数。`windmill:capture-ledger-token` が 5 つとも入れる。 */
 export const VARIABLES = [
   "u/admin/waggle_token",

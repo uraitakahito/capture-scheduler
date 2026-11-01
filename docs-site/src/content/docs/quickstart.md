@@ -136,6 +136,11 @@ The API address (`u/admin/waggle_api_url`) comes from the gateway of the `defaul
 network is recreated; re-run `windmill:capture-ledger-token` then. Do the same after restarting the
 issuer ([How the token gets there](#how-the-token-gets-there)).
 
+Names a script declares as `kind: secret` in the `params` of its `catalog.json` are placed by a
+person in Windmill variables `f/waggle_secrets/<name>` (how: "Secrets are Windmill variables" on
+[Following links](/crawl/)). The folder `f/waggle_secrets` is created by `windmill:push`. A crawl
+that uses such a script is refused by the ledger with a 400 naming the missing variable.
+
 ### Let windmill start crawls
 
 Windmill calls capture-ledger under the name `windmill` (the token's `sub`; organization `acme`).
@@ -173,7 +178,7 @@ command to type, with the names capture-ledger actually saw.
 
 ```sh
 cd ~/projects/crawler/capture-scheduler
-pnpm run doctor   # 14 checks; all ✓ means a crawl is set up to run to the end
+pnpm run doctor   # 15 checks; all ✓ means a crawl is set up to run to the end
 pnpm run smoke    # captures a capture-fixtures page once; "撮れた" (captured) once the WACZ comes back
 ```
 
@@ -218,7 +223,7 @@ waits for the level report — then fetches the archive the ledger recorded thro
 and checks that it starts with `PK` (a WACZ is a zip):
 
 ```
-点検     doctor の 14 本とも ✓
+点検     doctor の 15 本とも ✓
 始める   POST /api/crawls → 202  crawl 545e912c-…  http://capture-fixtures.capture-ledger:8080/plain-html
 待つ     running
 run      http://127.0.0.1:8000/run/01a0ba19-…?workspace=crawler

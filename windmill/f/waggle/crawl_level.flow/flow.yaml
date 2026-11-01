@@ -89,6 +89,16 @@ value:
                 artifact_sink:
                   type: javascript
                   expr: flow_input.artifact_sink
+                # クロールごとの値。**flow は運ぶだけで中身を見ない。** variables は名前 → 値で、
+                # BrowserHive が記録に残す。secrets は名前 → Windmill の変数の path で、値に解くのは
+                # crawl_host (f/waggle_secrets/ の下だけ)。古い台帳はどちらも送らないので null で届き、
+                # crawl_host が「無い」と読む。
+                variables:
+                  type: javascript
+                  expr: flow_input.variables
+                secrets:
+                  type: javascript
+                  expr: flow_input.secrets
             # **BrowserHive が全部居ないときだけ** crawl_host は投げる (ServerUnavailable)。
             # 1 ページの失敗は投げずに結果に載せるので、ここで再試行されるのは
             # 「口が 1 つも無い」状態だけ —— 再起動を待つぶんの間隔で 2 回。
@@ -249,9 +259,24 @@ schema:
           type: string
         token:
           type: string
+    variables:
+      # クロールごとの変数。capture-ledger がクロールの頼みから固定し、v0.67.0 から**必ず送る**
+      # (無ければ {})。flow は運ぶだけで中身を見ない。BrowserHive が記録に残す。
+      type: object
+      description: クロールごとの変数 (名前 → 値)。スクリプトが __bh.vars で読む。値は記録に残る
+      additionalProperties:
+        type: string
+    secrets:
+      # クロールごとのシークレット。値ではなく **Windmill の変数の path** (f/waggle_secrets/<名前>) で
+      # 届き、crawl_host が getVariable で解いて BrowserHive にだけ渡す。flow の入力にも run の履歴にも
+      # 値は現れない。
+      type: object
+      description: クロールごとのシークレット (名前 → Windmill の変数の path)。crawl_host が解き、スクリプトが __bh.secrets で読む。値は記録に残らない
+      additionalProperties:
+        type: string
   # capture-ledger が送るのは crawl_id / depth / frontier / 間隔 / 並列度 /
-  # capture_formats / signing / scripts と、受け口を出している配備では artifact_sink。並列度は
-  # plan_level が BrowserHive の口の数で頭打ちにしてから for-loop に渡る。
+  # capture_formats / signing / scripts / variables / secrets と、受け口を出している配備では
+  # artifact_sink。並列度は plan_level が BrowserHive の口の数で頭打ちにしてから for-loop に渡る。
   # capture-ledger は自分がコンテナからどう見えるかを知らないし、issuer の鍵も持っていない。
   #
   # **下の default は webhook からの実行では埋まらない。** 実測: 必須の引数だけ渡して

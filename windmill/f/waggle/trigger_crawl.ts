@@ -3,8 +3,9 @@
  *
  * Windmill が決めるのは「いつ」だけ。「何を・どう投げるか」は capture-ledger の側にある
  * (対象の一覧は `capture_targets`、取り込む形式は `CAPTURE_LEDGER_CAPTURE_FORMATS`)。
- * ここから渡せるのは `limit` だけで、それも省ける —— 知らない鍵を送ると capture-ledger は
- * 400 を返す。
+ * ここから渡せるのは `limit` と、スクリプトが読むクロールごとの `variables` (名前 → 値) だけで、
+ * どちらも省ける —— 知らない鍵を送ると capture-ledger は 400 を返す。シークレットは渡さない:
+ * スクリプトが宣言した名前を、台帳が Windmill の変数 (`f/waggle_secrets/<名前>`) に結ぶ。
  *
  * ## なぜ「クロール」なのか
  *
@@ -103,6 +104,12 @@ export async function main(
    * 書けるようにする。
    */
   poll_interval_ms: number = POLL_INTERVAL_MS,
+  /**
+   * スクリプトが読むクロールごとの変数 (名前 → 値)。**在るときだけ本文に載せる** —— 空の `{}` も
+   * 送らない。名前はスクリプトが `catalog.json` の `params` で宣言した物に限る (知らない名前は
+   * capture-ledger が 400 で名指す)。日次の schedule は渡さないので、既定は無い。
+   */
+  variables?: Record<string, string>,
 ): Promise<Result> {
   const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
 
@@ -110,7 +117,13 @@ export async function main(
     method: "POST",
     headers,
     // `fromTargets` が「登録済みの一覧を全部」。深さは capture-ledger が 0 にする。
-    body: JSON.stringify({ fromTargets: limit === undefined ? {} : { limit } }),
+    // UI の実行フォームは省いた引数を `null` で渡すことがあるので、`undefined` と同じに読む。
+    body: JSON.stringify({
+      fromTargets: limit === undefined || limit === null ? {} : { limit },
+      ...(variables === undefined || variables === null || Object.keys(variables).length === 0
+        ? {}
+        : { variables }),
+    }),
   });
 
   if (started.status === 409) {

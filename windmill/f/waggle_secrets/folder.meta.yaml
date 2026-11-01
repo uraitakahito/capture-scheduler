@@ -1,0 +1,4 @@
+summary: スクリプトのシークレットの置き場。catalog.json の params で kind を secret と宣言した名前を、人が wmill variable add --secret で置き、crawl_host が getVariable で解く。この外の path は crawl_host が断る
+display_name: スクリプトのシークレット
+extra_perms: {}
+owners: []

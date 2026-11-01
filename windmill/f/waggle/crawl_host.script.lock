@@ -15,6 +15,6 @@
     },
   },
   "packages": {
-    "windmill-client": ["windmill-client@1.817.0", "", {}, "sha512-Jsbtb/8e4frKMuIEJKLayMKcONnCtmzVfnk05EegZvlO/g0ZcF9mg1ACT0NnWFEbFt1c0qtT/nYlESEu26f+nA=="],
+    "windmill-client": ["windmill-client@1.855.1", "", {}, "sha512-LfkEv4hVKK6MWSssgPY47Dl8aONvZr0epls680WI2L2piX7bHmvjsGcYeks1x2oUx0E1e0s2y2mLbl1YIcNHCA=="],
   }
 }

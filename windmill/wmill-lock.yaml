@@ -3,10 +3,11 @@ locks:
   f/waggle/_shape_probe.flow+__flow_hash: 823a7723bac4970dbfaa01e4a9153f6d34bd8f0a0d78384ced90c02503c79564
   f/waggle/_shape_probe.flow+c.inline_script.ts: 5c29c6745f0637db467439be56f5427bb062bed875618535f8a45a7e5c66b9ef
   f/waggle/compile_scripts: 81deae3ce0ba1fa101ab59d0090e3958aaa42f7c5b6b5be76a64a8f7bc6be558
-  f/waggle/crawl_host: 8b0022755df5f7fe3d4c2598a94393798e21dd71fab8a2f72d58123888c551b9
+  f/waggle/crawl_host: ce901cec37a8917d6580065e6ff9ee15c53b8b857cfd5cfaf45454ee942fb6af
   f/waggle/crawl_level.flow+__flow_hash: 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a
   f/waggle/index_level: 5b53af7f9c30c9aead40b2cb3afdb85bf3ea126993957858033cf94840688d5f
   f/waggle/inspect_crawl: ec5dad413bfa7ee0e1e0000b7e336dc208ddc83a433b915296281d89ee1e8724
   f/waggle/inspect_domain: 1f7d1189e4dc52d8fc31ae197cd3fb8ce324f3c207c835d8abc1fc51573318da
   f/waggle/plan_level: b9bba21a0cb4759ee2d91650ebb4cb808720e45f006214345a223c24383fa043
   f/waggle/report_level: e99b71fef3b0e78459dd01e055c8d057f85cf2fd3516be51d5da55b5d1df1188
+  f/waggle/trigger_crawl: a5abb8fa7281a11fa5c71b6d295d8efc6f4ff62281275e6e6662697d8b6fe274

@@ -113,8 +113,9 @@ runs**, so a webhook run gets nothing — the BrowserHive target arrived
 `undefined` and the job died with "Channel target must be a string".
 
 What does arrive as arguments is what capture-ledger decides for that crawl and always
-sends: the URLs, the delay, `capture_formats` / `signing`, and **`scripts`** — the
-TypeScript to run inside each page. The ledger keeps it as written (its `sha256` is over the
+sends: the URLs, the delay, `capture_formats` / `signing`, **`scripts`** — the
+TypeScript to run inside each page — and **`variables` / `secrets`**, the per-crawl values
+([the section below](#per-crawl-values--variables-and-secrets)). The ledger keeps it as written (its `sha256` is over the
 TypeScript bytes); `compile_scripts` turns it into JavaScript and re-hashes it, and BrowserHive
 checks the JavaScript's hash. The two hashes meet at that one step. `report_level` then carries
 the JavaScript hash, with the compiler version and the host-types tag the service answered
@@ -160,3 +161,49 @@ there is no contract file to keep in sync — until v0.22 this repo carried a co
 BrowserHive's gRPC `.proto` as a Windmill resource, with a guard to catch it rotting.
 The endpoints are therefore `http(s)://` URLs; `crawl_host` refuses the old
 `host:port` form and names the variable.
+
+## Per-crawl values — variables and secrets
+
+A script receives values that differ from crawl to crawl through two slots. They are declared in
+the `params` of [capture-scripts](https://github.com/uraitakahito/capture-scripts)' `catalog.json`
+(from v0.6.0) and read through BrowserHive v22.0.0's host object, `__bh.vars` / `__bh.secrets`.
+**The flow carries both and looks at neither.**
+
+| Slot        | What the ledger sends                                                                                                                    | What `crawl_host` does                                                                                                     | What the records keep                                                                             |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `variables` | name → value; what was asked for as `variables` on `POST /api/crawls`, pinned on the crawl                                               | puts them on the BrowserHive request as they are                                                                           | the values (`settings.variables` in the WACZ, the crawl row)                                      |
+| `secrets`   | name → the path of a Windmill variable (`f/waggle_secrets/<name>`); the ledger collects them from the declarations and checks they exist | resolves each with `getVariable` and puts the values on the BrowserHive request **only**; a path outside the folder throws | the names only (`settings.secrets` in the WACZ; the crawl row keeps the path and when it was set) |
+
+An empty slot is not sent at all (BrowserHive up to v21 refuses unknown fields with a 400). An older
+ledger sends neither, so they arrive from the flow as `null`, which `crawl_host` reads as absent —
+`artifact_sink` now gets the same treatment (it used to check `undefined` only and sent `null` when
+the sink was left out).
+
+### Secrets are Windmill variables
+
+Only Windmill holds the value. A person puts it there ahead of time (`--secret` is the default for a
+new variable; it is spelled out anyway):
+
+```sh
+pnpm run windmill:cli variable add '<value>' f/waggle_secrets/<name> --secret --description '<what the key is for>'
+```
+
+- The name is the one the script declared (`^[a-z][a-z0-9_]*$`). The ledger builds the path, and
+  `crawl_host` throws, naming the secret, on any path outside `f/waggle_secrets/`.
+- The folder `f/waggle_secrets` is owned by `windmill/f/waggle_secrets/folder.meta.yaml` and created by
+  `windmill:push`. **A folder created through the API or the UI disappears on the next push** (`wmill sync
+push` deletes remote folders that are absent locally). The variables inside are not synced
+  (`skipVariables`), so a push neither removes nor adds them. The "シークレットのフォルダ" line of
+  `pnpm run doctor` checks that the folder is there.
+- A declared secret that is missing from Windmill makes the ledger refuse the crawl with a 400 naming it
+  and its path, before anything starts. One that disappears mid-crawl makes `crawl_host` throw, the level
+  fails, and `fail_crawl` closes the crawl.
+- The value travels only in the request body from the Windmill worker to BrowserHive. The run history
+  shows the path. Windmill masks whole occurrences of a secret's value in job logs as `zzp*****c3b`
+  (measured on 1.806.0; substrings are not masked), but `crawl_host` never logs values in the first
+  place (it logs the names). What BrowserHive does on its side — keep it out of the archive, mask it in
+  its logs, and the fact that page JavaScript can read it — is in BrowserHive's docs.
+
+`trigger_crawl` (the nightly run) accepts `variables` too. It does not take secrets — the ledger binds
+the names a script declared to the Windmill variables, so a nightly crawl and a hand-started one get the
+same values.
