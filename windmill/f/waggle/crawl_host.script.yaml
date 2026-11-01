@@ -89,6 +89,11 @@ schema:
             description: ""
             originalType: string
       originalType: record[]
+    secrets:
+      type: object
+      description: ""
+      default: null
+      format: resource-record
     signing:
       type: boolean
       description: ""
@@ -100,6 +105,11 @@ schema:
       items:
         type: string
       originalType: string[]
+    variables:
+      type: object
+      description: ""
+      default: null
+      format: resource-record
   required:
     - crawl_id
     - host

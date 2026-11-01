@@ -6,6 +6,7 @@
   ],
   "//devDependencies": {
     "puppeteer": "docs のスクリーンショット撮影 (scripts/docs-shots.mjs) 専用。配備にも flow の実行にも CI にも使わない —— Windmill の UI を開いて撮るためだけに Chromium を使う。重いのは承知で、誰のマシンでも同じ絵が出ることを優先した (puppeteer-core + 手元の Chrome では再現性が崩れる)。version は pin。ビルド (Chromium 取得) は pnpm-workspace.yaml の allowBuilds で false にし、.npmrc の PUPPETEER_SKIP_DOWNLOAD でも抑えている (CI で 150MB を毎回 DL しない)。撮る人は初回だけ手で `./node_modules/.bin/puppeteer browsers install chrome` する。撮り直しの手順は docs の development ページ。puppeteer を消すときはこの註と allowBuilds の puppeteer 行、.npmrc の該当行も消すこと。",
+    "fflate": "e2e (test/e2e/helpers/wacz.ts) が台帳から取り出した WACZ (zip) を開き、中の全 member を読むためだけに要る。配備にも flow の実行にも単体にも使わない。WARC の gzip は node:zlib で解く (組み込みで足りる) ので、ここに要るのは zip の側だけ。",
     "sharp": "docs サイトの画像最適化 (astro:assets の <Image>) が要求する。windmill-ui のスクリーンショットを配信サイズに落とすためだけに要る。site:build (= CI の site job) が使う。撮影の puppeteer とは別で、こちらは CI でも走る。"
   },
   "version": "0.1.0",
@@ -22,6 +23,8 @@
     "windmill:push": "pnpm run build:scripts && node --env-file-if-exists=.env --env-file-if-exists=.env.local dist/scripts/wmill.js sync push --yes",
     "windmill:pull": "pnpm run build:scripts && node --env-file-if-exists=.env --env-file-if-exists=.env.local dist/scripts/wmill.js sync pull --yes",
     "windmill:diff": "pnpm run build:scripts && node --env-file-if-exists=.env --env-file-if-exists=.env.local dist/scripts/wmill.js sync push --dry-run",
+    "windmill:metadata": "pnpm run build:scripts && node --env-file-if-exists=.env --env-file-if-exists=.env.local dist/scripts/wmill.js generate-metadata --yes",
+    "windmill:cli": "pnpm run build:scripts && node --env-file-if-exists=.env --env-file-if-exists=.env.local dist/scripts/wmill.js",
     "check-env": "pnpm run build:scripts && node dist/scripts/check-env.js",
     "audit": "pnpm audit --audit-level=low",
     "format": "prettier --write .",
@@ -47,6 +50,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.5.0",
+    "fflate": "0.8.3",
     "prettier": "3.6.2",
     "puppeteer": "25.13.0",
     "robots-parser": "3.0.1",

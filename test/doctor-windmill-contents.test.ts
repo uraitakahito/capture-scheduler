@@ -10,8 +10,10 @@ import { describe, expect, it } from "vitest";
 import {
   readCatalog,
   readPush,
+  readSecretsFolder,
   readVariables,
   readWorkspace,
+  SECRETS_FOLDER_NAME,
   VARIABLES,
   type Deployed,
 } from "../scripts/doctor/windmill-contents.js";
@@ -146,6 +148,28 @@ describe("readVariables", () => {
     exists.delete("u/admin/browserhive_tls_ca");
     expect(need(readVariables(exists))).toBe(
       "変数が無い: u/admin/waggle_api_url・u/admin/browserhive_tls_ca → pnpm run windmill:capture-ledger-token",
+    );
+  });
+});
+
+describe("readSecretsFolder", () => {
+  // folders/exists の答えは variables/exists と同じく、素の真偽値の本文で 200 (2026-11-01 実測)。
+  it("在れば ✓", () => {
+    expect(readSecretsFolder({ status: 200, body: "true" })).toEqual({ ok: true });
+  });
+
+  it("無ければ push を言う —— 変数と違って、フォルダは git の物", () => {
+    // API や UI で作っても次の push で消える (wmill sync push は手元に無いフォルダを消す) ので、
+    // 直し方は capture-ledger-token ではなく push。
+    const verdict = readSecretsFolder({ status: 200, body: "false" });
+    expect(need(verdict)).toMatch(/^フォルダ f\/waggle_secrets が無い → pnpm run windmill:push /);
+    expect(need(verdict)).toContain(`windmill/f/${SECRETS_FOLDER_NAME}/folder.meta.yaml`);
+    expect(need(verdict)).not.toMatch(/capture-ledger-token/);
+  });
+
+  it("読めない答えは、そのまま出す", () => {
+    expect(need(readSecretsFolder({ status: 500, body: "boom" }))).toBe(
+      "folders/exists/waggle_secrets → 500 boom",
     );
   });
 });

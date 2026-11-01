@@ -93,6 +93,18 @@ export interface CaptureSettings {
    * 入らない —— この層は中身を見ないし、作りもしない。
    */
   artifactSink?: { url: string; token: string };
+  /**
+   * クロールごとの変数 (名前 → 値)。**capture-ledger がクロールの頼みから固定して渡す。**
+   * 値は BrowserHive が記録に残す (datapackage.json の `settings.variables`)。この層は中身を見ない。
+   */
+  variables?: Record<string, string>;
+  /**
+   * クロールごとのシークレット (名前 → **解いた後の値**)。解くのは `main` —— 台帳が渡すのは
+   * Windmill の変数の path で、`resolveSecrets` が `f/waggle_secrets/` の下だけを `getVariable` で読む。
+   * BrowserHive は値をどこにも書かず、`settings.secrets` に名前だけ残す。ここでも log にも
+   * `PageResult` にも出さない —— 値が在るのは BrowserHive への要求の本文だけ。
+   */
+  secrets?: Record<string, string>;
 }
 
 /**
@@ -426,6 +438,51 @@ const toPreload = (scripts: CrawlScript[]): Record<string, unknown> => {
 };
 
 /**
+ * 名前 → 文字列の袋を、空なら鍵ごと送らない形にする。`{}` を送ることと省くことは受け側では同じで、
+ * v21 までの BrowserHive は知らない欄を 400 で断るので、空のときに鍵が無いほうが安全。
+ */
+const bagOf = (key: string, bag: Record<string, string> | undefined): Record<string, unknown> =>
+  bag === undefined || Object.keys(bag).length === 0 ? {} : { [key]: bag };
+
+/**
+ * flow が省いた入力は **`null` で届く** (Windmill CE の実測。`undefined` ではない)。どちらも「無い」と
+ * 読む。`artifact_sink` もこれを通す —— 以前は `=== undefined` しか見ておらず、省いた配備では
+ * `artifactSink: null` を BrowserHive に送っていた。**export は試験のため。**
+ */
+export const given = <T>(value: T | null | undefined): T | undefined =>
+  value === null ? undefined : value;
+
+/**
+ * スクリプトのシークレットを置くフォルダ。**この外の path は解かない。** path を組むのは台帳で、
+ * 台帳も同じ線で断る (二重の検査) —— ここまで外の path が届いたなら、運ぶ途中で入れ替わったか
+ * 台帳が壊れたかのどちらかで、黙って読んでよい物ではない。doctor の `SECRETS_FOLDER_NAME`
+ * (`scripts/doctor/windmill-contents.ts`) と同じ名前。食い違いは試験が止める。
+ */
+export const SECRETS_FOLDER = "f/waggle_secrets/";
+
+/**
+ * 名前 → Windmill の変数の path を、名前 → 値に解く。**値はここで初めて現れ、BrowserHive への
+ * 要求の本文にだけ載る** —— log にも `PageResult` にも出さない。
+ *
+ * 無い変数は `getVariable` が投げる (段ごと落ち、`fail_crawl` が締める)。台帳は始める前に在るかを
+ * 訊いているので、ここで落ちるのは「クロールの途中で消された」とき。`read` は試験のため。
+ */
+export const resolveSecrets = async (
+  refs: Record<string, string>,
+  read: (path: string) => Promise<string> = (path) => wmill.getVariable(path),
+): Promise<Record<string, string>> =>
+  Object.fromEntries(
+    await Promise.all(
+      Object.entries(refs).map(async ([name, path]): Promise<[string, string]> => {
+        if (!path.startsWith(SECRETS_FOLDER)) {
+          throw new Error(`secret ${name}: ${path} は ${SECRETS_FOLDER} の下ではない`);
+        }
+        return [name, await read(path)];
+      }),
+    ),
+  );
+
+/**
  * 1 件取り込む。1 往復で答えが返る —— 待つのは deadline だけ。
  *
  * **report が `success` でなければ失敗**。一過性の型 (`RETRYABLE`) なら間隔を空けて
@@ -457,6 +514,10 @@ const captureOne = async (
     ...toPreload(capture.scripts),
     // 在れば BrowserHive はここへ押し出し、自前の保管庫へは書かない。
     ...(capture.artifactSink === undefined ? {} : { artifactSink: capture.artifactSink }),
+    // クロールごとの値。変数は受け皿の `__bh.vars`、シークレットは `__bh.secrets` で頁に届く。
+    // 空なら鍵ごと送らない。
+    ...bagOf("variables", capture.variables),
+    ...bagOf("secrets", capture.secrets),
   };
 
   for (let attempt = 1; ; attempt += 1) {
@@ -603,8 +664,22 @@ export async function main(
    * 同時に生きる。ここを必須にすると、受け口を建てていない配備が動かなくなる。
    *
    * flow は運ぶだけで中身を見ない —— 発行するのも、置き場所を決めるのも capture-ledger。
+   * 省いた配備からは `null` で届く (`given`)。
    */
   artifact_sink?: { url: string; token: string },
+  /**
+   * クロールごとの変数 (名前 → 値)。capture-ledger がクロールの頼みから固定し、**必ず送る**
+   * (無ければ `{}`)。値は BrowserHive が記録に残す。古い台帳からは届かず `null` になるので、
+   * それも「無い」と読む (`given`)。
+   */
+  variables?: Record<string, string>,
+  /**
+   * クロールごとのシークレット (名前 → Windmill の変数の path)。capture-ledger がスクリプトの宣言
+   * (`catalog.json` の `params` の `kind: secret`) から集め、在るかを確かめてから**必ず送る**
+   * (無ければ `{}`)。path は `f/waggle_secrets/` の下に限る。**値を解くのはここ**で、解いた値は
+   * BrowserHive への要求にだけ載せる。
+   */
+  secrets?: Record<string, string>,
 ): Promise<PageResult[]> {
   // **設定は変数から読む。引数では受けない。**
   // Windmill は schema の既定値を UI からの実行にしか埋めない —— webhook で起こすと
@@ -615,6 +690,13 @@ export async function main(
   // 黙って平文に落ちると、TLS のつもりの配備が気づかないまま平文で喋る。
   const caPem = await wmill.getVariable("u/admin/browserhive_tls_ca");
   const endpoints = targets.map((target) => httpEndpoint(target, caPem));
+  // シークレットは段の最初に 1 度だけ解く。log に出すのは名前だけ (値はどこにも出さない)。
+  const refs = given(secrets) ?? {};
+  const resolved = await resolveSecrets(refs);
+  if (Object.keys(refs).length > 0) {
+    console.log(`[${host}] シークレットを解いた: ${Object.keys(refs).sort().join(", ")}`);
+  }
+  const sink = given(artifact_sink);
   return captureHost(
     endpoints,
     host,
@@ -624,7 +706,9 @@ export async function main(
       formats: capture_formats,
       signing,
       scripts,
-      ...(artifact_sink === undefined ? {} : { artifactSink: artifact_sink }),
+      ...(sink === undefined ? {} : { artifactSink: sink }),
+      variables: given(variables) ?? {},
+      secrets: resolved,
     },
     per_host_delay_ms,
     initial_delay_ms,

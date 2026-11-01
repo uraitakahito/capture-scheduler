@@ -60,6 +60,35 @@ describe("始め方", () => {
     expect(JSON.parse(String(seen[0]!.init.body))).toEqual({ fromTargets: { limit: 5 } });
   });
 
+  it("variables を渡せば、そのまま本文に載せる", async () => {
+    // 名前 → 値のまま。読み替えも検査もしない —— 宣言に照らして断るのは capture-ledger (400)。
+    const seen = responding(409, {});
+    await main("http://capture-ledger:7070", "tok", undefined, undefined, undefined, {
+      query: "個人情報",
+    });
+    expect(JSON.parse(String(seen[0]!.init.body))).toEqual({
+      fromTargets: {},
+      variables: { query: "個人情報" },
+    });
+  });
+
+  it("variables が無い・null・空なら、鍵ごと送らない", async () => {
+    // UI の実行フォームは省いた引数を null で渡すことがある。空の `{}` も送らない ——
+    // 古い capture-ledger は知らない鍵を 400 で断るので、送らないほうが安全。
+    for (const absent of [undefined, null, {}] as const) {
+      const seen = responding(409, {});
+      await main(
+        "http://capture-ledger:7070",
+        "tok",
+        undefined,
+        undefined,
+        undefined,
+        absent as Record<string, string> | undefined,
+      );
+      expect(JSON.parse(String(seen[0]!.init.body))).toEqual({ fromTargets: {} });
+    }
+  });
+
   it("トークンを Bearer で送る", async () => {
     const seen = responding(409, {});
     await main("http://capture-ledger:7070", "tok");

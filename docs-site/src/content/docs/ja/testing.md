@@ -10,8 +10,8 @@ pnpm run check       # audit / format / env / typecheck / 単体 / CI との一�
 ```
 
 `pretest:e2e` が先に doctor を `--e2e` 付きで走らせ、足りないものを名指しする ——
-[クイックスタートの「確かめる」](/quickstart/#確かめる--1-本撮れるまで)の 14 本に、capture-fixtures と、
-試験が名乗る `e2e` のクロールの許可（`fga:grant submitter e2e acme`）を足した 16 本。立っているかだけで
+[クイックスタートの「確かめる」](/quickstart/#確かめる--1-本撮れるまで)の 15 本に、capture-fixtures と、
+試験が名乗る `e2e` のクロールの許可（`fga:grant submitter e2e acme`）を足した 17 本。立っているかだけで
 なく、クロールが最後まで走る設定かも見る —— どれかが外れていると、クロールは段の報告のところで
 初めて落ち、`running` のまま残る。vitest の外に置いてあるのは意図的 —— global setup が throw すると
 vitest は必ず「No test files found, exiting with code 1」を先に出し、中に書いたどんなメッセージも
@@ -48,8 +48,8 @@ vitest は必ず「No test files found, exiting with code 1」を先に出し、
 
 どの試験も、Windmill の実行の口ではなく **capture-ledger の API** でクロールを始める —— 目的が
 「capture-ledger が実際に送る引数」を運ぶことだから: `crawl_id` / `depth` / `frontier` /
-`per_host_delay_ms` / `host_parallelism` / `capture_formats` / `signing` / `scripts` と、
-受け口を出している配備では `artifact_sink` で、**`respect_robots` は入っていない**。
+`per_host_delay_ms` / `host_parallelism` / `capture_formats` / `signing` / `scripts` / `variables` /
+`secrets` と、受け口を出している配備では `artifact_sink` で、**`respect_robots` は入っていない**。
 
 最初の試験が見ているのは 4 つ:
 
@@ -88,6 +88,14 @@ e2e のほうは capture-fixtures が禁じられたページを受け取った�
 - **型の誤りがいくつあっても、クロールは failed で締まり、次を塞がない。** 型の誤りを数百件出す
   その場の JS で始める。`error` が件数を言い、台帳の上限の 2,000 字に収まることと、続けて始めた
   1 本が通ることを見る。v0.24.2 までは診断を全部載せたので台帳が断り、クロールは running のまま残った。
+- **クロールごとの変数が頁に届く。** `POST /api/crawls` の `variables` で渡した値を、その場の JS（`params` で
+  宣言）が `__bh.vars` から読んで `/plain-html?var=<値>` を取りに行く。同じ値が台帳の `GET /api/crawls/:id` の
+  `variables` と、WACZ の `datapackage.json` の `settings.variables` に在る。
+- **シークレットが頁に届き、記録には残らない。** 試験が `f/waggle_secrets/e2e_probe` に無作為の値を置き、その場の
+  JS が `__bh.secrets.e2e_probe` の長さだけを `/plain-html?len=<長さ>` で送る。値そのものは WACZ の全 member・
+  台帳の答え・Windmill の run の引数のどこにも無く、`settings.secrets` に名前だけ在る。対照は、同じ値を変数で
+  渡した取り込み —— そちらでは同じ探し方で WACZ に見つかる。
+- **宣言した required のシークレットが Windmill に無ければ、台帳が 400 で名指し、クロールの行は立たない。**
 
 ## 日次のループは推測しない
 

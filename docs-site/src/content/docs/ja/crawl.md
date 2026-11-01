@@ -101,7 +101,8 @@ Windmill は schema の既定値を **UI からの実行にしか埋めない**�
 「Channel target must be a string」になった。
 
 引数で届くのは、そのクロールについて capture-ledger が決めて**必ず送る**もの —— URL と
-間隔、`capture_formats` / `signing`、そして **`scripts`**（ページの中で走らせる TypeScript）。
+間隔、`capture_formats` / `signing`、**`scripts`**（ページの中で走らせる TypeScript）、そして
+**`variables` / `secrets`**（クロールごとの値。[下の節](#クロールごとの値--変数とシークレット)）。
 台帳が持つのは書いたままの TS で、`sha256` はそのバイト列に打たれている。`compile_scripts` が
 JS にして hash を打ち直し、BrowserHive は JS の hash を照合する。2 つの hash はその 1 段で継がれる。
 `report_level` はその JS の hash を、サービスが名乗った compiler の版と受け皿の型の tag と一緒に
@@ -141,3 +142,44 @@ BrowserHive から写しているものは他に無い。`crawl_host` は Browse
 ファイルが無い —— v0.22 までは BrowserHive の gRPC の `.proto` の写しを Windmill の resource に
 置き、腐りを捕まえる番人を付けていた。だから口は `http(s)://` の URL で、`crawl_host` は
 古い `host:port` の形を変数の名前を挙げて断る。
+
+## クロールごとの値 —— 変数とシークレット
+
+スクリプトは、クロールごとに違う値を 2 つの口で受け取る。宣言するのは
+[capture-scripts](https://github.com/uraitakahito/capture-scripts) の `catalog.json` の `params`
+（v0.6.0 から）、読むのは BrowserHive v22.0.0 の受け皿 `__bh.vars` / `__bh.secrets`。
+**flow はどちらも運ぶだけで中身を見ない。**
+
+| 口          | 台帳が送る物                                                                                                 | `crawl_host` がすること                                                                    | 記録に残る物                                                             |
+| ----------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| `variables` | 名前 → 値。`POST /api/crawls` の `variables` で頼んだ物を台帳が固定する                                      | そのまま BrowserHive の要求に載せる                                                        | 値（WACZ の `settings.variables`・台帳の行）                             |
+| `secrets`   | 名前 → Windmill の変数の path（`f/waggle_secrets/<名前>`）。スクリプトの宣言から台帳が集め、在るかを確かめる | `getVariable` で値に解き、BrowserHive の要求に**だけ**載せる。フォルダの外の path は投げる | 名前だけ（WACZ の `settings.secrets`。台帳の行には path と、置いた時刻） |
+
+どちらも空なら鍵ごと送らない（v21 までの BrowserHive は知らない欄を 400 で断る）。古い台帳は
+どちらも送らないので flow からは `null` で届き、`crawl_host` は「無い」と読む —— `artifact_sink` も
+同じ扱いにした（以前は `undefined` しか見ておらず、省いた配備では `null` を送っていた）。
+
+### シークレットは Windmill の変数
+
+値を持つのは Windmill だけ。人が前もって置く（`--secret` は新しく作るときの既定なので、付けなくても secret
+になるが、書いておく）:
+
+```sh
+pnpm run windmill:cli variable add '<値>' f/waggle_secrets/<名前> --secret --description '<何の鍵か>'
+```
+
+- 名前はスクリプトが宣言した綴り（`^[a-z][a-z0-9_]*$`）。path を組むのは台帳で、`crawl_host` は
+  `f/waggle_secrets/` の外の path を名前と一緒に投げる。
+- フォルダ `f/waggle_secrets` は `windmill/f/waggle_secrets/folder.meta.yaml` が正で、`windmill:push` が作る。
+  **API や UI で作ったフォルダは次の push で消える**（`wmill sync push` は手元に無いフォルダを消す）。中の変数は
+  同期しない（`skipVariables`）ので、push で消えも増えもしない。`pnpm run doctor` の「シークレットのフォルダ」が
+  在るかを見る。
+- 宣言したシークレットが Windmill に無ければ、台帳はクロールを始めずに 400 で名前と path を言う。
+  `crawl_host` が解くときに無い（クロールの途中で消された）なら段ごと落ち、`fail_crawl` が締める。
+- 値が通るのは、Windmill の worker から BrowserHive への要求の本文だけ。run の履歴に載る引数は path。
+  Windmill の job のログは、secret の値の全体一致を `zzp*****c3b` の形に伏せる（1.806.0 で実測。部分文字列は
+  伏せない）が、`crawl_host` は元から値を log に出さない（出すのは名前だけ）。BrowserHive の側の扱い
+  （記録に残さない・ログで伏せる・頁の JS からは読める）は BrowserHive の docs を見ること。
+
+`trigger_crawl`（日次）にも `variables` を渡せる。シークレットは渡さない —— スクリプトが宣言した名前を
+台帳が Windmill の変数に結ぶので、日次でも手で始めたクロールでも同じ値が届く。

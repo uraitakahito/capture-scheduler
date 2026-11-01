@@ -20,6 +20,18 @@ pnpm run windmill:push   # git を正として UI に反映する
 `windmill/wmill.yaml` は `includeSchedules: true` にしてある。秘密は同期しない
 （`skipSecrets`）。`u/admin/waggle_token` は `scripts/capture-ledger-token.ts` が API 経由で入れる。
 
+フォルダは同期する（`skipFolders` は書いておらず、既定で同期）。`windmill/f/<名前>/folder.meta.yaml` が正で、
+**手元に無いフォルダは push が消す** —— API や UI で作ったフォルダは次の push で消える（2026-11-01 に
+`windmill:diff` で確かめた）。スクリプトのシークレットの置き場 `f/waggle_secrets` もその形で作ってある。中の
+変数は同期しないので、push で消えも増えもしない（[リンクを辿る](/crawl/)）。
+
+script の `main` の引数を変えたら、`.script.yaml`（schema）・`.script.lock`・`wmill-lock.yaml` を
+`pnpm run windmill:metadata`（`wmill generate-metadata`）で作り直し、`pnpm run format` を通す（生成物は prettier の
+形ではない）。生成は、内容を変えていない script も「stale」に数えて作り直すことがある —— stale の判定の hash が
+yaml の整形まで含むため、format の後は常に stale になる。触っていない script の生成物まで commit に入れなくてよい。
+push は stale を警告するだけで止まらない。`pnpm run windmill:cli <wmill の引数>` で、`.env` の接続先のまま
+他の `wmill` のコマンド（`variable add` など）を打てる。
+
 ## スクリーンショットを撮り直す
 
 [管理画面](/windmill-ui/) の PNG は `scripts/docs-shots.ts` の生成物。手で撮った絵は
@@ -46,6 +58,7 @@ pnpm run docs:shots
 | `windmill/f/waggle/*.ts`                       | Windmill が Bun で動かす script                                                  |
 | `windmill/f/waggle/crawl_level.flow/flow.yaml` | クロール 1 段を回す flow                                                         |
 | `windmill/f/waggle/daily.schedule.yaml`        | 日次のクロールが起きる時刻                                                       |
+| `windmill/f/waggle_secrets/folder.meta.yaml`   | スクリプトのシークレットを置くフォルダ。中の変数は人が置き、git には入れない     |
 | `test/`                                        | 単体試験。**`windmill/f/` の下には置かないこと** —— `sync push` が配備してしまう |
 | `scripts/*.ts`                                 | host 側の道具（bootstrap、トークン、点検）                                       |
 | `.env.local`                                   | **道具が書く**（`WINDMILL_TOKEN`）。git は無視する                               |
