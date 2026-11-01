@@ -35,7 +35,7 @@ import { membersContaining, readWacz, settingsOf } from "./helpers/wacz.js";
 const sendsVariable = (name: string): string =>
   `(() => {\n  void fetch("/plain-html?var=" + encodeURIComponent(String(globalThis.__bh.vars.${name})));\n})();\n`;
 
-/** シークレットは**長さだけ**を送る。値を網に送れば WARC に残り、「残らない」の判定が自分で崩れる。 */
+/** シークレットは**長さだけ**を送る。値を通信に載せれば WARC に残り、「残らない」の判定が自分で崩れる。 */
 const sendsSecretLength = (name: string): string =>
   `(() => {\n  void fetch("/plain-html?len=" + String(globalThis.__bh.secrets.${name} ?? "").length);\n})();\n`;
 
@@ -159,7 +159,7 @@ describe("クロールごとの値 —— 変数とシークレット", () => {
     );
     expect(got["state"], String(got["error"])).toBe("succeeded");
 
-    // ① 頁の中に届いた —— 長さの印。値そのものは網に出していない
+    // ① 頁の中に届いた —— 長さの印。値そのものは通信に出していない
     const counts = await requestCounts();
     expect(counts["/plain-html"], "取り込みが届いていない").toBeGreaterThan(0);
     expect(
@@ -230,7 +230,7 @@ describe("クロールごとの値 —— 変数とシークレット", () => {
     const members = await readWacz(await api.signedUrl(archive.id));
     const found = membersContaining(members, value);
     expect(found, "探し方が壊れている —— 変数の値すら見つからない").toContain("datapackage.json");
-    // 変数の値は網にも出した (印の URL) ので、WARC か索引にも残る
+    // 変数の値は通信にも出した (印の URL) ので、WARC か索引にも残る
     expect(found.some((name) => name.startsWith("archive/") || name.startsWith("indexes/"))).toBe(
       true,
     );

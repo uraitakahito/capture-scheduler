@@ -184,7 +184,7 @@ pnpm run smoke    # capture-fixtures の頁を 1 本撮り、WACZ を取り出�
 smoke が既定で撮るのは、capture-ledger のスタックにいる
 [capture-fixtures](https://github.com/uraitakahito/capture-fixtures) の頁
 （`http://capture-fixtures.capture-ledger:8080/plain-html`）。`example.com` のような例示の名前は、
-網によって答えが変わる（ルータが `127.0.0.1` を返すことがある）ので使わない。capture-fixtures は
+ネットワークによって答えが変わる（ルータが `127.0.0.1` を返すことがある）ので使わない。capture-fixtures は
 `dev:up` では立ち上がらないので、smoke の前に立ち上げておく:
 
 ```sh

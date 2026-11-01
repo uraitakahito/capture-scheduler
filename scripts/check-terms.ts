@@ -1,5 +1,5 @@
 /**
- * クロールの語を、旧い言い方で書いていないかを見張る。規則は下の RULES の 3 つ。
+ * クロールの語を、旧い言い方で書いていないかを見張る。規則は下の RULES の 4 つ。
  *
  * ## なぜ要るのか
  *
@@ -14,6 +14,10 @@
  *   （doctor の札「スクリプト」・Windmill の説明・docs・試験の文で 62 か所。capture-ledger と dashboard も同じ）。
  *   「目録」は browserhive と wacz-validator では WACZ の中の storage の目録を指す。この repo はそれを
  *   持たないので、全部見る
+ * - **network は「通信」と書く。** 2026-11 に「網」（network の 1 字の直訳）から「通信」へそろえた（docs・
+ *   試験とコメントの注記で 8 か所。browserhive・capture-ledger・dashboard も同じ日にそろえている）。「網」は
+ *   読み手に通じにくい。基盤のネットワーク（私設ネットワーク・default ネットワーク）は「ネットワーク」と
+ *   書く。「安全網」「網羅」は別の語で、見ない
  *
  * 書き手（人と Claude）は長くこの形で書いてきたので、見張らなければ戻ってくる。
  *
@@ -25,6 +29,7 @@
  *   書かない（「この種の」は「こうした」と書く）
  * - 「起こす」: クロールを始める意味の形（OKOSU。capture-ledger・dashboard と同じ並び）
  * - 「目録」: 全部
+ * - 「網」: 「安全網」「網羅」の外に立つ「網」
  *
  * ## 見ないもの
  *
@@ -39,6 +44,8 @@ import { readFileSync } from "node:fs";
 const SELF = "scripts/check-terms.ts";
 /** 許す形。足すときは、その形が seed の意味を持ちえないことを確かめる。 */
 const ALLOWED = /種類|種別|\d\s?種/gu;
+/** 「網」を network の意味に取れない形（安全網・網羅）。 */
+const NOT_NET = /安全網|網羅/gu;
 /**
  * クロールを始める意味の「起こす」の形。capture-ledger・dashboard と同じ並び。
  * 足すときは、プロセス・job・flow の「起こす」（webhook で起こす・次の段を起こす）に当たらないことを確かめる。
@@ -58,6 +65,10 @@ const RULES: { find: (line: string) => boolean; say: string }[] = [
   {
     find: (line) => line.includes("目録"),
     say: "「目録」が残っています。ページで走らせる物は「スクリプト」、置き場は「台帳」（台帳にスクリプトが無い）と書きます。",
+  },
+  {
+    find: (line) => line.replace(NOT_NET, "").includes("網"),
+    say: "「網」が残っています。network は「通信」（通信の記録・通信が静まる・通信に載せる）、基盤のネットワークは「ネットワーク」と書きます。",
   },
 ];
 

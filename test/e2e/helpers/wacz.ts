@@ -2,7 +2,7 @@
  * 台帳から取り出した WACZ を開いて、中の全 member を文字として読む。
  *
  * 「値が記録に残っていない」を言うには、datapackage.json だけでは足りない —— 値が漏れうるのは WARC の本文
- * (スクリプトが網に送れば残る)・索引・pages.jsonl・runtime.js のどれでもある。だから member を全部開く。
+ * (スクリプトが通信に載せれば残る)・索引・pages.jsonl・runtime.js のどれでもある。だから member を全部開く。
  * WARC と索引は gzip なので解いてから見る (WARC の gzip は record ごとの member が連なった物。node の zlib は
  * 連なった gzip を続けて解く)。
  *
