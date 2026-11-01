@@ -25,7 +25,11 @@ Folders are synced (`skipFolders` is not set, so the default applies). `windmill
 is the source of truth, and **a folder absent locally is deleted by push** — one created through the
 API or the UI disappears on the next push (confirmed with `windmill:diff` on 2026-11-01). The folder for
 script secrets, `f/waggle_secrets`, is made that way. The variables inside it are not synced, so a push
-neither removes nor adds them ([Following links](/crawl/)).
+neither removes nor adds them ([Following links](/crawl/)). A new folder shows up in `windmill:diff` once
+more after its first push, as `~ folder` — Windmill adds the creator to `owners` and `extra_perms` when it
+creates the folder, which differs from the local `owners: []` (measured with `f/waggle_secrets`). The next
+push is expected to write the local shape; `f/waggle` has `owners: []` on the remote too. The "push" line of
+doctor compares script contents only, so this difference does not turn it ✗.
 
 When you change the arguments of a script's `main`, regenerate its `.script.yaml` (schema),
 `.script.lock` and `wmill-lock.yaml` with `pnpm run windmill:metadata` (`wmill generate-metadata`) and run

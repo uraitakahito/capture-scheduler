@@ -23,7 +23,10 @@ pnpm run windmill:push   # git を正として UI に反映する
 フォルダは同期する（`skipFolders` は書いておらず、既定で同期）。`windmill/f/<名前>/folder.meta.yaml` が正で、
 **手元に無いフォルダは push が消す** —— API や UI で作ったフォルダは次の push で消える（2026-11-01 に
 `windmill:diff` で確かめた）。スクリプトのシークレットの置き場 `f/waggle_secrets` もその形で作ってある。中の
-変数は同期しないので、push で消えも増えもしない（[リンクを辿る](/crawl/)）。
+変数は同期しないので、push で消えも増えもしない（[リンクを辿る](/crawl/)）。新しいフォルダは、最初の push の
+後にもう 1 度だけ `windmill:diff` に `~ folder` で出る —— Windmill は作るときに作成者を `owners` と `extra_perms`
+に足し、手元の `owners: []` と食い違うため（`f/waggle_secrets` で実測）。次の push が手元の形を書く見込みで、
+`f/waggle` は remote も `owners: []`。doctor の「push」は script の中身しか比べないので、この差で ✗ にはならない。
 
 script の `main` の引数を変えたら、`.script.yaml`（schema）・`.script.lock`・`wmill-lock.yaml` を
 `pnpm run windmill:metadata`（`wmill generate-metadata`）で作り直し、`pnpm run format` を通す（生成物は prettier の
