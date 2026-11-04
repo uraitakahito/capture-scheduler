@@ -4,7 +4,7 @@
  *
  * compose に書けない仕事なので、ここに置いている —— container-compose には
  * 使い捨てのサービスが無い (subcommand は up / down / build / version の 4 つだけ)。
- * capture-ledger の `scripts/fga-migrate.mjs` と同じ立場。
+ * capture-ledger の `src/tools/fga-migrate.ts` と同じ立場。
  *
  * **書くのは自分の repo の中だけ。** token は `.env.local` へ、capture-ledger に渡す 4 行は
  * `.dev/capture-ledger.env` へ。`.env` は人のもので、道具は触らない（`env-local.ts`）。
