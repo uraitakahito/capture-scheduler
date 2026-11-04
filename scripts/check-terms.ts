@@ -23,7 +23,8 @@
  *
  * ## 何を見るか
  *
- * git が追跡する text のファイルの全行。docs に限らない —— 語は、書かれる場所を選ばずに広がる。
+ * git が repo の中身と見なす text のファイル（追跡している物と、まだ add していない物）の全行。docs に限らない
+ * —— 語は、書かれる場所を選ばずに広がる。
  *
  * - 「種」: 熟語（種類・種別）と、数のあとの「N 種」の外に立つ「種」。種類の意味でも、単独の「種」は
  *   書かない（「この種の」は「こうした」と書く）
@@ -38,8 +39,9 @@
  *   - 「起点」を seed の意味で使っているか、「起こす」がクロールの意味か。語の意味は機械には
  *     見えないので、「起こす」は形の並びで見る（並びに無い言い回しは止まらない）
  */
-import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+
+import { repoFiles } from "./repo-files.js";
 
 const SELF = "scripts/check-terms.ts";
 /** 許す形。足すときは、その形が seed の意味を持ちえないことを確かめる。 */
@@ -72,9 +74,8 @@ const RULES: { find: (line: string) => boolean; say: string }[] = [
   },
 ];
 
-const files = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" })
-  .split("\0")
-  .filter((f) => f !== "" && f !== SELF && f !== "pnpm-lock.yaml");
+// 追跡している物と、まだ add していない新しい物（`repo-files.ts`）。
+const files = repoFiles(process.cwd()).filter((f) => f !== SELF && f !== "pnpm-lock.yaml");
 
 const hits: string[][] = RULES.map(() => []);
 for (const file of files) {

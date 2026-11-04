@@ -12,7 +12,8 @@
  *
  * ## 何を見るか
  *
- * git が追跡する text のファイルのうち、SCOPES に挙げた場所（試験と、試験が読む物）。
+ * git が repo の中身と見なす text のファイル（追跡している物と、まだ add していない物。`repo-files.ts`）の
+ * うち、SCOPES に挙げた場所（試験と、試験が読む物）。
  * 名前の形は 4 つ: example.com など・その SURT（com,example）・*.example・その SURT（example,a）。
  * 正規表現の中の \. も同じ名前として見る。
  *
@@ -21,8 +22,9 @@
  * docs・src のコメント・UI の placeholder。example は文書のための名前で、そこが本来の使い道。
  * .env.example（名前ではなくファイル名）と、zip や画像のような text でないファイル。
  */
-import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+
+import { repoFiles } from "./repo-files.js";
 
 /** この repo の試験の場所。repo ごとに違うのはここだけ。 */
 const SCOPES = ["test", "scripts/smoke.ts", "scripts/smoke"];
@@ -38,9 +40,8 @@ const FIND = [
   /(?<![A-Za-z0-9-])example,[A-Za-z0-9-]+[),]/i,
 ];
 
-const files = execFileSync("git", ["ls-files", "--", ...SCOPES], { encoding: "utf8" })
-  .split("\n")
-  .filter(Boolean);
+// 追跡している物と、まだ add していない新しい物（`repo-files.ts`）。新しい試験も commit の前に見る
+const files = repoFiles(process.cwd(), SCOPES);
 let found = 0;
 for (const file of files) {
   const text = readFileSync(file, "utf8");
