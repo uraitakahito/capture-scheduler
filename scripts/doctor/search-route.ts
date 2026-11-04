@@ -1,26 +1,39 @@
 /**
- * capture-ledger に全文検索の口が在るかの読み分け。
+ * capture-ledger の全文検索が働いているかの読み分け。
  *
- * 名乗らずに `GET /api/search?q=x` を引く。**口が在れば、名乗りを見る所で 401** になり、口が無ければ
- * route ごと無いので Fastify の 404 になる (「crawl route」と同じ見分け方)。200 を求めないのは、
- * 名乗りの無い 200 は認可が外れた印で、検索が在ることの印ではないため。
+ * **名乗って引く。** issuer から取ったばかりのトークンで `GET /api/search?q=x` を引く (jwt の行と同じ
+ * 取り方)。名乗らずに引くと、口が在れば名乗りを見る所で 401 になるので、OpenSearch が止まっていても
+ * ✓ に見える —— 台帳の検索の口は、名乗りを見た後で OpenSearch に訊く。名乗って引けば、200 が
+ * 「口が在り、OpenSearch が答えた」、503 が「OpenSearch が答えないか、索引が無い」、404 が「口が無い」と
+ * 分かれる。
  *
- * capture-ledger は CAPTURE-53 から、`CAPTURE_LEDGER_OPENSEARCH_URL` が無ければ起動しないので、
- * 404 が返るのは古い capture-ledger だけ。古い capture-ledger では、flow の索引の段が毎回 404 で落ちる。
+ * capture-ledger は CAPTURE-53 から、OpenSearch に届かなければ起動しないので、404 が返るのは古い
+ * capture-ledger だけ。503 は起動の後にも起きる —— API が動いたまま OpenSearch が落ちたか、作り直された
+ * (compose の OpenSearch は volume を持たないので、作り直すと索引ごと消える)。どちらでも flow の索引の段は
+ * 落ちる。
  */
 import type { Verdict } from "./run.js";
 import type { Answer } from "./windmill-contents.js";
 
-/** host から引く検索の口。`q` は何でもよい (名乗りを見る前に答えが決まる)。 */
+/** host から引く検索の口。`q` は何でもよい (当たりの数は見ない)。 */
 export const SEARCH_PROBE = "/api/search?q=x";
 
-/** 名乗らずに `GET /api/search?q=x` を引いた答え。 */
+/** issuer のトークンで `GET /api/search?q=x` を引いた答え。 */
 export const readSearchRoute = (answer: Answer): Verdict => {
-  if (answer.status === 401) return { ok: true };
+  if (answer.status === 200) return { ok: true };
   if (answer.status === undefined) {
     return {
       ok: false,
       need: "capture-ledger の API に届かない → cd ../capture-ledger && pnpm run api",
+    };
+  }
+  if (answer.status === 503) {
+    return {
+      ok: false,
+      need:
+        "GET /api/search → 503 —— capture-ledger の OpenSearch が答えないか、索引が無い → " +
+        "cd ../capture-ledger && pnpm run dev:status の「検索」の行を見る (答えないなら " +
+        "pnpm run dev:up --from search、索引が無いなら pnpm run search:reindex)",
     };
   }
   if (answer.status === 404) {
@@ -33,6 +46,6 @@ export const readSearchRoute = (answer: Answer): Verdict => {
   }
   return {
     ok: false,
-    need: `GET /api/search → ${String(answer.status)} (名乗らずに引いたので 401 のはず) ${answer.body.slice(0, 120)}`,
+    need: `GET /api/search → ${String(answer.status)} (issuer のトークンで引いたので 200 のはず) ${answer.body.slice(0, 120)}`,
   };
 };

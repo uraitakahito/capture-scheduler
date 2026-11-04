@@ -212,8 +212,8 @@ DNS が覚えるため）。
   ✗ capture-ledger api  http://127.0.0.1:7070/healthz
   ✗ oidc issuer         http://127.0.0.1:9099/.well-known/openid-configuration
   ・crawl route         先に capture-ledger api を
-  ・search route        先に capture-ledger api を
   ・jwt                 先に capture-ledger api・oidc issuer を
+  ・search route        先に capture-ledger api・oidc issuer を
 
 直すもの (2):
   capture-ledger api —— capture-ledger の API が答えない → cd ../capture-ledger && pnpm run api

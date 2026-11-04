@@ -14,7 +14,8 @@ pnpm run check       # audit, format, env, typecheck, unit tests, CI parity, doc
 the crawl permission for `e2e`, the name the test uses (`fga:grant submitter e2e acme`). It checks not just that things are up but that a crawl can run to the end — miss any of
 these and a crawl fails only at its level report, staying `running`. Full-text search is part of
 that: capture-ledger does not start without OpenSearch (`CAPTURE_LEDGER_OPENSEARCH_URL`, which its
-`dev:up` writes), and doctor's `search route` says when the ledger serves no search. It lives outside vitest
+`dev:up` writes). OpenSearch can still stop, or be recreated without its index, while the API runs;
+doctor's `search route` searches with an issuer token and says so. It lives outside vitest
 deliberately: vitest prints "No test files found, exiting with code 1" whenever a global setup
 throws, and no message written inside can survive that.
 

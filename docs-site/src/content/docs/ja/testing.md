@@ -14,8 +14,9 @@ pnpm run check       # audit / format / env / typecheck / 単体 / CI との一�
 試験が名乗る `e2e` のクロールの許可（`fga:grant submitter e2e acme`）を足した物。立っているかだけで
 なく、クロールが最後まで走る設定かも見る —— どれかが外れていると、クロールは段の報告のところで
 初めて落ち、`running` のまま残る。全文検索もその 1 つ —— capture-ledger は OpenSearch
-（`CAPTURE_LEDGER_OPENSEARCH_URL`。台帳の `dev:up` が書く）が無ければ起動せず、台帳に検索の口が無ければ
-doctor の `search route` が言う。vitest の外に置いてあるのは意図的 —— global setup が throw すると
+（`CAPTURE_LEDGER_OPENSEARCH_URL`。台帳の `dev:up` が書く）が無ければ起動しない。それでも API が動いたまま
+OpenSearch が止まったり、索引ごと作り直されたりはするので、doctor の `search route` が issuer のトークンで
+検索を引いて言う。vitest の外に置いてあるのは意図的 —— global setup が throw すると
 vitest は必ず「No test files found, exiting with code 1」を先に出し、中に書いたどんなメッセージも
 その後ろに隠れるため。
 
