@@ -29,6 +29,13 @@ The reason is cut to the ledger's limit of 2,000 characters: above it the ledger
 report, and the crawl would stay `running` and block every crawl after it. A script that does
 not type-check never reaches a page.
 
+`index_level` runs after the report, so by then capture-ledger has already marked the crawl
+`succeeded` (or started the next level). Full-text search is a required part of capture-ledger, so
+the step skips nothing: it throws when the ledger answers 404 (no such crawl, or no crawl permission
+for the token's name), 503 (OpenSearch did not answer), or 202 with `failed` above 0 (an archive was
+left out of the index). On the last level that leaves the crawl `succeeded` and only the Windmill run
+red — `pnpm run smoke` waits for the run and reports it.
+
 The same `ts-compile` is also published on the host at `127.0.0.1:28080`. capture-ledger runs on the host
 and calls it to re-read, by line and column, the type errors of a crawl that failed, and to check proposed
 fixes (the host's node cannot reach the container subnet, so the port is published on loopback). bootstrap

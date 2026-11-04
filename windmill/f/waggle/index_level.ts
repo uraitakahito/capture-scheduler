@@ -5,29 +5,42 @@
  *
  * 渡すのは `crawl_id` だけ。**どの archive がまだ索引されていないかは capture-ledger が
  * 知っている** (`archives.indexed_at IS NULL`)。id の一覧をこちらで組み立てて渡す形も
- * 書けるが、そうすると「何を索引すべきか」の判断が **単体試験の無い場所**へ移る。
- * この repo の Windmill script は 1 本も試験を持っていないので、判断は置かない。
+ * 書けるが、そうすると「何を索引すべきか」の判断が Windmill の flow へ移る。答えの読み分けは
+ * `test/index-level.test.ts` が見ているが、何を載せるかの判断はここに置かない。
  *
  * 本文の取り出し (WACZ を開いて `pages.jsonl` を読む) も capture-ledger 側。ここに置くと
  * S3 の資格情報が Windmill にも要る。
  *
- * ## 索引が無い配備では 404 が返る
+ * ## 検索は台帳の必須の部品 —— 載らなければ段を落とす
  *
- * `CAPTURE_LEDGER_OPENSEARCH_URL` を設定していない capture-ledger は、この口を **そもそも出さない**。
- * それは正しい答え (その配備に検索は無い) なので、**失敗にしない** —— 404 だけは
- * 通し、それ以外の失敗は投げる。ここで一律に投げると、検索を使わない配備で
- * クロールの flow が毎回赤くなる。
+ * capture-ledger は `CAPTURE_LEDGER_OPENSEARCH_URL` が無ければ起動しない (CAPTURE-53)。だから
+ * この口は必ず在り、**どの失敗も黙らせない**:
+ *
+ * - 404 —— クロールが無いか、トークンの名前にクロールの許可 (`can_submit`) が無い。capture-ledger は
+ *   列挙を避けるために両者を区別せずに答える (`api/routes.ts`)。以前は「検索の無い配備」としてこれを
+ *   飛ばしていたが、その配備はもう無い。飛ばすと、索引が 1 本も載らないまま flow が緑で終わる
+ * - 503 —— OpenSearch が答えない
+ * - 202 で `failed` が 1 以上 —— 載せられなかったアーカイブがある (`indexed_at` は立たないので、
+ *   同じクロールの次の段の索引か、`pnpm run search:reindex` が拾い直す)
+ *
+ * 投げると flow の failure_module (`fail_crawl.ts`) が走る。最後の段では、台帳はクロールを段の報告の
+ * 時点で succeeded にしているので、クロールの状態は変わらず、Windmill の run だけが赤くなる。
  */
 import * as wmill from "windmill-client";
 
 export interface IndexOutcome {
-  /** 索引に載せたアーカイブの本数。 */
+  /** この呼び出しの時点で、まだ索引に載っていなかったアーカイブの本数。 */
+  pending: number;
+  /** 載せたアーカイブの本数。 */
   indexed: number;
-  /** そのアーカイブに含まれていたページの数。 */
+  /** 載せられなかったアーカイブの本数 (`pending - indexed`)。 */
+  failed: number;
+  /** 載せたアーカイブに含まれていた、索引の件数 (ページ一覧の行のうち載せた物)。 */
   pages: number;
-  /** この配備に検索が無かった (capture-ledger が口を出していない)。 */
-  skipped: boolean;
 }
+
+const isCount = (value: unknown): value is number =>
+  typeof value === "number" && Number.isInteger(value) && value >= 0;
 
 export async function main(crawl_id: string): Promise<IndexOutcome> {
   // 設定は変数から。`report_level.ts` と同じ理由 (schema の既定値は webhook からの
@@ -43,26 +56,38 @@ export async function main(crawl_id: string): Promise<IndexOutcome> {
     headers: { authorization: `Bearer ${token}` },
   });
 
-  if (res.status === 404) {
-    // 上の docstring のとおり。**404 は「索引が無い」とも「許可が無い」とも読める**
-    // ので、log には両方の可能性を残す —— capture-ledger は列挙を避けるために両者を
-    // 区別せずに答える設計 (`api/routes.ts`)。
-    console.log(
-      "索引の口がありません (この配備に検索が無いか、トークンの名前にクロールの許可がありません)。飛ばします",
-    );
-    return { indexed: 0, pages: 0, skipped: true };
-  }
-
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(
-      `POST /api/crawls/${crawl_id}/index → ${String(res.status)} ${body.slice(0, 300)}`,
-    );
+    const body = (await res.text()).slice(0, 300);
+    const head = `POST /api/crawls/${crawl_id}/index → ${String(res.status)} ${body}`;
+    if (res.status === 404) {
+      throw new Error(
+        `${head} —— クロールが無いか、トークンの名前にクロールの許可 (can_submit) が無い`,
+      );
+    }
+    if (res.status === 503) {
+      throw new Error(`${head} —— capture-ledger の OpenSearch が答えない`);
+    }
+    throw new Error(head);
   }
 
-  const outcome = (await res.json()) as { indexed: number; pages: number };
+  const answer = (await res.json()) as Record<string, unknown>;
+  const { pending, indexed, failed, pages } = answer;
+  if (!isCount(pending) || !isCount(indexed) || !isCount(failed) || !isCount(pages)) {
+    throw new Error(
+      `POST /api/crawls/${crawl_id}/index の答えの形が違う (pending・indexed・failed・pages が要る): ` +
+        JSON.stringify(answer).slice(0, 300),
+    );
+  }
+  const outcome: IndexOutcome = { pending, indexed, failed, pages };
   console.log(
-    `索引: アーカイブ ${String(outcome.indexed)} 本 / ページ ${String(outcome.pages)} 件`,
+    `索引: 待っていたアーカイブ ${String(pending)} 本・載せた ${String(indexed)} 本・` +
+      `載せられなかった ${String(failed)} 本・索引の件数 ${String(pages)}`,
   );
-  return { ...outcome, skipped: false };
+  if (failed > 0) {
+    throw new Error(
+      `索引に入らなかったアーカイブが ${String(failed)} 本 (待っていた ${String(pending)} 本のうち) —— ` +
+        "capture-ledger の API のログの「could not index this archive」を見る",
+    );
+  }
+  return outcome;
 }

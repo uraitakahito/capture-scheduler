@@ -12,7 +12,7 @@
  * flow が読むその値で宛先を叩く。
  *
  * 読み分けは入出力を持たない module に分けてある (`windmill-contents.ts`・`worker-probes.ts`・
- * `host-probes.ts`・`jwt-check.ts`・`can-submit.ts`)。ここは答えを取ってくるだけ。
+ * `host-probes.ts`・`jwt-check.ts`・`can-submit.ts`・`search-route.ts`)。ここは答えを取ってくるだけ。
  */
 import { execFile } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
@@ -32,6 +32,7 @@ import {
 import { readCanSubmit } from "./can-submit.js";
 import { readHostTsCompile } from "./host-probes.js";
 import { readJwt } from "./jwt-check.js";
+import { readSearchRoute, SEARCH_PROBE } from "./search-route.js";
 import { runChecks, type Check, type Outcome, type Result, type Verdict } from "./run.js";
 import { SECTIONS } from "./sections.js";
 import {
@@ -525,6 +526,14 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
           "CAPTURE_LEDGER_CRAWL_WEBHOOK_URL と _TOKEN (windmill:bootstrap が出す 2 行) を書いて API を起こし直す",
       };
     },
+  },
+  {
+    name: "search route",
+    section: SECTIONS.bringUp,
+    where: `GET ${API}${SEARCH_PROBE} (名乗らずに 401 なら在る)`,
+    needs: ["capture-ledger api"],
+    // 台帳の全文検索の口。無いと、flow の索引の段が毎回 404 で落ちる (CAPTURE-53 から 404 を飛ばさない)。
+    probe: async () => readSearchRoute(await answerOf(`${API}${SEARCH_PROBE}`)),
   },
   {
     name: "jwt",

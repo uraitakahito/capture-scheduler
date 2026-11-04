@@ -27,6 +27,12 @@ flow は `fail_crawl` へ落ち、クロールは診断の件数と最初の 5 �
 reason は台帳の上限の 2,000 字に切る。超えると台帳が報告を断り、クロールは running のまま残って、
 後のクロールを全部塞ぐ。型が通らないスクリプトはページに届かない。
 
+`index_level` は報告の後に走るので、そのとき capture-ledger はもうクロールを `succeeded` にしている（または
+次の段を始めている）。全文検索は capture-ledger の必須の部品なので、この段は何も飛ばさない —— 台帳が 404
+（クロールが無いか、トークンの名前にクロールの許可が無い）・503（OpenSearch が答えない）・`failed` が 1 以上の
+202（索引に載らなかったアーカイブがある）を返せば投げる。最後の段なら、クロールは `succeeded` のまま、
+Windmill の run だけが赤くなる —— `pnpm run smoke` は run の終わりを待って、それを言う。
+
 同じ `ts-compile` を、compose は host の `127.0.0.1:28080` にも出している。host で動く capture-ledger が、
 型で落ちたクロールの誤りを行と列で取り直すときと、直し方を確かめるときに呼ぶ（host の node はコンテナの
 subnet に届かないので、loopback に出す）。この宛先は、bootstrap がほかの行と一緒に capture-ledger へ渡す
