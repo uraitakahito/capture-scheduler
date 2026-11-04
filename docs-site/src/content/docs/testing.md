@@ -12,7 +12,10 @@ pnpm run check       # audit, format, env, typecheck, unit tests, CI parity, doc
 `pretest:e2e` runs doctor with `--e2e` first and names what is missing — the checks of
 [the quickstart's "Check it"](/quickstart/#check-it-take-one-capture), plus capture-fixtures and
 the crawl permission for `e2e`, the name the test uses (`fga:grant submitter e2e acme`). It checks not just that things are up but that a crawl can run to the end — miss any of
-these and a crawl fails only at its level report, staying `running`. It lives outside vitest
+these and a crawl fails only at its level report, staying `running`. Full-text search is part of
+that: capture-ledger does not start without OpenSearch (`CAPTURE_LEDGER_OPENSEARCH_URL`, which its
+`dev:up` writes). OpenSearch can still stop, or be recreated without its index, while the API runs;
+doctor's `search route` searches with an issuer token and says so. It lives outside vitest
 deliberately: vitest prints "No test files found, exiting with code 1" whenever a global setup
 throws, and no message written inside can survive that.
 
@@ -66,8 +69,11 @@ The first one asserts four things:
    verdict comes from the _other end's_ request log, because the ledger can only
    say what it recorded.
 2. the crawl succeeded and captured at least one page
-3. `GET /api/search?q=hub` returns a hit — so the indexing step completed inside
-   the flow
+3. after the last level's run has finished, `GET /api/search?q=hub` returns a hit from one of this
+   crawl's archives. The test waits for the run, not just for `succeeded`: the ledger marks the crawl
+   `succeeded` at the level report, before the flow's index step runs, so a search right at
+   `succeeded` can come before the indexing. Hits are narrowed to this crawl's archives, so an
+   earlier crawl of the same page does not pass the check
 4. if capture-ledger serves the sink — an unauthenticated `PUT /api/sink/…` answers
    401 rather than 404 — every archive of the crawl has an `objectKey` under
    `org/acme/<YYYY-MM>/`. A flat key means the sink was never handed out and

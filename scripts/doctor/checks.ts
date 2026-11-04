@@ -12,7 +12,7 @@
  * flow が読むその値で宛先を叩く。
  *
  * 読み分けは入出力を持たない module に分けてある (`windmill-contents.ts`・`worker-probes.ts`・
- * `host-probes.ts`・`jwt-check.ts`・`can-submit.ts`)。ここは答えを取ってくるだけ。
+ * `host-probes.ts`・`jwt-check.ts`・`can-submit.ts`・`search-route.ts`)。ここは答えを取ってくるだけ。
  */
 import { execFile } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
@@ -32,6 +32,7 @@ import {
 import { readCanSubmit } from "./can-submit.js";
 import { readHostTsCompile } from "./host-probes.js";
 import { readJwt } from "./jwt-check.js";
+import { readSearchRoute, SEARCH_PROBE } from "./search-route.js";
 import { runChecks, type Check, type Outcome, type Result, type Verdict } from "./run.js";
 import { SECTIONS } from "./sections.js";
 import {
@@ -286,6 +287,18 @@ const acceptsJwt = async (): Promise<Verdict> => {
   return readJwt({ token: status, header, iss: await issuerName() });
 };
 
+/**
+ * issuer から token を取り、名乗って検索を引く。**名乗らずに引くと、OpenSearch が止まっていても 401 で
+ * 終わる** (台帳は名乗りを見てから OpenSearch に訊く)。読み分けは `search-route.ts`。
+ */
+const searchAnswers = async (): Promise<Verdict> => {
+  const token = await mint("doctor");
+  if (token === undefined) return readJwt({ token: "no-token", iss: ISSUER });
+  return readSearchRoute(
+    await answerOf(`${API}${SEARCH_PROBE}`, { headers: { authorization: `Bearer ${token}` } }),
+  );
+};
+
 // ── windmill にクロールを許可する ──────────────────────────────────────
 
 /**
@@ -532,6 +545,15 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
     where: `issuer のトークンで GET ${API}/api/archives`,
     needs: ["capture-ledger api", "oidc issuer"],
     probe: acceptsJwt,
+  },
+  {
+    name: "search route",
+    section: SECTIONS.bringUp,
+    where: `issuer のトークンで GET ${API}${SEARCH_PROBE} (200 なら OpenSearch まで届く)`,
+    // 台帳の全文検索。口が無いか OpenSearch が答えないと、flow の索引の段が毎回落ちる (CAPTURE-53 から
+    // 404 を飛ばさない)。トークンは jwt の行と同じ取り方なので、jwt の後に訊く。
+    needs: ["jwt"],
+    probe: searchAnswers,
   },
   {
     name: "変数",

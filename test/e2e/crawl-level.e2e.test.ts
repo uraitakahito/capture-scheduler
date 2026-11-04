@@ -12,7 +12,8 @@ import { describe, it, expect, beforeAll } from "vitest";
  * Windmill の口 (`/jobs/run/f/...`) を直接叩けば速いが、それでは意味が無い。
  * この試験の目的は **capture-ledger が実際に送る引数**を通すことで、capture-ledger が送るのは
  * `crawl_id` / `depth` / `frontier` / `per_host_delay_ms` / `host_parallelism` /
- * `capture_formats` / `signing` と、受け口を出している配備では `artifact_sink`。
+ * `capture_formats` / `signing` / `scripts` / `variables` / `secrets` と、受け口を出している配備では
+ * `artifact_sink`。
  * `respect_robots` は**送られない**。
  *
  * ## なぜ単体では代わりにならないか
@@ -107,6 +108,29 @@ const requestCounts = async (): Promise<Record<string, number>> =>
 
 const resetFixtures = async (): Promise<void> => {
   await fetch(`${FIXTURES_HOST}/__reset`, { method: "POST" });
+};
+
+/**
+ * クロールの最後の段の run (`lastJob`) が終わるまで待ち、その job を返す。
+ *
+ * **succeeded だけを待たない。** 台帳は段の報告の時点でクロールを succeeded にし、flow の索引の段は
+ * その後に走る —— succeeded の直後に検索すると、索引より先になりうる (CAPTURE-53 の調べ)。
+ */
+const lastRunFinished = async (crawlId: string): Promise<Record<string, unknown>> => {
+  const windmillToken = process.env["WINDMILL_TOKEN"];
+  expect(windmillToken, "WINDMILL_TOKEN が無い —— pnpm run windmill:bootstrap").toBeTruthy();
+  const crawl = await json(await fetch(`${WAGGLE}/api/crawls/${crawlId}`, { headers: auth() }));
+  const lastJob = crawl["lastJob"] as { id?: unknown } | null | undefined;
+  expect(typeof lastJob?.id, "台帳が段の run を知らない (lastJob が無い)").toBe("string");
+  const headers = { authorization: `Bearer ${String(windmillToken)}` };
+  for (let i = 0; i < 60; i++) {
+    const job = await json(
+      await fetch(`${WINDMILL}/api/w/${WORKSPACE}/jobs_u/get/${String(lastJob?.id)}`, { headers }),
+    );
+    if (job["type"] === "CompletedJob") return job;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  throw new Error(`クロール ${crawlId} の最後の段の run が 60 秒で終わらない`);
 };
 
 /** Windmill で script を 1 本走らせ、終わるまで待って結果を返す。失敗した run は、その中身で落とす。 */
@@ -231,10 +255,39 @@ describe("クロールが flow を通って索引まで終わる", () => {
     expect(Object.keys(counts)).toContain("/links/hub");
 
     // ── ② 索引まで flow の中で終わったか ────────────────────────────
-    // index step は report の後に並んでいる。クロールが succeeded になった時点で
-    // 走り終えているはず。検索に出れば、台帳への登録も索引も通っている。
-    const found = await json(await fetch(`${WAGGLE}/api/search?q=hub`, { headers: auth() }));
-    expect((found["hits"] as unknown[]).length, "索引に載っていない").toBeGreaterThan(0);
+    // index step は report の後に並んでいる。**台帳は report の時点で succeeded にする**ので、
+    // succeeded を見た時点では、最後の段の索引はまだ走っているかもしれない。run の終わりを待つ。
+    const lastRun = await lastRunFinished(crawlId);
+    expect(
+      lastRun["success"],
+      `最後の段の run が失敗した: ${JSON.stringify(lastRun["result"])}`,
+    ).toBe(true);
+    // 当たりは、この回のクロールのアーカイブに絞る —— 前の回に /links/hub を撮っていれば、それにも当たる。
+    // 見てよいかの権限は台帳が 5 秒ごとに OpenFGA へ書くので、当たるまで少し引き直す。
+    const listedForSearch = await json(await fetch(`${WAGGLE}/api/archives`, { headers: auth() }));
+    const crawlArchives = new Set(
+      (listedForSearch["archives"] as { id: string; sourceUrl: string; capturedAt: string }[])
+        .filter(
+          (archive) =>
+            archive.sourceUrl.startsWith(`${FIXTURES}/links/`) &&
+            Date.parse(archive.capturedAt) >= startedAt,
+        )
+        .map((archive) => archive.id),
+    );
+    expect(crawlArchives.size, "この回の取り込みが capture-ledger の一覧に無い").toBeGreaterThan(0);
+    let ourHits: unknown[] = [];
+    for (let i = 0; i < 8 && ourHits.length === 0; i++) {
+      if (i > 0) await new Promise((resolve) => setTimeout(resolve, 2000));
+      const found = await json(await fetch(`${WAGGLE}/api/search?q=hub`, { headers: auth() }));
+      expect(
+        typeof found["total"],
+        `検索の答えの形が違う: ${JSON.stringify(found).slice(0, 200)}`,
+      ).toBe("number");
+      ourHits = (found["hits"] as { archiveId: string }[]).filter((hit) =>
+        crawlArchives.has(hit.archiveId),
+      );
+    }
+    expect(ourHits.length, "この回のクロールのアーカイブが索引に載っていない").toBeGreaterThan(0);
 
     // ── ③ 成果物が受け口を通ったか ──────────────────────────────────
     // **受け口の有無は capture-ledger に訊く。** トークン無しの PUT は、口が在ればトークンの検査で

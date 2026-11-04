@@ -13,7 +13,10 @@ pnpm run check       # audit / format / env / typecheck / 単体 / CI との一�
 [クイックスタートの「確かめる」](/quickstart/#確かめる--1-本撮れるまで)の点検に、capture-fixtures と、
 試験が名乗る `e2e` のクロールの許可（`fga:grant submitter e2e acme`）を足した物。立っているかだけで
 なく、クロールが最後まで走る設定かも見る —— どれかが外れていると、クロールは段の報告のところで
-初めて落ち、`running` のまま残る。vitest の外に置いてあるのは意図的 —— global setup が throw すると
+初めて落ち、`running` のまま残る。全文検索もその 1 つ —— capture-ledger は OpenSearch
+（`CAPTURE_LEDGER_OPENSEARCH_URL`。台帳の `dev:up` が書く）が無ければ起動しない。それでも API が動いたまま
+OpenSearch が止まったり、索引ごと作り直されたりはするので、doctor の `search route` が issuer のトークンで
+検索を引いて言う。vitest の外に置いてあるのは意図的 —— global setup が throw すると
 vitest は必ず「No test files found, exiting with code 1」を先に出し、中に書いたどんなメッセージも
 その後ろに隠れるため。
 
@@ -63,8 +66,10 @@ vitest は必ず「No test files found, exiting with code 1」を先に出し、
    ページで、判定は**相手のリクエストログ**から採る —— 台帳は「記録したこと」しか
    言わない。
 2. クロールが成功し、1 ページ以上取り込んでいること
-3. `GET /api/search?q=hub` がヒットを返すこと —— 索引の step まで flow の中で
-   終わっている証拠
+3. 最後の段の run が終わった後に、`GET /api/search?q=hub` がこのクロールのアーカイブに当たること。
+   succeeded を待つだけでなく run の終わりを待つ —— 台帳は段の報告の時点でクロールを succeeded にし、
+   flow の索引の段はその後に走るので、succeeded の直後の検索は索引より先になりうる。当たりはこの
+   クロールのアーカイブに絞るので、前の回に同じ頁を撮っていても、それで通りはしない
 4. capture-ledger が受け口を出していれば（トークン無しの `PUT /api/sink/…` が 404 でなく
    401 を返す）、そのクロールのアーカイブの `objectKey` が全部 `org/acme/<YYYY-MM>/` の下に
    あること。平らな鍵は、口が配られず BrowserHive が自前の bucket へ書いた印 ——

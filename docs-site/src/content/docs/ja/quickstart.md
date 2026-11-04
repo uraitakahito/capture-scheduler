@@ -180,12 +180,14 @@ pnpm run fga:grant submitter windmill acme
 ```sh
 cd ~/projects/crawler/capture-scheduler
 pnpm run doctor   # 点検を順に。全部 ✓ なら、クロールが最後まで走る設定になっている
-pnpm run smoke    # capture-fixtures の頁を 1 本撮り、WACZ を取り出せたら「撮れた」
+pnpm run smoke    # capture-fixtures の頁を 1 本撮り、WACZ を取り出せて検索に当たれば「撮れた」
 ```
 
 smoke が既定で撮るのは、capture-ledger のスタックにいる
-[capture-fixtures](https://github.com/uraitakahito/capture-fixtures) の頁
-（`http://capture-fixtures.capture-ledger:8080/plain-html`）。`example.com` のような例示の名前は、
+[capture-fixtures](https://github.com/uraitakahito/capture-fixtures) の印付きの頁
+（`http://capture-fixtures.capture-ledger:8080/marked/page/smoke?tag=<印>`）。印は撮るたびに変わり、頁は
+それを題と本文に書くので、台帳の検索をその印で引けば、この回の archive にだけ当たる（前の回の取り込みは
+混ざらない）。`example.com` のような例示の名前は、
 ネットワークによって答えが変わる（ルータが `127.0.0.1` を返すことがある）ので使わない。capture-fixtures は
 `dev:up` では立ち上がらないので、smoke の前に立ち上げておく:
 
@@ -211,6 +213,7 @@ DNS が覚えるため）。
   ✗ oidc issuer         http://127.0.0.1:9099/.well-known/openid-configuration
   ・crawl route         先に capture-ledger api を
   ・jwt                 先に capture-ledger api・oidc issuer を
+  ・search route        先に capture-ledger api・oidc issuer を
 
 直すもの (2):
   capture-ledger api —— capture-ledger の API が答えない → cd ../capture-ledger && pnpm run api
@@ -221,16 +224,21 @@ DNS が覚えるため）。
 **smoke** は、doctor が全部 ✓ のときだけ 1 本撮る。本番と同じ道 —— capture-ledger の
 `POST /api/crawls` に flow と同じトークンで頼み、Windmill の flow に撮らせ、段の報告を待つ ——
 を通し、台帳に載った archive を署名付き URL で取り出して、先頭が `PK`（WACZ は zip）であることまで
-見る:
+見る。台帳は段の報告の時点でクロールを succeeded にし、flow の索引の段はその後に走るので、smoke は
+段の run の終わりを待って、索引の段の答え（載らなかった 0 本・載せた 1 本以上）を照らす。最後に、
+印で台帳の検索を引き、この回の archive の当たりの時点が、WACZ のページ一覧から予想した時点（写しの行が
+あれば写しの時点、無ければ文書の行の 1 件 `page`）と同じかを照らす:
 
 ```
-点検     doctor の 16 本とも ✓
-始める   POST /api/crawls → 202  crawl 545e912c-…  http://capture-fixtures.capture-ledger:8080/plain-html
+点検     doctor の 17 本とも ✓
+始める   POST /api/crawls → 202  crawl 545e912c-…  http://capture-fixtures.capture-ledger:8080/marked/page/smoke?tag=smokemh5k2x1fq3
 待つ     running
 run      http://127.0.0.1:8000/run/01a0ba19-…?workspace=crawler
 終わり   succeeded (max_depth) —— 撮ったページ 1・6 秒
 取り出す archive 928d640f-… の先頭が PK (WACZ = zip)
-撮れた   http://capture-fixtures.capture-ledger:8080/plain-html
+索引     載せたアーカイブ 1 本・載らなかった 0 本・索引の件数 2
+検索     「smokemh5k2x1fq3」で archive 928d640f-… の after-load・after-behaviors が当たる (ページ一覧から予想した時点と同じ)
+撮れた   http://capture-fixtures.capture-ledger:8080/marked/page/smoke?tag=smokemh5k2x1fq3
 ```
 
 **撮れなかったら**、smoke が落ちた段と直し方を言う（`原因` と `直す` の 2 行）。言われた手を直して
@@ -240,7 +248,7 @@ smoke をもう一度。自分が始めたクロールは、失敗しても時�
 
 ```sh
 cd ~/projects/crawler/capture-scheduler
-pnpm run smoke http://capture-fixtures.capture-ledger:8080/links/hub   # 撮る URL を変える
+pnpm run smoke http://capture-fixtures.capture-ledger:8080/links/hub   # 撮る URL を変える（当たる語が分からないので、検索は照らさない）
 pnpm run smoke --timeout 300          # 待つ上限（秒。既定 180）
 pnpm run smoke --no-doctor            # 点検を飛ばす（直した直後の撮り直し）
 pnpm run smoke --close-running        # 409 のとき、走っている 1 本を締めてから撮る

@@ -7,6 +7,12 @@
  * 「撮れた」は台帳の succeeded だけでは言わない。その回の archive を台帳の一覧から探し、
  * 署名付き URL で先頭 4 バイトを取り、`PK` (WACZ は zip) であることまで見る。
  *
+ * **索引と検索まで見る (CAPTURE-53)。** 台帳は段の報告の時点で succeeded にし、索引の段はその後に
+ * 走るので、段の run の終わりを待ち、索引の段の答え (載らなかった 0 本・載せた 1 本以上) を照らす。
+ * 既定の頁 (capture-fixtures の印付きの頁。印は撮るたびに変える) なら、その印で台帳の検索を引き、
+ * この回の archive の当たりの時点が、WACZ のページ一覧から予想した時点と同じかまで照らす
+ * (`smoke/read-search.ts`)。URL を渡したときは、検索は照らさない (その頁で当たる語が分からない)。
+ *
  * 撮れなかったら、落ちた段と直し方を言う (`smoke/read-crawl.ts`)。**自分が始めたクロールは
  * 必ず締める** —— running のまま残すと、以後の起動が全部 409 になる。flow がまだ走っていれば、
  * Windmill の run を取り消してから締める (`cancelRun`)。
@@ -21,17 +27,31 @@ import { parseArgs } from "node:util";
 import { guardEnv, windmillFetch, windmillUrl, windmillWorkspace } from "./env.js";
 import { API, runDoctor } from "./doctor/checks.js";
 import { formatFixes, formatTable, pad } from "./doctor/run.js";
+import { strFromU8, unzipSync } from "fflate";
+
 import {
   parseCrawl,
   readBusy,
   readFinished,
   readRefused,
   readRun,
+  readStepFailure,
   readStuck,
   stepMessage,
   type Crawl,
   type Reading,
 } from "./smoke/read-crawl.js";
+import {
+  compareSearchHits,
+  expectedStages,
+  indexJobOf,
+  readIndexFailure,
+  readIndexOutcome,
+  readIndexStep,
+  readSearchHits,
+  smokeTarget,
+  stagesOf,
+} from "./smoke/read-search.js";
 
 guardEnv();
 
@@ -52,8 +72,15 @@ function stop(label: string, text: string): never {
   process.exit(1);
 }
 
+/** 既定で撮る capture-fixtures (capture-ledger のスタックの物。BrowserHive のコンテナがこの名前を引く)。 */
+const FIXTURES = "http://capture-fixtures.capture-ledger:8080";
+/** 既定の頁と、検索に使う語 (撮るたびに変わる印)。URL を渡したときは無い。 */
+const target =
+  positionals[0] === undefined
+    ? smokeTarget(FIXTURES, Date.now(), Math.random().toString(36).slice(2, 8))
+    : undefined;
 const url = (() => {
-  const raw = positionals[0] ?? "http://capture-fixtures.capture-ledger:8080/plain-html";
+  const raw = positionals[0] ?? target?.url ?? "";
   try {
     return new URL(raw).href;
   } catch {
@@ -367,4 +394,139 @@ if (head !== "PK") {
   );
 }
 say("取り出す", `archive ${archive.id} の先頭が PK (WACZ = zip)`);
+
+// ── 索引 ──────────────────────────────────────────────────────────────
+
+/**
+ * 段の run が終わるまで待つ。**台帳は段の報告の時点で succeeded にし、索引の段はその後に走る** ——
+ * succeeded を見ただけでは、索引が載ったかは分からない (CAPTURE-53 の調べ)。
+ */
+const finishedRun = async (
+  jobId: string,
+): Promise<{ run: ReturnType<typeof readRun>; job: unknown }> => {
+  const until = Date.now() + 60_000;
+  for (;;) {
+    const job = await windmillJob(jobId);
+    const run = readRun(job);
+    if (run.state !== "running" || Date.now() >= until) return { run, job };
+    await sleep(2000);
+  }
+};
+
+const levelJob = crawl.lastJob?.id;
+if (levelJob === undefined) {
+  report(
+    {
+      evidence: "段の run が分からない (lastJob が無い) —— 索引の段の答えを読めない",
+      fix: "capture-ledger が v0.43.0 より古い → capture-ledger を新しくする",
+    },
+    crawl,
+  );
+}
+const level = await finishedRun(levelJob);
+if (level.run.state === "running") {
+  report(
+    {
+      evidence: "段の run が、succeeded の後 60 秒たっても終わらない (索引の段で止まっている)",
+      fix: "run を開いて index の段の log を見る。OpenSearch が遅いなら capture-ledger の pnpm run dev:status",
+    },
+    crawl,
+  );
+}
+if (level.run.state === "unknown") {
+  report(
+    {
+      evidence: `段の run が読めない (${level.run.detail})`,
+      fix: "Windmill に届くか —— .env の WINDMILL_TOKEN と pnpm run doctor の workspace",
+    },
+    crawl,
+  );
+}
+if (level.run.state === "failed") {
+  const failed = level.run;
+  const message =
+    (failed.stepJob === undefined ? undefined : stepMessage(await windmillJob(failed.stepJob))) ??
+    failed.closeProblem ??
+    "";
+  report(
+    {
+      evidence: `クロールは succeeded だが、run の ${failed.step ?? "?"} の段が落ちた: ${message || "(文が読めない)"}`,
+      fix: readIndexFailure(message) ?? readStepFailure(failed.step, message),
+    },
+    crawl,
+  );
+}
+const indexJob = indexJobOf(level.job);
+const outcome = indexJob === undefined ? undefined : readIndexOutcome(await windmillJob(indexJob));
+const indexProblem = readIndexStep(outcome);
+if (indexProblem !== undefined || outcome === undefined) {
+  report(
+    indexProblem ?? { evidence: "索引の段の答えが読めない", fix: "pnpm run windmill:push" },
+    crawl,
+  );
+}
+say(
+  "索引",
+  `載せたアーカイブ ${String(outcome.indexed)} 本・載らなかった 0 本・索引の件数 ${String(outcome.pages)}`,
+);
+
+// ── 検索 ──────────────────────────────────────────────────────────────
+
+if (target === undefined) {
+  say("検索", "URL を渡したので照らさない (照らすのは既定の印付きの頁のとき)");
+} else {
+  // 当たるはずの時点は、その WACZ のページ一覧から決める (写しの行があれば写しの時点だけ)。
+  const pagesJsonl =
+    signed.url === undefined
+      ? undefined
+      : await fetch(signed.url)
+          .then(async (res) => {
+            const members = unzipSync(new Uint8Array(await res.arrayBuffer()), {
+              filter: (file) => file.name === "pages/pages.jsonl",
+            });
+            const bytes = members["pages/pages.jsonl"];
+            return bytes === undefined ? undefined : strFromU8(bytes);
+          })
+          .catch(() => undefined);
+  if (pagesJsonl === undefined) {
+    report(
+      {
+        evidence: `archive ${archive.id} の pages/pages.jsonl が読めない`,
+        fix: "署名付き URL の先 (capture-ledger の CAPTURE_LEDGER_S3_ENDPOINT) に host から届くか",
+      },
+      crawl,
+    );
+  }
+  const expected = expectedStages(pagesJsonl);
+
+  // **当たるまで少し待つ。** 見てよいかの権限は capture-ledger が 5 秒ごとに OpenFGA へ書くので、撮った
+  // 直後は当たらないことがある。当たったのに時点が違えば、待っても変わらないので待たない。
+  const until = Date.now() + 15_000;
+  let problem: Reading | undefined;
+  for (;;) {
+    const got = await ledger(`/api/search?q=${encodeURIComponent(target.query)}`);
+    const hits = readSearchHits(parse(got.body));
+    if (hits === undefined) {
+      problem = {
+        evidence: `GET /api/search → ${String(got.status)} ${got.body.slice(0, 200)}`,
+        fix:
+          got.status === 503
+            ? "capture-ledger の OpenSearch が答えない → cd ../capture-ledger && pnpm run dev:up --from search"
+            : got.status === 404
+              ? "台帳に検索の口が無い (pnpm run doctor の search route)"
+              : "答えの形が違う (total が数でない) —— capture-ledger が古い",
+      };
+      break;
+    }
+    problem = compareSearchHits(hits, archive.id, expected);
+    if (problem === undefined || stagesOf(hits, archive.id).length > 0 || Date.now() >= until)
+      break;
+    await sleep(2000);
+  }
+  if (problem !== undefined) report(problem, crawl);
+  say(
+    "検索",
+    `「${target.query}」で archive ${archive.id} の ${expected.join("・")} が当たる (ページ一覧から予想した時点と同じ)`,
+  );
+}
 say("撮れた", url);

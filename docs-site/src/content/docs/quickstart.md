@@ -181,12 +181,14 @@ command to type, with the names capture-ledger actually saw.
 ```sh
 cd ~/projects/crawler/capture-scheduler
 pnpm run doctor   # runs the checks in order; all ✓ means a crawl is set up to run to the end
-pnpm run smoke    # captures a capture-fixtures page once; "撮れた" (captured) once the WACZ comes back
+pnpm run smoke    # captures a capture-fixtures page once; "撮れた" (captured) once the WACZ comes back and search finds it
 ```
 
-By default smoke captures a page of [capture-fixtures](https://github.com/uraitakahito/capture-fixtures)
-in the capture-ledger stack (`http://capture-fixtures.capture-ledger:8080/plain-html`). Example names
-such as `example.com` are not used: their answers differ by network (a router may answer `127.0.0.1`).
+By default smoke captures a marked page of [capture-fixtures](https://github.com/uraitakahito/capture-fixtures)
+in the capture-ledger stack (`http://capture-fixtures.capture-ledger:8080/marked/page/smoke?tag=<tag>`).
+The tag is new on every run and the page writes it into its title and text, so searching the ledger for
+the tag finds this run's archive and nothing older. Example names such as `example.com` are not used:
+their answers differ by network (a router may answer `127.0.0.1`).
 `dev:up` does not start capture-fixtures, so start it before smoke:
 
 ```sh
@@ -212,6 +214,7 @@ fix means one ✗.
   ✗ oidc issuer         http://127.0.0.1:9099/.well-known/openid-configuration
   ・crawl route         先に capture-ledger api を
   ・jwt                 先に capture-ledger api・oidc issuer を
+  ・search route        先に capture-ledger api・oidc issuer を
 
 直すもの (2):
   capture-ledger api —— capture-ledger の API が答えない → cd ../capture-ledger && pnpm run api
@@ -222,16 +225,23 @@ fix means one ✗.
 **smoke** captures one page, and only when doctor is all ✓. It takes the production path —
 asks capture-ledger's `POST /api/crawls` with the flow's own token, lets the Windmill flow capture,
 waits for the level report — then fetches the archive the ledger recorded through a signed URL
-and checks that it starts with `PK` (a WACZ is a zip):
+and checks that it starts with `PK` (a WACZ is a zip). The ledger marks the crawl `succeeded` at the
+level report, before the flow's index step runs, so smoke then waits for the level's run to finish
+and checks the index step's answer (no archive left out, at least one indexed). Last, it searches the
+ledger for the tag and checks that this archive's hits are at the stages the WACZ's page list
+predicts: the snapshot stages when the page list has snapshot entries, otherwise the one entry of the
+document (`page`):
 
 ```
-点検     doctor の 16 本とも ✓
-始める   POST /api/crawls → 202  crawl 545e912c-…  http://capture-fixtures.capture-ledger:8080/plain-html
+点検     doctor の 17 本とも ✓
+始める   POST /api/crawls → 202  crawl 545e912c-…  http://capture-fixtures.capture-ledger:8080/marked/page/smoke?tag=smokemh5k2x1fq3
 待つ     running
 run      http://127.0.0.1:8000/run/01a0ba19-…?workspace=crawler
 終わり   succeeded (max_depth) —— 撮ったページ 1・6 秒
 取り出す archive 928d640f-… の先頭が PK (WACZ = zip)
-撮れた   http://capture-fixtures.capture-ledger:8080/plain-html
+索引     載せたアーカイブ 1 本・載らなかった 0 本・索引の件数 2
+検索     「smokemh5k2x1fq3」で archive 928d640f-… の after-load・after-behaviors が当たる (ページ一覧から予想した時点と同じ)
+撮れた   http://capture-fixtures.capture-ledger:8080/marked/page/smoke?tag=smokemh5k2x1fq3
 ```
 
 **When it fails**, smoke names the step that failed and how to fix it (the `原因` cause and
@@ -241,7 +251,7 @@ timeout, on Ctrl-C — so the next run is never blocked by a 409. To follow it i
 
 ```sh
 cd ~/projects/crawler/capture-scheduler
-pnpm run smoke http://capture-fixtures.capture-ledger:8080/links/hub   # capture a different URL
+pnpm run smoke http://capture-fixtures.capture-ledger:8080/links/hub   # capture a different URL (search is not checked: no known word)
 pnpm run smoke --timeout 300          # how long to wait (seconds, default 180)
 pnpm run smoke --no-doctor            # skip the checks (re-running right after a fix)
 pnpm run smoke --close-running        # on 409, close the running crawl first, then capture

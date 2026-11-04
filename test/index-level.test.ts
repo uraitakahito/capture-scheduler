@@ -2,11 +2,14 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { main } from "../windmill/f/waggle/index_level.js";
 
 /**
- * 索引の step。**判断はゼロで、渡すのは crawl_id だけ** —— 押さえるのはその形。
+ * 索引の step。**判断はゼロで、渡すのは crawl_id だけ** —— 押さえるのはその形と、答えの読み分け。
  *
  * どの archive がまだ索引されていないかは capture-ledger が知っている
  * (`archives.indexed_at IS NULL`)。id の一覧をここで組み立てる形に変わったら、
- * 「何を索引すべきか」の判断が試験の無い場所へ移ったということ。
+ * 「何を索引すべきか」の判断が flow へ移ったということ。
+ *
+ * 検索は台帳の必須の部品 (CAPTURE-53) なので、**どの失敗も黙らせない** —— 以前は 404 を
+ * 「検索の無い配備」として飛ばしていたが、その配備はもう無い。
  */
 
 const VARS: Record<string, string> = {
@@ -36,13 +39,16 @@ const responding = (status: number, body: unknown) => {
   return seen;
 };
 
+const OK = { pending: 3, indexed: 3, failed: 0, pages: 7 };
+
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("capture-ledger への頼み方", () => {
   it("crawl_id だけを URL に載せ、本文は送らない", async () => {
-    const seen = responding(202, { indexed: 3, pages: 3 });
+    const seen = responding(202, OK);
     await main("c-1");
 
     expect(seen[0]!.url).toBe("http://capture-ledger:7070/api/crawls/c-1/index");
@@ -54,7 +60,7 @@ describe("capture-ledger への頼み方", () => {
     // **本文の無い POST に `application/json` を名乗ると、Fastify が
     // `FST_ERR_CTP_EMPTY_JSON_BODY` で 400 を返す。** 実際に踏んで、flow の
     // index step が赤くなった。「JSON だと言ったのに空」という言い分は正しい。
-    const seen = responding(202, { indexed: 0, pages: 0 });
+    const seen = responding(202, { pending: 0, indexed: 0, failed: 0, pages: 0 });
     await main("c-1");
 
     const headers = seen[0]!.init.headers as Record<string, string>;
@@ -62,22 +68,39 @@ describe("capture-ledger への頼み方", () => {
     expect(headers["authorization"]).toBe("Bearer tok");
   });
 
-  it("件数をそのまま返す", async () => {
-    responding(202, { indexed: 3, pages: 7 });
-    await expect(main("c-1")).resolves.toEqual({ indexed: 3, pages: 7, skipped: false });
+  it("4 つの数をそのまま返し、1 行のログに書く", async () => {
+    responding(202, OK);
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+    await expect(main("c-1")).resolves.toEqual(OK);
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(String(log.mock.calls[0]?.[0])).toMatch(
+      /待っていたアーカイブ 3 本.*載せた 3 本.*載せられなかった 0 本.*索引の件数 7/,
+    );
   });
 });
 
-describe("索引が無い配備", () => {
-  it("404 は飛ばす（投げない）", async () => {
-    // `CAPTURE_LEDGER_OPENSEARCH_URL` を設定していない capture-ledger は口ごと出さない。
-    // それは正しい答えなので、一律に投げるとクロールが毎回赤くなる。
+describe("載らなかったら段を落とす", () => {
+  it("載せられなかったアーカイブがあれば投げる（202 でも）", async () => {
+    // 1 本の失敗を、台帳は 202 のまま failed に数える。ここで黙ると、索引に 1 本も無いまま緑になる。
+    responding(202, { pending: 2, indexed: 1, failed: 1, pages: 2 });
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    await expect(main("c-1")).rejects.toThrow(/索引に入らなかったアーカイブが 1 本/);
+  });
+
+  it("404 は投げる —— クロールが無いか、許可が無い", async () => {
+    // 以前は「検索の無い配備」として飛ばしていた。台帳は検索なしでは起動しなくなったので、
+    // 404 はクロールが無いか、トークンの名前に can_submit が無いことしか意味しない。
     responding(404, { error: "not found" });
-    await expect(main("c-1")).resolves.toEqual({ indexed: 0, pages: 0, skipped: true });
+    await expect(main("c-1")).rejects.toThrow(/404.*can_submit/);
+  });
+
+  it("503 は投げ、OpenSearch が答えないと言う", async () => {
+    responding(503, { error: "search unavailable" });
+    await expect(main("c-1")).rejects.toThrow(/503.*OpenSearch が答えない/);
   });
 
   it("500 は投げる", async () => {
-    // 索引の失敗を黙らせない。飛ばしてよいのは 404 だけ。
     responding(500, { error: "internal error" });
     await expect(main("c-1")).rejects.toThrow(/500/);
   });
@@ -85,5 +108,11 @@ describe("索引が無い配備", () => {
   it("401 も投げる", async () => {
     responding(401, { error: "unauthenticated" });
     await expect(main("c-1")).rejects.toThrow(/401/);
+  });
+
+  it("答えの形が古い（pending・failed が無い）なら投げる", async () => {
+    // capture-ledger が古いと `{ indexed, pages }` しか返さない —— 載せられなかった数が分からないので通さない。
+    responding(202, { indexed: 3, pages: 3 });
+    await expect(main("c-1")).rejects.toThrow(/答えの形が違う/);
   });
 });
