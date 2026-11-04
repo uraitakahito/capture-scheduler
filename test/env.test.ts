@@ -20,6 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CRAWL_FLOW_PATH,
   ledgerApiUrl,
+  HOST_TS_COMPILE,
   ledgerEnv,
   ledgerIssuer,
   optional,
@@ -100,11 +101,12 @@ describe("CRAWL_FLOW_PATH", () => {
 });
 
 /**
- * capture-ledger の `.env` の末尾に貼る 4 行。以前は webhook の 2 行だけで、残り 2 行 (待ち受けと
- * issuer) を書き漏らした API で 2 度止まった (2026-09-19・20)。
+ * capture-ledger に渡す行 (`connect` が向こうの `.env.local` に写す)。以前は webhook の 2 行だけで、
+ * 残り (待ち受けと issuer) を書き漏らした API で 2 度止まった (2026-09-19・20)。ts-compile の宛先は
+ * 2026-11-05 に、人が書き足すまで API が起動で止まった。
  */
 describe("ledgerEnv", () => {
-  it("capture-ledger の変数名で、webhook の URL・token・待ち受け・issuer の 4 行を返す", () => {
+  it("capture-ledger の変数名で、webhook の URL・token・待ち受け・issuer・ts-compile の宛先を返す", () => {
     expect(
       ledgerEnv({
         windmillUrl: "http://127.0.0.1:8000",
@@ -117,7 +119,18 @@ describe("ledgerEnv", () => {
       "CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN=tok",
       "CAPTURE_LEDGER_API_HOST=0.0.0.0",
       "CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099",
+      "CAPTURE_LEDGER_TS_COMPILE_URL=http://127.0.0.1:28080",
     ]);
+  });
+
+  it("ts-compile の宛先は、doctor が host から叩く口と同じ値", () => {
+    const lines = ledgerEnv({
+      windmillUrl: "http://127.0.0.1:8000",
+      workspace: "crawler",
+      token: "tok",
+      issuer: "i",
+    });
+    expect(lines).toContain(`CAPTURE_LEDGER_TS_COMPILE_URL=${HOST_TS_COMPILE}`);
   });
 });
 
@@ -137,7 +150,7 @@ describe("ledgerIssuer", () => {
     expect(ledgerIssuer()).toBe("http://127.0.0.1:9099");
   });
 
-  it("CAPTURE_LEDGER_OIDC_ISSUER を変えると、capture-ledger に貼る 4 行目もそろって変わる", () => {
+  it("CAPTURE_LEDGER_OIDC_ISSUER を変えると、capture-ledger に渡す issuer の行もそろって変わる", () => {
     process.env["CAPTURE_LEDGER_OIDC_ISSUER"] = "http://127.0.0.1:9199";
     const lines = ledgerEnv({
       windmillUrl: "http://127.0.0.1:8000",
@@ -145,7 +158,9 @@ describe("ledgerIssuer", () => {
       token: "tok",
       issuer: ledgerIssuer(),
     });
-    expect(lines.at(-1)).toBe("CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9199");
+    expect(lines.find((line) => line.startsWith("CAPTURE_LEDGER_OIDC_ISSUER="))).toBe(
+      "CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9199",
+    );
   });
 });
 

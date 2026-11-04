@@ -2,14 +2,14 @@
  * 道具が書くファイル。**人が書く `.env` には触らない。**
  *
  * 分けるのは持ち主が違うから —— `.env` は人が決めた値、ここは **走らせてみないと
- * 決まらない値** (Windmill の token と、その token から組み立てた 4 行)。混ぜると、
+ * 決まらない値** (Windmill の token と、その token から組み立てた、capture-ledger に渡す行)。混ぜると、
  * 道具が人の編集を踏む日が来る。
  *
  * ## 書くのは、この repo の中だけ
  *
  * `windmill:bootstrap` は capture-scheduler で打つコマンドなので、capture-scheduler の
  * 中にしか書かない。**打った repo の外が変わるのは、打った人の予想に反する。**
- * capture-ledger に渡したい 4 行は「引き渡しファイル」として自分の中に置き、
+ * capture-ledger に渡したい行は「引き渡しファイル」として自分の中に置き、
  * 取りに行くのは向こうの仕事 (capture-ledger の `pnpm run connect`)。
  *
  * ## 2 枚の性格が違う
@@ -27,7 +27,7 @@ import { dirname, join } from "node:path";
 import { repoRoot } from "./env.js";
 
 export const ENV_LOCAL = ".env.local";
-/** capture-ledger に渡す 4 行の置き場。**読むのは向こうの `pnpm run connect`。** */
+/** capture-ledger に渡す行の置き場。**読むのは向こうの `pnpm run connect`。** */
 export const HANDOFF = join(".dev", "capture-ledger.env");
 
 const ENV_LOCAL_HEADER = `# capture-scheduler の道具が書くファイル。**手で書かない**（手で書くのは .env）。

@@ -103,22 +103,30 @@ export const CRAWL_FLOW_PATH = "f/waggle/crawl_level";
 
 /**
  * capture-ledger の dev issuer。**トークンを取りに行く先 (`windmill:capture-ledger-token`・doctor) と、
- * capture-ledger が照合する先 (`ledgerEnv` の 4 行目) は、同じ値でなければならない** ——
+ * capture-ledger が照合する先 (`ledgerEnv` の issuer の行) は、同じ値でなければならない** ——
  * 一字一句違うだけで、flow の JWT は 401 になる。だから 1 か所で決める。
  */
 export const ledgerIssuer = (): string =>
   optional("CAPTURE_LEDGER_OIDC_ISSUER", "http://127.0.0.1:9099");
 
 /**
- * capture-ledger の `.env` の**末尾に**貼る 4 行。**`windmill:bootstrap` が出力し、クイックスタートが
- * 同じ形で載せる** (一致は `check-doc-refs.ts` が見る)。
+ * capture-ledger が host から ts-compile を呼ぶ宛先。compose が `127.0.0.1:28080` に出す口
+ * (`docker-compose.yml` の ts-compile の `ports`)。**doctor が叩く先 (host→ts-compile) と、capture-ledger に
+ * 渡す値 (`ledgerEnv`) は同じでなければならない** —— 違えば、doctor は ✓ なのに、台帳の型の誤りの取り直しと
+ * 直し方の口だけが 503 になる。だから 1 か所で決める。
+ */
+export const HOST_TS_COMPILE = "http://127.0.0.1:28080";
+
+/**
+ * capture-ledger に渡す行。**`windmill:bootstrap` が引き渡しファイル (`.dev/capture-ledger.env`) に書き、
+ * capture-ledger の `pnpm run connect` が向こうの `.env.local` に写す**。クイックスタートが同じ形で載せる
+ * (一致は `check-doc-refs.ts` が見る)。
  *
- * 以前は webhook の 2 行だけを出していた。残りの 2 行 (待ち受けと issuer) はクイックスタートと
- * capture-ledger の `.env.example` に `#` 付きで在るだけで、2026-09-19 と 20 の 2 回とも、止まったのは
- * その 2 行だった —— 貼ったのは道具が出した 2 行だけ。4 行とも出せば、貼るものは 1 か所になる。
- *
- * 末尾に貼らせるのは、node の `--env-file` では同じ名前の後ろの行が効くから。`.env.example` を写した
- * `.env` には `#CAPTURE_LEDGER_API_HOST=127.0.0.1` のような行が前に在るが、末尾の行が勝つ。
+ * 以前は webhook の 2 行だけを出していた。残り (待ち受けと issuer) はクイックスタートと capture-ledger の
+ * `.env.example` に `#` 付きで在るだけで、2026-09-19 と 20 の 2 回とも、止まったのはその 2 行だった ——
+ * 貼ったのは道具が出した 2 行だけ。ts-compile の宛先も同じ形で漏れた (2026-11-05。capture-ledger v0.71.0 は、
+ * Claude の鍵があって宛先が無いと起動で止まる。人に `.env` へ書いてもらった)。値を決めるこちらが全部を出せば、
+ * 渡すものは 1 か所になる。
  *
  * token は bootstrap が作った API token そのもの —— capture-ledger はそれで webhook を叩く。
  */
@@ -139,6 +147,9 @@ export const ledgerEnv = ({
   "CAPTURE_LEDGER_API_HOST=0.0.0.0",
   // flow は JWT で名乗る。これが無い API は開発用ヘッダで名乗る設定になり、段の報告は 401。
   `CAPTURE_LEDGER_OIDC_ISSUER=${issuer}`,
+  // 型で落ちたクロールの誤りの取り直しと、直し方の検査 (capture-ledger v0.69.0 以降)。台帳は host で動くので、
+  // 名前ではなく host に出した口で呼ぶ。Claude の鍵があってこれが無いと、台帳の API は起動で止まる。
+  `CAPTURE_LEDGER_TS_COMPILE_URL=${HOST_TS_COMPILE}`,
 ];
 
 /**

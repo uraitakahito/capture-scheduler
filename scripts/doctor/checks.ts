@@ -21,6 +21,7 @@ import { join, relative } from "node:path";
 import { promisify } from "node:util";
 
 import {
+  HOST_TS_COMPILE,
   ledgerApiUrl,
   ledgerIssuer,
   optional,
@@ -29,7 +30,7 @@ import {
   windmillWorkspace,
 } from "../env.js";
 import { readCanSubmit } from "./can-submit.js";
-import { HOST_TS_COMPILE, readHostTsCompile } from "./host-probes.js";
+import { readHostTsCompile } from "./host-probes.js";
 import { readJwt } from "./jwt-check.js";
 import { runChecks, type Check, type Outcome, type Result, type Verdict } from "./run.js";
 import { SECTIONS } from "./sections.js";

@@ -29,7 +29,9 @@ reason は台帳の上限の 2,000 字に切る。超えると台帳が報告を
 
 同じ `ts-compile` を、compose は host の `127.0.0.1:28080` にも出している。host で動く capture-ledger が、
 型で落ちたクロールの誤りを行と列で取り直すときと、直し方を確かめるときに呼ぶ（host の node はコンテナの
-subnet に届かないので、loopback に出す）。flow の側は今までどおり、名前（`u/admin/ts_compile_url`）で呼ぶ。
+subnet に届かないので、loopback に出す）。この宛先は、bootstrap がほかの行と一緒に capture-ledger へ渡す
+（`.dev/capture-ledger.env` の `CAPTURE_LEDGER_TS_COMPILE_URL`。capture-ledger の `pnpm run connect` が写す）ので、
+手で書く物はない。flow の側は今までどおり、名前（`u/admin/ts_compile_url`）で呼ぶ。
 
 **繰り返すのは capture-ledger。** この flow は 1 段で終わる。Windmill の while ループに
 繰り返しを持たせようとしたが、`stop_after_if` を付けた最小の flow が
