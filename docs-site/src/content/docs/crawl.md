@@ -29,6 +29,11 @@ The reason is cut to the ledger's limit of 2,000 characters: above it the ledger
 report, and the crawl would stay `running` and block every crawl after it. A script that does
 not type-check never reaches a page.
 
+The same `ts-compile` is also published on the host at `127.0.0.1:28080`. capture-ledger runs on the host
+and calls it to re-read, by line and column, the type errors of a crawl that failed, and to check proposed
+fixes (the host's node cannot reach the container subnet, so the port is published on loopback). The flow
+keeps calling it by name (`u/admin/ts_compile_url`).
+
 **capture-ledger does the repeating.** This flow ends after one level. Putting the loop
 in Windmill was tried: a minimal flow with `stop_after_if` **ran 643 iterations
 without stopping**. A mechanism for not overloading someone else's server does

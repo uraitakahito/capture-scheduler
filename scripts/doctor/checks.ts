@@ -1,5 +1,5 @@
 /**
- * doctor の点検 15 本 (e2e のときは 17 本)。**クイックスタートの手の順に並べてある。**
+ * doctor の点検 (本数は `CHECKS` の長さ。e2e のときだけ増える)。**クイックスタートの手の順に並べてある。**
  *
  * 1 本ずつ「クイックスタートのどの手が済んでいるか」を、その手が作るものに訊く。立っているか
  * だけでなく、**クロールが最後まで走る設定か**まで見る —— 外れていても、API に POST すれば
@@ -12,7 +12,7 @@
  * flow が読むその値で宛先を叩く。
  *
  * 読み分けは入出力を持たない module に分けてある (`windmill-contents.ts`・`worker-probes.ts`・
- * `jwt-check.ts`・`can-submit.ts`)。ここは答えを取ってくるだけ。
+ * `host-probes.ts`・`jwt-check.ts`・`can-submit.ts`)。ここは答えを取ってくるだけ。
  */
 import { execFile } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
@@ -29,6 +29,7 @@ import {
   windmillWorkspace,
 } from "../env.js";
 import { readCanSubmit } from "./can-submit.js";
+import { HOST_TS_COMPILE, readHostTsCompile } from "./host-probes.js";
 import { readJwt } from "./jwt-check.js";
 import { runChecks, type Check, type Outcome, type Result, type Verdict } from "./run.js";
 import { SECTIONS } from "./sections.js";
@@ -449,6 +450,15 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
         `${windmillUrl()}/api/version`,
         "Windmill が答えない → この repo で container-compose up -d",
       ),
+  },
+  {
+    name: "host→ts-compile",
+    section: SECTIONS.bringUp,
+    // **loopback で訊く** (capture-fixtures と同じ理由で、host の node はコンテナの subnet に届かない)。
+    // capture-ledger が、型で落ちたクロールの誤りを取り直し、直し方を確かめるのに呼ぶ口。
+    // worker→ts-compile は flow の側の宛先 (名前) を見るので、どちらか片方では足りない。
+    where: `${HOST_TS_COMPILE}/healthz (capture-ledger が host から呼ぶ口)`,
+    probe: async () => readHostTsCompile(await answerOf(`${HOST_TS_COMPILE}/healthz`)),
   },
   {
     name: "workspace",

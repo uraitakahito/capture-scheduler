@@ -71,9 +71,9 @@ describe("本物の点検の並び", () => {
     expect(stateOf(results, "can_submit")).toMatchObject({ state: "skip", reason: "先に jwt を" });
   });
 
-  it("点検は 15 本で、e2e のときだけ 2 本増える", () => {
-    expect(CHECKS.filter((c) => c.e2eOnly !== true)).toHaveLength(15);
-    expect(CHECKS).toHaveLength(17);
+  it("点検は 16 本で、e2e のときだけ 2 本増える", () => {
+    expect(CHECKS.filter((c) => c.e2eOnly !== true)).toHaveLength(16);
+    expect(CHECKS).toHaveLength(18);
   });
 
   it("親は必ず子より前に並ぶ (報告がクイックスタートの順に読め、循環も無い)", () => {

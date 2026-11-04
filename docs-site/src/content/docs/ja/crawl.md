@@ -27,6 +27,10 @@ flow は `fail_crawl` へ落ち、クロールは診断の件数と最初の 5 �
 reason は台帳の上限の 2,000 字に切る。超えると台帳が報告を断り、クロールは running のまま残って、
 後のクロールを全部塞ぐ。型が通らないスクリプトはページに届かない。
 
+同じ `ts-compile` を、compose は host の `127.0.0.1:28080` にも出している。host で動く capture-ledger が、
+型で落ちたクロールの誤りを行と列で取り直すときと、直し方を確かめるときに呼ぶ（host の node はコンテナの
+subnet に届かないので、loopback に出す）。flow の側は今までどおり、名前（`u/admin/ts_compile_url`）で呼ぶ。
+
 **繰り返すのは capture-ledger。** この flow は 1 段で終わる。Windmill の while ループに
 繰り返しを持たせようとしたが、`stop_after_if` を付けた最小の flow が
 **643 回まで回り続けた**。相手のサーバに負荷をかけない仕組みを、暴走しうるループの

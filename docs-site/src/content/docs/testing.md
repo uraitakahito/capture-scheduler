@@ -9,10 +9,9 @@ pnpm run test:e2e    # 1 end-to-end test, needs the stack
 pnpm run check       # audit, format, env, typecheck, unit tests, CI parity, docs site
 ```
 
-`pretest:e2e` runs doctor with `--e2e` first and names what is missing — the 15 checks of
+`pretest:e2e` runs doctor with `--e2e` first and names what is missing — the checks of
 [the quickstart's "Check it"](/quickstart/#check-it-take-one-capture), plus capture-fixtures and
-the crawl permission for `e2e`, the name the test uses (`fga:grant submitter e2e acme`): 17 in
-all. It checks not just that things are up but that a crawl can run to the end — miss any of
+the crawl permission for `e2e`, the name the test uses (`fga:grant submitter e2e acme`). It checks not just that things are up but that a crawl can run to the end — miss any of
 these and a crawl fails only at its level report, staying `running`. It lives outside vitest
 deliberately: vitest prints "No test files found, exiting with code 1" whenever a global setup
 throws, and no message written inside can survive that.

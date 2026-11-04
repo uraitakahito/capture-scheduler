@@ -97,7 +97,11 @@ services:
   #
   # image は ts-compile-service の tag で ghcr.io に公開されている物 (arm64)。手元で建てるなら
   # `container build -t ts-compile-service:dev -f Containerfile .` して image: をそれに。
-  # port は開けない —— 呼ぶのは worker だけ。
+  # **host の 127.0.0.1:28080 にも出す。** capture-ledger は host で動き、型で落ちたクロールの
+  # 誤りを取り直すときと、直し方を確かめるときに、ここを呼ぶ。macOS 26 では host の node が
+  # コンテナの subnet に TCP を張れない (doctor の capture-fixtures の注記と同じ実測) ので、
+  # loopback に出すしかない。番号は、慣例の 8080 も、BrowserHive の e2e の fixtures が出す
+  # 18080〜18082 も避けた。worker は今までどおり名前 (ts-compile.capture-scheduler:8080) で呼ぶ。
   #
   # /healthz の hostTypes が「受け皿の型 (capture-scripts の types/host.d.ts) をどの tag から
   # 写したか」。台帳が取り込んだ capture-scripts の tag と同じでなければ、向こうで通った TS がここで 422 になりうる。
@@ -106,6 +110,9 @@ services:
     environment:
       - PORT=8080
       - HOST=0.0.0.0
+    ports:
+      # loopback に閉じる。認証は無いが、TS を JS にして返すだけで、何も書き換えない。
+      - "127.0.0.1:28080:8080"
     mem_limit: 512mb
 
 volumes:
