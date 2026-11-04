@@ -109,7 +109,7 @@ export const readContainerApi = ({
       need:
         `worker から ${url} に届かない (refused) —— API が 127.0.0.1 で待っている ` +
         "(CAPTURE_LEDGER_API_HOST=0.0.0.0 が効いていない) → " +
-        "windmill:bootstrap が出した 4 行を capture-ledger の .env の末尾に貼り、API を起こし直す",
+        "capture-ledger で pnpm run connect を打ち (windmill:bootstrap が引き渡した行を .env.local に写す)、API を起こし直す",
     };
   }
   if (answer.rc === 28) return { ok: false, need: `worker から ${url} が 5 秒で答えない` };

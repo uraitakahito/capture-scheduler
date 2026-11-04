@@ -33,7 +33,7 @@ capture-scheduler command inside capture-ledger and pnpm only says `Missing scri
 `pnpm run dev:up` over in capture-ledger runs 16 steps in order — **including the ones on this
 page**: it brings Windmill up, bootstraps it, loads the flow, hands over the keys,
 and finishes with `doctor`. What it runs there are **this repo's own commands**, and **no file
-of this repo's is written from over there** (the four lines for capture-ledger are fetched by
+of this repo's is written from over there** (the lines for capture-ledger are fetched by
 its own `pnpm run connect`).
 
 ```sh
@@ -59,32 +59,34 @@ pnpm run windmill:push        # upload the scripts, the flow and the schedule
 
 **There is nothing to paste any more.** bootstrap writes two files, both inside this repo:
 
-| File                      | What is in it                                                    |
-| ------------------------- | ---------------------------------------------------------------- |
-| `.env.local`              | `WINDMILL_TOKEN`, read by this repo's own scripts                |
-| `.dev/capture-ledger.env` | the four lines for capture-ledger. **The other side reads them** |
+| File                      | What is in it                                               |
+| ------------------------- | ----------------------------------------------------------- |
+| `.env.local`              | `WINDMILL_TOKEN`, read by this repo's own scripts           |
+| `.dev/capture-ledger.env` | the lines for capture-ledger. **The other side reads them** |
 
 Changing capture-ledger's settings is the job of a command you run **there**:
 
 ```sh
 cd ~/projects/crawler/capture-ledger
-pnpm run connect              # reads the four lines above into capture-ledger's .env.local
+pnpm run connect              # reads the lines above into capture-ledger's .env.local
 ```
 
-These are the four lines. **Miss any of them and no crawl runs to the end**:
+These are the lines, and **each one is needed** (the table says what stops without it):
 
 ```dotenv title="capture-scheduler/.dev/capture-ledger.env"
 CAPTURE_LEDGER_CRAWL_WEBHOOK_URL=http://127.0.0.1:8000/api/w/crawler/jobs/run/f/f/waggle/crawl_level
 CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN=<the token bootstrap created>
 CAPTURE_LEDGER_API_HOST=0.0.0.0
 CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099
+CAPTURE_LEDGER_TS_COMPILE_URL=http://127.0.0.1:28080
 ```
 
-| Line                                           | Why                                                                                                 |
-| ---------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `…_CRAWL_WEBHOOK_URL`, `…_CRAWL_WEBHOOK_TOKEN` | Where crawls are sent to Windmill. Without them `/api/crawls` does not exist (`404`)                |
-| `CAPTURE_LEDGER_API_HOST=0.0.0.0`              | Level reports come from a container, and an API listening on `127.0.0.1` never receives them        |
-| `CAPTURE_LEDGER_OIDC_ISSUER`                   | The flow identifies itself with a JWT. Without it the API trusts dev headers, and reports get `401` |
+| Line                                           | Why                                                                                                                                                                                                                                              |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `…_CRAWL_WEBHOOK_URL`, `…_CRAWL_WEBHOOK_TOKEN` | Where crawls are sent to Windmill. Without them `/api/crawls` does not exist (`404`)                                                                                                                                                             |
+| `CAPTURE_LEDGER_API_HOST=0.0.0.0`              | Level reports come from a container, and an API listening on `127.0.0.1` never receives them                                                                                                                                                     |
+| `CAPTURE_LEDGER_OIDC_ISSUER`                   | The flow identifies itself with a JWT. Without it the API trusts dev headers, and reports get `401`                                                                                                                                              |
+| `CAPTURE_LEDGER_TS_COMPILE_URL`                | Where capture-ledger, on the host, asks ts-compile-service (published on `127.0.0.1:28080`) to re-read a failed crawl's type errors and to check a proposed fix. With the Claude key set and this missing, capture-ledger's API refuses to start |
 
 bootstrap creates a new token every time you run it (the earlier ones stay valid), so **run `connect`
 again whenever you run bootstrap again** — the handoff file is rewritten with the new token, and
@@ -95,7 +97,7 @@ Once `connect` has run, start the issuer on the capture-ledger side and **restar
 
 **Stop the API you started in §6 of capture-ledger's quickstart (`Ctrl-C`)** and run the same
 command again — this is not a second instance. The API reads its settings **once, at
-startup**, so a process left running never sees the four lines above. Trying to run both
+startup**, so a process left running never sees the lines above. Trying to run both
 fails anyway: the second one exits with
 `EADDRINUSE: address already in use 0.0.0.0:7070`. **When you cannot tell what is still
 running**, capture-ledger's `pnpm run dev:status` prints the pid and start time and
@@ -111,7 +113,7 @@ pnpm run oidc:issuer   # keep it running
 pnpm run api           # stop the one from §6 first, then use the same command
 ```
 
-The **last line** of the API's startup log says whether the four lines took:
+The **last line** of the API's startup log says whether the lines took:
 
 ```text
 Archive API listening on 0.0.0.0:7070 — identity: JWT (http://127.0.0.1:9099); crawl level reports: ready

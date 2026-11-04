@@ -31,8 +31,10 @@ not type-check never reaches a page.
 
 The same `ts-compile` is also published on the host at `127.0.0.1:28080`. capture-ledger runs on the host
 and calls it to re-read, by line and column, the type errors of a crawl that failed, and to check proposed
-fixes (the host's node cannot reach the container subnet, so the port is published on loopback). The flow
-keeps calling it by name (`u/admin/ts_compile_url`).
+fixes (the host's node cannot reach the container subnet, so the port is published on loopback). bootstrap
+hands this address to capture-ledger with the other lines (`CAPTURE_LEDGER_TS_COMPILE_URL` in
+`.dev/capture-ledger.env`, copied by capture-ledger's `pnpm run connect`), so nobody writes it by hand. The
+flow keeps calling it by name (`u/admin/ts_compile_url`).
 
 **capture-ledger does the repeating.** This flow ends after one level. Putting the loop
 in Windmill was tried: a minimal flow with `stop_after_if` **ran 643 iterations

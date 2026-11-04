@@ -25,7 +25,7 @@
  *   6. doctor と smoke が指す節 —— ✗ に添える URL の anchor が、build 後の HTML の見出しの id に
  *      在るか (`scripts/doctor/sections.ts`)。見出しを書き換えると id が変わり、URL は黙って
  *      ページの先頭に落ちる。
- *   7. capture-ledger に貼る 4 行 —— クイックスタートの dotenv のブロックが、bootstrap の出力
+ *   7. capture-ledger に渡す行 —— クイックスタートの dotenv のブロックが、bootstrap の出力
  *      (`env.ts` の `ledgerEnv`) と名前も値も同じか。
  *
  * 訳について見るのはページの **存在** だけで、構造は一切見ない。両方の言語に同じ
@@ -181,9 +181,9 @@ for (const section of Object.values(SECTIONS)) {
   }
 }
 
-// ── 7. capture-ledger に貼る 4 行 ────────────────────────────────────
+// ── 7. capture-ledger に渡す行 ────────────────────────────────────
 // クイックスタートの dotenv のブロックは、bootstrap の出力の写し。写しは腐る —— 2026-09-19 と
-// 20 に、写しの中に無かった 2 行で止まった (以前は 4 行を sh のブロックのコメントで並べていた)。
+// 20 に、写しの中に無かった 2 行で止まった (以前は行を sh のブロックのコメントで並べていた)。
 // 名前と値が一字一句同じかを見る。token の値 (docs では置き場所の説明) と、コメントの行は比べない。
 // 題名は `capture-ledger/.env` から `capture-scheduler/.dev/capture-ledger.env` へ移った
 // (bootstrap が引き渡しファイルに書くようになったため)。**見る中身は同じ** ——
@@ -200,7 +200,7 @@ for (const page of ["quickstart.md", join("ja", "quickstart.md")]) {
   const block = LEDGER_BLOCK.exec(readFileSync(join(DOCS, page), "utf8"));
   if (block === null) {
     problems.push(
-      `${page}: capture-ledger/.env の dotenv のブロックが無い (bootstrap の 4 行を載せる所)`,
+      `${page}: capture-ledger/.env の dotenv のブロックが無い (bootstrap が渡す行を載せる所)`,
     );
     continue;
   }
@@ -210,7 +210,7 @@ for (const page of ["quickstart.md", join("ja", "quickstart.md")]) {
     .map((line) => (line.startsWith(`${TOKEN_NAME}=`) ? `${TOKEN_NAME}=` : line));
   if (lines.join("\n") !== expectedLedger.join("\n")) {
     problems.push(
-      `${page}: capture-ledger/.env のブロックが bootstrap の 4 行と違う (env.ts の ledgerEnv に合わせる)\n` +
+      `${page}: capture-ledger/.env のブロックが bootstrap の渡す行と違う (env.ts の ledgerEnv に合わせる)\n` +
         `      docs:      ${lines.join(" | ")}\n` +
         `      bootstrap: ${expectedLedger.join(" | ")}`,
     );

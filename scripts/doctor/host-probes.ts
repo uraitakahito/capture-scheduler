@@ -7,11 +7,9 @@
  * (2026-09-20 に、台帳の fixtures の代わりに BrowserHive の e2e の fixtures が 18080 で答えた)。
  * だから `/healthz` の形 (`typescript` と `hostTypes`) まで見る。
  */
+import { HOST_TS_COMPILE } from "../env.js";
 import type { Verdict } from "./run.js";
 import type { Answer } from "./windmill-contents.js";
-
-/** compose が ts-compile を出す host の口。capture-ledger の `CAPTURE_LEDGER_TS_COMPILE_URL` もここを指す。 */
-export const HOST_TS_COMPILE = "http://127.0.0.1:28080";
 
 const parse = (body: string): unknown => {
   try {

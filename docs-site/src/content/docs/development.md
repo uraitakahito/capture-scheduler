@@ -70,7 +70,7 @@ When you drop `puppeteer`, drop its `//devDependencies` note in `package.json` t
 | `test/`                                        | unit tests; **never put these under `windmill/f/`** — `sync push` would deploy them      |
 | `scripts/*.ts`                                 | host-side helpers (bootstrap, tokens, checks)                                            |
 | `.env.local`                                   | **written by the tools** (`WINDMILL_TOKEN`); git ignores it                              |
-| `.dev/capture-ledger.env`                      | the four lines for capture-ledger. **Its `pnpm run connect` reads them**                 |
+| `.dev/capture-ledger.env`                      | the lines for capture-ledger. **Its `pnpm run connect` reads them**                      |
 
 Adding an environment variable is a three-part contract, checked in both
 directions by `scripts/check-env.ts`: `.env.example`, the name lists in
@@ -89,7 +89,7 @@ afterwards what happened.
 
 **Write only inside your own repo; to cross, read.** `windmill:bootstrap` is a
 command you run in capture-scheduler, so it never writes into capture-ledger —
-the four lines go into `.dev/capture-ledger.env`, and fetching them is the other
+the lines for capture-ledger go into `.dev/capture-ledger.env`, and fetching them is the other
 side's `pnpm run connect`. A repo changing because of a command typed somewhere
 else is not what the person typing it expects.
 

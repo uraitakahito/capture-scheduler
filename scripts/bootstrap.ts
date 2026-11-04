@@ -6,14 +6,14 @@
  * 使い捨てのサービスが無い (subcommand は up / down / build / version の 4 つだけ)。
  * capture-ledger の `src/tools/fga-migrate.ts` と同じ立場。
  *
- * **書くのは自分の repo の中だけ。** token は `.env.local` へ、capture-ledger に渡す 4 行は
+ * **書くのは自分の repo の中だけ。** token は `.env.local` へ、capture-ledger に渡す行は
  * `.dev/capture-ledger.env` へ。`.env` は人のもので、道具は触らない（`env-local.ts`）。
  * 打ったのは capture-scheduler のコマンドなので、**向こうの repo には書きに行かない** ——
  * 取りに行くのは向こうの仕事で、`cd ../capture-ledger && pnpm run connect` が読む。
  *
- * 4 行は webhook の URL と token、待ち受け、issuer（`env.ts` の `ledgerEnv`）。どれもここで
- * 決まるか決め打ちの値で、人に組み立てさせると古くなる。以前は webhook の 2 行だけを出して
- * いて、残り 2 行を書き漏らした API で 2 度止まった。
+ * 渡すのは webhook の URL と token、待ち受け、issuer、ts-compile の宛先（`env.ts` の `ledgerEnv`）。
+ * どれもここで決まるか決め打ちの値で、人に組み立てさせると古くなる。以前は webhook の 2 行だけを
+ * 出していて、残りを書き漏らした API で止まった（待ち受けと issuer で 2 度、ts-compile の宛先で 1 度）。
  *
  * **印字は残す。** 値そのものを見たい場面（別の機械へ持っていく、壊れたときに突き合わせる）が
  * 残るため。変えたのは「貼れ」という指示のほうで、貼る作業は無くなった。
@@ -141,11 +141,11 @@ const main = async () => {
   process.stderr.write(
     `\n── 書いたファイル (どちらもこの repo の中。.env は触っていません) ──\n` +
       `  ${shown(envLocal)}   WINDMILL_TOKEN\n` +
-      `  ${shown(handoff)}   capture-ledger に渡す 4 行\n` +
+      `  ${shown(handoff)}   capture-ledger に渡す行\n` +
       "\n次は capture-ledger 側で、取りに行かせます:\n" +
       "\n  cd ../capture-ledger && pnpm run connect\n" +
       "\nそのあと capture-ledger の API を起こし直します (設定は起動のときに 1 回だけ読みます)。\n" +
-      "起動ログの最後の行が「crawl level reports: ready」なら、4 行は効いています。\n",
+      "起動ログの最後の行が「crawl level reports: ready」なら、渡した行は効いています。\n",
   );
 };
 

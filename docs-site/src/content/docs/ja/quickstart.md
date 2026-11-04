@@ -34,7 +34,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'authorization: Bearer dev-key' http
 capture-ledger で `pnpm run dev:up` を打つと、**このページの手順も含めて** 16 段を順に
 起こします —— Windmill を立て、bootstrap し、flow を入れ、鍵を渡し、最後に
 `doctor` まで。向こうが打つのは**この repo のコマンド**で、**ファイルはこの repo の中に
-しか書かれません**（capture-ledger に渡す 4 行は、向こうの `pnpm run connect` が
+しか書かれません**（capture-ledger に渡す行は、向こうの `pnpm run connect` が
 取りに来ます）。
 
 ```sh
@@ -60,32 +60,34 @@ pnpm run windmill:push        # script・flow・schedule を入れる
 
 **貼る行はもう出ません。**bootstrap が書くのは、この repo の中の 2 枚だけです:
 
-| ファイル                  | 中身                                           |
-| ------------------------- | ---------------------------------------------- |
-| `.env.local`              | `WINDMILL_TOKEN`。この repo の script が読む   |
-| `.dev/capture-ledger.env` | capture-ledger に渡す 4 行。**読むのは向こう** |
+| ファイル                  | 中身                                         |
+| ------------------------- | -------------------------------------------- |
+| `.env.local`              | `WINDMILL_TOKEN`。この repo の script が読む |
+| `.dev/capture-ledger.env` | capture-ledger に渡す行。**読むのは向こう**  |
 
 capture-ledger の設定を書き換えるのは、**向こうで打つコマンドの仕事**です:
 
 ```sh
 cd ~/projects/crawler/capture-ledger
-pnpm run connect              # 上の 4 行を読み、capture-ledger の .env.local に書く
+pnpm run connect              # 上の行を読み、capture-ledger の .env.local に書く
 ```
 
-渡るのはこの 4 行。**どれが欠けても、クロールは最後まで走りません**:
+渡るのは次の行で、**どれも要ります**（欠けると何が止まるかは下の表）:
 
 ```dotenv title="capture-scheduler/.dev/capture-ledger.env"
 CAPTURE_LEDGER_CRAWL_WEBHOOK_URL=http://127.0.0.1:8000/api/w/crawler/jobs/run/f/f/waggle/crawl_level
 CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN=<bootstrap が作った token>
 CAPTURE_LEDGER_API_HOST=0.0.0.0
 CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099
+CAPTURE_LEDGER_TS_COMPILE_URL=http://127.0.0.1:28080
 ```
 
-| 行                                             | なぜ要るか                                                                         |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `…_CRAWL_WEBHOOK_URL`・`…_CRAWL_WEBHOOK_TOKEN` | クロールを Windmill に投げる先。無いと `/api/crawls` そのものが無い（`404`）       |
-| `CAPTURE_LEDGER_API_HOST=0.0.0.0`              | 段の報告はコンテナから来る。`127.0.0.1` で待つ API には届かない                    |
-| `CAPTURE_LEDGER_OIDC_ISSUER`                   | flow は JWT で名乗る。無い API は開発用ヘッダの設定になり、段の報告は `401` になる |
+| 行                                             | なぜ要るか                                                                                                                                                                                       |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `…_CRAWL_WEBHOOK_URL`・`…_CRAWL_WEBHOOK_TOKEN` | クロールを Windmill に投げる先。無いと `/api/crawls` そのものが無い（`404`）                                                                                                                     |
+| `CAPTURE_LEDGER_API_HOST=0.0.0.0`              | 段の報告はコンテナから来る。`127.0.0.1` で待つ API には届かない                                                                                                                                  |
+| `CAPTURE_LEDGER_OIDC_ISSUER`                   | flow は JWT で名乗る。無い API は開発用ヘッダの設定になり、段の報告は `401` になる                                                                                                               |
+| `CAPTURE_LEDGER_TS_COMPILE_URL`                | host で動く台帳が、落ちたクロールの型の誤りを取り直し、直し方を検査するときに呼ぶ ts-compile-service の口（host の `127.0.0.1:28080`）。Claude の鍵があってこれが無いと、台帳の API は起動しない |
 
 bootstrap は打つたびに新しい token を作ります（前に作ったものも、使えるまま残ります）。
 **打ち直したら `connect` も打ち直すこと** —— 引き渡しファイルは新しい token で書き換わるので、
@@ -97,7 +99,7 @@ bootstrap は打つたびに新しい token を作ります（前に作ったも
 **capture-ledger のクイックスタート §6 で起こした API を、`Ctrl-C` で止めてから**
 同じコマンドをもう一度打ちます —— 新しく 2 本目を立てるのではありません。
 API が設定を読むのは**起動のときの 1 度だけ**なので、走ったままのプロセスは
-上の 4 行を知りません。並べて立てようとしても、2 本目は
+上の行を知りません。並べて立てようとしても、2 本目は
 `EADDRINUSE: address already in use 0.0.0.0:7070` で落ちます。**どこに残っているか
 分からなくなったら**、capture-ledger の `pnpm run dev:status` が pid と起動時刻を出し、
 `pnpm run dev:down` が止めます（issuer も API もコンテナではないので、
@@ -112,7 +114,7 @@ pnpm run oidc:issuer   # 動かし続ける
 pnpm run api           # §6 で起こしたものを止めてから、同じ口でもう一度
 ```
 
-4 行が効いたかは、API の起動ログの**最後の行**が言います:
+渡した行が効いたかは、API の起動ログの**最後の行**が言います:
 
 ```text
 Archive API listening on 0.0.0.0:7070 — identity: JWT (http://127.0.0.1:9099); crawl level reports: ready

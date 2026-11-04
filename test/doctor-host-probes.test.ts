@@ -6,7 +6,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { HOST_TS_COMPILE, readHostTsCompile } from "../scripts/doctor/host-probes.js";
+import { readHostTsCompile } from "../scripts/doctor/host-probes.js";
+import { HOST_TS_COMPILE } from "../scripts/env.js";
 
 const need = (verdict: { ok: boolean; need?: string }): string => verdict.need ?? "";
 const health = JSON.stringify({ ok: true, typescript: "6.0.2", hostTypes: "v0.6.1" });

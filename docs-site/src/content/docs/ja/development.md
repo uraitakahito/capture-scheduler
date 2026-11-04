@@ -65,7 +65,7 @@ pnpm run docs:shots
 | `test/`                                        | 単体試験。**`windmill/f/` の下には置かないこと** —— `sync push` が配備してしまう |
 | `scripts/*.ts`                                 | host 側の道具（bootstrap、トークン、点検）                                       |
 | `.env.local`                                   | **道具が書く**（`WINDMILL_TOKEN`）。git は無視する                               |
-| `.dev/capture-ledger.env`                      | capture-ledger に渡す 4 行。**読むのは向こうの `pnpm run connect`**              |
+| `.dev/capture-ledger.env`                      | capture-ledger に渡す行。**読むのは向こうの `pnpm run connect`**                 |
 
 環境変数を足すのは 3 点契約で、`scripts/check-env.ts` が両方向に検査する:
 `.env.example`、`scripts/env.ts` の名前の一覧、そしてリテラル文字列での読み取り。
@@ -82,7 +82,7 @@ pnpm run docs:shots
 
 **書くのは自分の repo だけ、跨ぐときは読むだけ。** `windmill:bootstrap` は
 capture-scheduler で打つコマンドなので、capture-ledger には書きに行かない ——
-渡したい 4 行は `.dev/capture-ledger.env` に置き、取りに行くのは向こうの
+渡したい行は `.dev/capture-ledger.env` に置き、取りに行くのは向こうの
 `pnpm run connect`。打った repo の外が変わるのは、打った人の予想に反する。
 
 古い `.env.local` を疑うときは、**両方を作り直す**のがいちばん速い:

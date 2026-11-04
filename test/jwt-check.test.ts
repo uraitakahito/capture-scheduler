@@ -20,10 +20,8 @@ describe("readJwt", () => {
     const verdict = readJwt({ token: 401, header: { status: 200, body: "{}" }, iss: ISS });
     expect(need(verdict)).toMatch(/ヘッダで名乗る設定/);
     expect(need(verdict)).toContain(`CAPTURE_LEDGER_OIDC_ISSUER=${ISS}`);
-    // 直す手は、bootstrap が出す 4 行を貼ること (1 行ずつ書かせると、残りを書き漏らす)。
-    expect(need(verdict)).toMatch(
-      /windmill:bootstrap が出した 4 行を capture-ledger の \.env の末尾に貼り/,
-    );
+    // 直す手は、connect で引き渡しの行を全部写すこと (1 行ずつ書かせると、残りを書き漏らす)。
+    expect(need(verdict)).toMatch(/capture-ledger で pnpm run connect を打ち/);
   });
 
   it("ヘッダでも 401 なら、トークンを拒んだと言い、iss・aud・30 秒・ログを挙げる", () => {
