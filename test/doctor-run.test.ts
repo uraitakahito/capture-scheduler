@@ -71,9 +71,21 @@ describe("本物の点検の並び", () => {
     expect(stateOf(results, "can_submit")).toMatchObject({ state: "skip", reason: "先に jwt を" });
   });
 
-  it("点検は 17 本で、e2e のときだけ 2 本増える", () => {
-    expect(CHECKS.filter((c) => c.e2eOnly !== true)).toHaveLength(17);
-    expect(CHECKS).toHaveLength(19);
+  it("点検は 18 本で、e2e のときだけ 2 本増える", () => {
+    expect(CHECKS.filter((c) => c.e2eOnly !== true)).toHaveLength(18);
+    expect(CHECKS).toHaveLength(20);
+  });
+
+  it("crawl route が ✗ なら、合本の口は訊かない（台帳は webhook が無いと両方の口を出さない）", async () => {
+    // 合本の口が 404 で ✗ を足すと、webhook の 2 行という 1 つの原因に ✗ が 2 本並ぶ
+    const results = await runChecks(withOnlyFailing("crawl route"));
+    expect(results.filter((r) => r.state === "fail").map((r) => r.check.name)).toEqual([
+      "crawl route",
+    ]);
+    expect(stateOf(results, "replay-bundle route")).toMatchObject({
+      state: "skip",
+      reason: "先に crawl route を",
+    });
   });
 
   it("親は必ず子より前に並ぶ (報告がクイックスタートの順に読め、循環も無い)", () => {

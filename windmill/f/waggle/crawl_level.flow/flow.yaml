@@ -12,8 +12,12 @@ description: |
                                 (上限は BrowserHive の口の数。plan_level が決める)
     - ホスト内は逐次 + 間隔     (crawl_host)
 
-  報告のあとに索引を 1 段だけ足してある。載せる中身を選ぶのは capture-ledger で、ここが渡すのは
-  crawl_id だけ —— 判断を、単体試験の無い場所に置かないため。
+  報告のあとに 2 段足してある。合本を書かせる段 (replay_bundle) と、索引に載せる段 (index)。
+  合本は、そのクロールの WACZ を全部並べた replay.json と頁の行の pages.json の組で、replay が
+  1 つのアーカイブとして開く。合本を先に置くのは、合本が OpenSearch に頼らないから —— 索引が
+  落ちても合本は書かれる。合本の段は、台帳が 200 で返す失敗 (保管庫に書けない など) では投げない。
+  投げると索引の段が飛び、クロールが failed で締められる。何を入れ・何を載せるかを選ぶのは
+  capture-ledger で、ここが渡すのは crawl_id と段の深さだけ —— 判断を、単体試験の無い場所に置かないため。
 
   Windmill の per-key concurrency limit は使わない。実装が jobs_ee.rs にあり、
   Community Edition では常に許可を返すスタブなので、**設定しても無言で素通しになる**。
@@ -139,6 +143,22 @@ value:
           compiled:
             type: javascript
             expr: results.compile
+    # **合本を書かせる。** 報告の後なので、この段で台帳に載った WACZ も入る。index より前に置くのは、
+    # 合本が OpenSearch に頼らないから。台帳が 200 で返す失敗では投げない (replay_bundle_level.ts) ——
+    # ここで投げると index が飛び、failure_module がクロールを failed で締める。depth は台帳が
+    # replay.json に記録するだけで、版は台帳が払い出す。
+    - id: replay_bundle
+      summary: 合本を書かせる (replay で 1 つのアーカイブとして開ける形)
+      value:
+        type: script
+        path: f/waggle/replay_bundle_level
+        input_transforms:
+          crawl_id:
+            type: javascript
+            expr: flow_input.crawl_id
+          depth:
+            type: javascript
+            expr: flow_input.depth
     - id: index
       summary: 索引に載せる
       value:

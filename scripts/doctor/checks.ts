@@ -12,7 +12,8 @@
  * flow が読むその値で宛先を叩く。
  *
  * 読み分けは入出力を持たない module に分けてある (`windmill-contents.ts`・`worker-probes.ts`・
- * `host-probes.ts`・`jwt-check.ts`・`can-submit.ts`・`search-route.ts`)。ここは答えを取ってくるだけ。
+ * `host-probes.ts`・`jwt-check.ts`・`can-submit.ts`・`search-route.ts`・`replay-bundle-route.ts`)。
+ * ここは答えを取ってくるだけ。
  */
 import { execFile } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
@@ -32,6 +33,11 @@ import {
 import { readCanSubmit } from "./can-submit.js";
 import { readHostTsCompile } from "./host-probes.js";
 import { readJwt } from "./jwt-check.js";
+import {
+  readReplayBundleRoute,
+  REPLAY_BUNDLE_PROBE,
+  REPLAY_BUNDLE_PROBE_BODY,
+} from "./replay-bundle-route.js";
 import { readSearchRoute, SEARCH_PROBE } from "./search-route.js";
 import { runChecks, type Check, type Outcome, type Result, type Verdict } from "./run.js";
 import { SECTIONS } from "./sections.js";
@@ -538,6 +544,24 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
           "CAPTURE_LEDGER_CRAWL_WEBHOOK_URL と _TOKEN (windmill:bootstrap が出す 2 行) を書いて API を起こし直す",
       };
     },
+  },
+  {
+    name: "replay-bundle route",
+    section: SECTIONS.bringUp,
+    where: `POST ${API}/api/crawls/<uuid>/replay-bundle ${REPLAY_BUNDLE_PROBE_BODY} (名乗らずに 401 なら在る)`,
+    // flow の合本の段が叩く口。無い (古い capture-ledger) と、どのクロールも合本の段で落ちる。
+    // 名乗らずに叩くので、台帳は版を払い出さず、何も書かない (読み分けは `replay-bundle-route.ts`)。
+    // 親は crawl route —— 台帳はクロールの口 (webhook の 2 行) を出すときだけ合本の口も出すので、webhook が
+    // 無いと両方 404 になる。親にしておけば、直すもの 1 つに ✗ も 1 本。
+    needs: ["crawl route"],
+    probe: async () =>
+      readReplayBundleRoute(
+        await answerOf(`${API}${REPLAY_BUNDLE_PROBE}`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: REPLAY_BUNDLE_PROBE_BODY,
+        }),
+      ),
   },
   {
     name: "jwt",

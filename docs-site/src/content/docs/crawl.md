@@ -8,16 +8,18 @@ of `capture_targets` — and hands capture-scheduler **one level at a time**. Th
 `f/waggle/crawl_level`; one execution is one level.
 
 ```
-plan_level       group by host, fetch robots.txt once per host
+plan_level           group by host, fetch robots.txt once per host
   ↓
-compile_scripts  type-check the catalog's TypeScript and turn it into JavaScript (ts-compile-service)
+compile_scripts      type-check the catalog's TypeScript and turn it into JavaScript (ts-compile-service)
   ↓
-for-each         parallel across hosts (parallelism = host_parallelism)
-  crawl_host       sequential within a host: finish → wait → next
+for-each             parallel across hosts (parallelism = host_parallelism)
+  crawl_host           sequential within a host: finish → wait → next
   ↓
-report_level     report to capture-ledger, receive the next level
+report_level         report to capture-ledger, receive the next level
   ↓
-index_level      ask capture-ledger to index what landed in the ledger
+replay_bundle_level  ask capture-ledger to rewrite the crawl's replay bundle, which replay opens as one archive
+  ↓
+index_level          ask capture-ledger to index what landed in the ledger
 ```
 
 `compile_scripts` is the one step that calls a service outside the stack's own
@@ -28,6 +30,24 @@ and the crawl ends as `failed`, with the number of diagnostics and the first fiv
 The reason is cut to the ledger's limit of 2,000 characters: above it the ledger refuses the
 report, and the crawl would stay `running` and block every crawl after it. A script that does
 not type-check never reaches a page.
+
+`replay_bundle_level` also runs after the report. It sends the level's `depth` to capture-ledger's
+`POST /api/crawls/:id/replay-bundle`, and capture-ledger writes the crawl's **replay bundle** as a new
+revision to the store, under `org/<organization>/crawls/<crawl>/r<revision>/`: a `replay.json` listing
+every WACZ of the crawl so far and a `pages.json` of their pages. replay opens the `replay.json` as one
+archive, so a link from a page in one WACZ leads to a page in another. Which WACZ files go in, and the
+revision number, are capture-ledger's to decide; `depth` is only recorded. The step comes before
+`index_level` because the replay bundle does not depend on OpenSearch — a failing index step does not
+stop it.
+
+A replay bundle is derived from what was captured and can be rebuilt
+(`pnpm run replay-bundle:rebuild --crawl <id>` in capture-ledger), so **the step does not throw on
+anything the ledger answers with 200**: the store refused the write (`error`), a WACZ could not be
+inspected (`failed` above 0, picked up by the next replay bundle), or there was no WACZ to include yet
+(`rev: null`). It writes one log line and returns. Throwing would skip the index step and make `fail_crawl` close the crawl as `failed` while its
+next level may already be running. It throws only when the ledger does not answer 200 — 400 (the body),
+401 (the token), 404 (no such crawl, no crawl permission for the token's name, or a capture-ledger too
+old to have the endpoint), 5xx — or answers in the wrong shape.
 
 `index_level` runs after the report, so by then capture-ledger has already marked the crawl
 `succeeded` (or started the next level). Full-text search is a required part of capture-ledger, so
@@ -121,7 +141,7 @@ Two consequences:
 
 ## Settings come from variables, not arguments
 
-`crawl_host`, `report_level` and `index_level` do **not** take their connection
+`crawl_host`, `report_level`, `replay_bundle_level` and `index_level` do **not** take their connection
 settings as arguments. Windmill fills schema defaults **only for UI-triggered
 runs**, so a webhook run gets nothing — the BrowserHive target arrived
 `undefined` and the job died with "Channel target must be a string".

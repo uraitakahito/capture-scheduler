@@ -60,7 +60,7 @@ vitest は必ず「No test files found, exiting with code 1」を先に出し、
 `per_host_delay_ms` / `host_parallelism` / `capture_formats` / `signing` / `scripts` / `variables` /
 `secrets` と、受け口を出している配備では `artifact_sink` で、**`respect_robots` は入っていない**。
 
-最初の試験が見ているのは 4 つ:
+最初の試験が見ているのは 5 つ:
 
 1. **capture-fixtures が `/links/hidden` を一度も受け取っていない**こと。robots.txt が禁じている
    ページで、判定は**相手のリクエストログ**から採る —— 台帳は「記録したこと」しか
@@ -68,12 +68,16 @@ vitest は必ず「No test files found, exiting with code 1」を先に出し、
 2. クロールが成功し、1 ページ以上取り込んでいること
 3. 最後の段の run が終わった後に、`GET /api/search?q=hub` がこのクロールのアーカイブに当たること。
    succeeded を待つだけでなく run の終わりを待つ —— 台帳は段の報告の時点でクロールを succeeded にし、
-   flow の索引の段はその後に走るので、succeeded の直後の検索は索引より先になりうる。当たりはこの
+   flow の合本の段と索引の段はその後に走るので、succeeded の直後の検索は索引より先になりうる。当たりはこの
    クロールのアーカイブに絞るので、前の回に同じ頁を撮っていても、それで通りはしない
-4. capture-ledger が受け口を出していれば（トークン無しの `PUT /api/sink/…` が 404 でなく
+4. 台帳がこのクロールの合本を指していること（`GET /api/crawls/:id` の `replayBundle`）。`error` が無く、版が
+   1 以上で、鍵が `org/acme/crawls/<クロール>/r<版>/replay.json`、頁の行がこのクロールのアーカイブの数以上。
+   run が緑でもこれは言えない —— 合本の段は、台帳が 200 で返す失敗では投げない（その失敗 1 つでクロールを
+   止めないため）
+5. capture-ledger が受け口を出していれば（トークン無しの `PUT /api/sink/…` が 404 でなく
    401 を返す）、そのクロールのアーカイブの `objectKey` が全部 `org/acme/<YYYY-MM>/` の下に
    あること。平らな鍵は、口が配られず BrowserHive が自前の bucket へ書いた印 ——
-   capture-ledger #226 から直るまで実際にそうなっていて、その形のクロールは上の 3 つを通る。
+   capture-ledger #226 から直るまで実際にそうなっていて、その形のクロールは上の 4 つを通る。
 
 `plan_level.ts` の `?? true` を消して配備すると、**単体と e2e が両方赤くなり**、
 e2e のほうは capture-fixtures が禁じられたページを受け取ったことを示す。この対は一度わざと

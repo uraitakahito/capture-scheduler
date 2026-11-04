@@ -146,7 +146,7 @@ API の宛先（`u/admin/waggle_api_url`）は、`CAPTURE_LEDGER_API_URL` を書
 ### windmill にクロールを許可する
 
 Windmill は capture-ledger を `windmill` という名前で呼ぶ（トークンの `sub`。組織は `acme`）。
-capture-ledger は、クロールを始める・段を報告する・索引を渡す・締める、のたびに
+capture-ledger は、クロールを始める・段を報告する・合本を書かせる・索引を渡す・締める、のたびに
 「windmill は acme のクロールを始めてよいか」を OpenFGA に訊き、許可が無ければ 404 を返す。
 手で始めたクロールでも、段の報告は windmill の名前で来る。
 
@@ -157,7 +157,7 @@ pnpm run fga:grant submitter windmill acme      （あなたが 1 度だけ）
 OpenFGA   user:windmill  submitter  organization:acme
     ▲
     │ 訊く: user:windmill は organization:acme で can_submit か
-    │      （クロールを始める・段の報告・索引・締めのたび）
+    │      （クロールを始める・段の報告・合本・索引・締めのたび）
 capture-ledger API   ◄── Windmill（sub=windmill, orgs=[acme] のトークン）
     │
     └─ 行が在れば 202。無ければ 404 {"error":"not found"}
@@ -212,6 +212,7 @@ DNS が覚えるため）。
   ✗ capture-ledger api  http://127.0.0.1:7070/healthz
   ✗ oidc issuer         http://127.0.0.1:9099/.well-known/openid-configuration
   ・crawl route         先に capture-ledger api を
+  ・replay-bundle route 先に capture-ledger api を
   ・jwt                 先に capture-ledger api・oidc issuer を
   ・search route        先に capture-ledger api・oidc issuer を
 
@@ -224,18 +225,23 @@ DNS が覚えるため）。
 **smoke** は、doctor が全部 ✓ のときだけ 1 本撮る。本番と同じ道 —— capture-ledger の
 `POST /api/crawls` に flow と同じトークンで頼み、Windmill の flow に撮らせ、段の報告を待つ ——
 を通し、台帳に載った archive を署名付き URL で取り出して、先頭が `PK`（WACZ は zip）であることまで
-見る。台帳は段の報告の時点でクロールを succeeded にし、flow の索引の段はその後に走るので、smoke は
-段の run の終わりを待って、索引の段の答え（載らなかった 0 本・載せた 1 本以上）を照らす。最後に、
-印で台帳の検索を引き、この回の archive の当たりの時点が、WACZ のページ一覧から予想した時点（写しの行が
-あれば写しの時点、無ければ文書の行の 1 件 `page`）と同じかを照らす:
+見る。台帳は段の報告の時点でクロールを succeeded にし、flow の合本の段と索引の段はその後に
+走るので、smoke は段の run の終わりを待つ。合本の段の答え（書けた・検められなかった WACZ が 0 本）を
+照らし —— 合本の段はそれらの失敗では投げないので、run が緑でも書けたとは限らない —— 台帳が指す
+合本の `replay.json` を replay の `/wacz/`（`127.0.0.1:8899`。capture-ledger のスタックの replay）から
+読んで、この回の archive が `resources` に在るかを見る。続けて索引の段の答え（載らなかった 0 本・
+載せた 1 本以上）を照らす。最後に、印で台帳の検索を引き、この回の archive の当たりの時点が、
+WACZ のページ一覧から予想した時点（写しの行があれば写しの時点、無ければ文書の行の 1 件 `page`）と
+同じかを照らす:
 
 ```
-点検     doctor の 17 本とも ✓
+点検     doctor の 18 本とも ✓
 始める   POST /api/crawls → 202  crawl 545e912c-…  http://capture-fixtures.capture-ledger:8080/marked/page/smoke?tag=smokemh5k2x1fq3
 待つ     running
 run      http://127.0.0.1:8000/run/01a0ba19-…?workspace=crawler
 終わり   succeeded (max_depth) —— 撮ったページ 1・6 秒
 取り出す archive 928d640f-… の先頭が PK (WACZ = zip)
+合本     r1 を書いた —— 頁 3・WACZ 1 本。replay の /wacz/org/acme/crawls/545e912c-…/r1/replay.json にこの回の archive が在る
 索引     載せたアーカイブ 1 本・載らなかった 0 本・索引の件数 2
 検索     「smokemh5k2x1fq3」で archive 928d640f-… の after-load・after-behaviors が当たる (ページ一覧から予想した時点と同じ)
 撮れた   http://capture-fixtures.capture-ledger:8080/marked/page/smoke?tag=smokemh5k2x1fq3
