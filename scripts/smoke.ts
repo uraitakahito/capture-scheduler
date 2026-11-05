@@ -7,8 +7,11 @@
  * 「撮れた」は台帳の succeeded だけでは言わない。その回の archive を台帳の一覧から探し、
  * 署名付き URL で先頭 4 バイトを取り、`PK` (WACZ は zip) であることまで見る。
  *
- * **索引と検索まで見る (CAPTURE-53)。** 台帳は段の報告の時点で succeeded にし、索引の段はその後に
- * 走るので、段の run の終わりを待ち、索引の段の答え (載らなかった 0 本・載せた 1 本以上) を照らす。
+ * **合本と索引と検索まで見る (CAPTURE-57・CAPTURE-53)。** 台帳は段の報告の時点で succeeded にし、合本の段と
+ * 索引の段はその後に走るので、段の run の終わりを待つ。合本の段の答え (書けた・検められなかった 0 本) を照らし、
+ * 台帳が指す合本の `replay.json` を replay の `/wacz/<鍵>` から読んで、この回の archive が入っているかを見る
+ * (`smoke/read-replay-bundle.ts`)。合本の段は台帳の 200 の失敗では投げない (クロールを止めないため) ので、
+ * run が緑でも合本が書けたとは限らない。続けて索引の段の答え (載らなかった 0 本・載せた 1 本以上) を照らす。
  * 既定の頁 (capture-fixtures の印付きの頁。印は撮るたびに変える) なら、その印で台帳の検索を引き、
  * この回の archive の当たりの時点が、WACZ のページ一覧から予想した時点と同じかまで照らす
  * (`smoke/read-search.ts`)。URL を渡したときは、検索は照らさない (その頁で当たる語が分からない)。
@@ -42,6 +45,15 @@ import {
   type Reading,
 } from "./smoke/read-crawl.js";
 import {
+  readLedgerReplayBundle,
+  readReplayBundleFailure,
+  readReplayBundleOutcome,
+  readReplayBundleStep,
+  readReplayJson,
+  replayBundleJobOf,
+  replayKeyUrl,
+} from "./smoke/read-replay-bundle.js";
+import {
   compareSearchHits,
   expectedStages,
   indexJobOf,
@@ -74,6 +86,12 @@ function stop(label: string, text: string): never {
 
 /** 既定で撮る capture-fixtures (capture-ledger のスタックの物。BrowserHive のコンテナがこの名前を引く)。 */
 const FIXTURES = "http://capture-fixtures.capture-ledger:8080";
+/**
+ * host から見た capture-ledger のスタックの replay (compose が loopback の 8899 に出す口)。合本の `replay.json` を
+ * `/wacz/<鍵>` から読む —— replay が合本を開くときと同じ口で読めるかを見る。`API` と同じく、台帳の
+ * 開発のスタックの決まった口。
+ */
+const REPLAY = "http://127.0.0.1:8899";
 /** 既定の頁と、検索に使う語 (撮るたびに変わる印)。URL を渡したときは無い。 */
 const target =
   positionals[0] === undefined
@@ -345,11 +363,13 @@ if (finished !== undefined) report(finished, crawl);
  * capture-ledger の outbox が 5 秒ごとに書く (CAPTURE_LEDGER_DRAIN_INTERVAL_MS)。succeeded の
  * 直後に訊くと、まだ無い (2026-09-19 に実測。数秒後に出た)。
  */
-const findArchive = async (startedAt: string): Promise<{ id: string } | undefined> => {
+const findArchive = async (
+  startedAt: string,
+): Promise<{ id: string; objectKey: string } | undefined> => {
   const until = Date.now() + 30_000;
   for (;;) {
     const listed = parse((await ledger("/api/archives")).body) as
-      | { archives?: { id: string; sourceUrl: string; capturedAt: string }[] }
+      | { archives?: { id: string; sourceUrl: string; capturedAt: string; objectKey: string }[] }
       | undefined;
     const found = listed?.archives?.find(
       (a) => a.sourceUrl === url && Date.parse(a.capturedAt) >= Date.parse(startedAt),
@@ -395,11 +415,11 @@ if (head !== "PK") {
 }
 say("取り出す", `archive ${archive.id} の先頭が PK (WACZ = zip)`);
 
-// ── 索引 ──────────────────────────────────────────────────────────────
+// ── 段の run の終わり ─────────────────────────────────────────────────
 
 /**
- * 段の run が終わるまで待つ。**台帳は段の報告の時点で succeeded にし、索引の段はその後に走る** ——
- * succeeded を見ただけでは、索引が載ったかは分からない (CAPTURE-53 の調べ)。
+ * 段の run が終わるまで待つ。**台帳は段の報告の時点で succeeded にし、合本の段と索引の段はその後に走る** ——
+ * succeeded を見ただけでは、合本が書けたか・索引が載ったかは分からない (CAPTURE-53 の調べ)。
  */
 const finishedRun = async (
   jobId: string,
@@ -417,7 +437,7 @@ const levelJob = crawl.lastJob?.id;
 if (levelJob === undefined) {
   report(
     {
-      evidence: "段の run が分からない (lastJob が無い) —— 索引の段の答えを読めない",
+      evidence: "段の run が分からない (lastJob が無い) —— 合本と索引の段の答えを読めない",
       fix: "capture-ledger が v0.43.0 より古い → capture-ledger を新しくする",
     },
     crawl,
@@ -427,8 +447,9 @@ const level = await finishedRun(levelJob);
 if (level.run.state === "running") {
   report(
     {
-      evidence: "段の run が、succeeded の後 60 秒たっても終わらない (索引の段で止まっている)",
-      fix: "run を開いて index の段の log を見る。OpenSearch が遅いなら capture-ledger の pnpm run dev:status",
+      evidence:
+        "段の run が、succeeded の後 60 秒たっても終わらない (合本か索引の段で止まっている)",
+      fix: "run を開いて replay_bundle と index の段の log を見る。OpenSearch が遅いなら capture-ledger の pnpm run dev:status",
     },
     crawl,
   );
@@ -451,11 +472,65 @@ if (level.run.state === "failed") {
   report(
     {
       evidence: `クロールは succeeded だが、run の ${failed.step ?? "?"} の段が落ちた: ${message || "(文が読めない)"}`,
-      fix: readIndexFailure(message) ?? readStepFailure(failed.step, message),
+      fix:
+        readReplayBundleFailure(message) ??
+        readIndexFailure(message) ??
+        readStepFailure(failed.step, message),
     },
     crawl,
   );
 }
+
+// ── 合本 ──────────────────────────────────────────────────────────────
+
+const replayBundleJob = replayBundleJobOf(level.job);
+const replayBundleOutcome =
+  replayBundleJob === undefined
+    ? undefined
+    : readReplayBundleOutcome(await windmillJob(replayBundleJob));
+const replayBundleProblem = readReplayBundleStep(replayBundleOutcome, crawlId);
+if (
+  replayBundleProblem !== undefined ||
+  replayBundleOutcome === undefined ||
+  replayBundleOutcome.rev === null
+) {
+  report(
+    replayBundleProblem ?? { evidence: "合本の段の答えが読めない", fix: "pnpm run windmill:push" },
+    crawl,
+  );
+}
+// 台帳が指す合本の鍵を、段の run の後に読み直す (待っている間に読んだクロールは、合本の段より前の物)
+const pointed = readLedgerReplayBundle(
+  parse((await ledger(`/api/crawls/${crawlId}`)).body),
+  replayBundleOutcome.rev,
+);
+if ("problem" in pointed) report(pointed.problem, crawl);
+// replay は匿名で読む (保管庫も匿名で読める) ので、名乗らずに引く。
+const replayJsonUrl = replayKeyUrl(REPLAY, pointed.replayBundle.key);
+const replayJson = await (async (): Promise<{ status: number | undefined; body: string }> => {
+  try {
+    const res = await fetch(replayJsonUrl, { signal: AbortSignal.timeout(10_000) });
+    return { status: res.status, body: await res.text() };
+  } catch {
+    return { status: undefined, body: "" };
+  }
+})();
+const replayProblem = readReplayJson(
+  replayJsonUrl,
+  replayJson.status,
+  replayJson.body,
+  archive.objectKey,
+);
+if (replayProblem !== undefined) report(replayProblem, crawl);
+say(
+  "合本",
+  `r${String(replayBundleOutcome.rev)} を書いた —— 頁 ${String(replayBundleOutcome.pages)}・` +
+    `WACZ ${String(replayBundleOutcome.members)} 本。` +
+    `replay の /wacz/${pointed.replayBundle.key} にこの回の archive が在る`,
+);
+
+// ── 索引 ──────────────────────────────────────────────────────────────
+
 const indexJob = indexJobOf(level.job);
 const outcome = indexJob === undefined ? undefined : readIndexOutcome(await windmillJob(indexJob));
 const indexProblem = readIndexStep(outcome);

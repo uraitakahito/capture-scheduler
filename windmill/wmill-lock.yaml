@@ -9,5 +9,6 @@ locks:
   f/waggle/inspect_crawl: ec5dad413bfa7ee0e1e0000b7e336dc208ddc83a433b915296281d89ee1e8724
   f/waggle/inspect_domain: 1f7d1189e4dc52d8fc31ae197cd3fb8ce324f3c207c835d8abc1fc51573318da
   f/waggle/plan_level: b9bba21a0cb4759ee2d91650ebb4cb808720e45f006214345a223c24383fa043
+  f/waggle/replay_bundle_level: a5b89c7582572df8dff25dfc014f5da9d955f5c66a29ae59a490a530cd489896
   f/waggle/report_level: e99b71fef3b0e78459dd01e055c8d057f85cf2fd3516be51d5da55b5d1df1188
   f/waggle/trigger_crawl: a5abb8fa7281a11fa5c71b6d295d8efc6f4ff62281275e6e6662697d8b6fe274

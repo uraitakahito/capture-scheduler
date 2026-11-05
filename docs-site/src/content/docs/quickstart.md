@@ -146,7 +146,7 @@ that uses such a script is refused by the ledger with a 400 naming the missing v
 ### Let windmill start crawls
 
 Windmill calls capture-ledger under the name `windmill` (the token's `sub`; organization `acme`).
-Each time it starts a crawl, reports a level, hands over the index, or closes a crawl,
+Each time it starts a crawl, reports a level, has the replay bundle written, hands over the index, or closes a crawl,
 capture-ledger asks OpenFGA "may windmill start crawls for acme?" and answers 404 when it may not.
 Even a crawl you start by hand reports its levels under the name windmill.
 
@@ -157,7 +157,7 @@ pnpm run fga:grant submitter windmill acme      (you, once)
 OpenFGA   user:windmill  submitter  organization:acme
     ▲
     │ asks: is user:windmill can_submit on organization:acme?
-    │       (on every start, level report, index, and close)
+    │       (on every start, level report, replay bundle, index, and close)
 capture-ledger API   ◄── Windmill (a token with sub=windmill, orgs=[acme])
     │
     └─ 202 when the tuple is there; otherwise 404 {"error":"not found"}
@@ -213,6 +213,7 @@ fix means one ✗.
   ✗ capture-ledger api  http://127.0.0.1:7070/healthz
   ✗ oidc issuer         http://127.0.0.1:9099/.well-known/openid-configuration
   ・crawl route         先に capture-ledger api を
+  ・replay-bundle route 先に capture-ledger api を
   ・jwt                 先に capture-ledger api・oidc issuer を
   ・search route        先に capture-ledger api・oidc issuer を
 
@@ -226,19 +227,24 @@ fix means one ✗.
 asks capture-ledger's `POST /api/crawls` with the flow's own token, lets the Windmill flow capture,
 waits for the level report — then fetches the archive the ledger recorded through a signed URL
 and checks that it starts with `PK` (a WACZ is a zip). The ledger marks the crawl `succeeded` at the
-level report, before the flow's index step runs, so smoke then waits for the level's run to finish
-and checks the index step's answer (no archive left out, at least one indexed). Last, it searches the
+level report, before the flow's replay bundle and index steps run, so smoke then waits for the level's
+run to finish. It checks the replay bundle step's answer (written, no WACZ left uninspected) — the step
+does not throw on those failures, so a green run does not prove it — and reads the `replay.json` of the
+replay bundle the ledger points to through replay's `/wacz/` (`127.0.0.1:8899`, the capture-ledger
+stack's replay), checking that this archive is among its `resources`. Then it checks the index step's
+answer (no archive left out, at least one indexed). Last, it searches the
 ledger for the tag and checks that this archive's hits are at the stages the WACZ's page list
 predicts: the snapshot stages when the page list has snapshot entries, otherwise the one entry of the
 document (`page`):
 
 ```
-点検     doctor の 17 本とも ✓
+点検     doctor の 18 本とも ✓
 始める   POST /api/crawls → 202  crawl 545e912c-…  http://capture-fixtures.capture-ledger:8080/marked/page/smoke?tag=smokemh5k2x1fq3
 待つ     running
 run      http://127.0.0.1:8000/run/01a0ba19-…?workspace=crawler
 終わり   succeeded (max_depth) —— 撮ったページ 1・6 秒
 取り出す archive 928d640f-… の先頭が PK (WACZ = zip)
+合本     r1 を書いた —— 頁 3・WACZ 1 本。replay の /wacz/org/acme/crawls/545e912c-…/r1/replay.json にこの回の archive が在る
 索引     載せたアーカイブ 1 本・載らなかった 0 本・索引の件数 2
 検索     「smokemh5k2x1fq3」で archive 928d640f-… の after-load・after-behaviors が当たる (ページ一覧から予想した時点と同じ)
 撮れた   http://capture-fixtures.capture-ledger:8080/marked/page/smoke?tag=smokemh5k2x1fq3

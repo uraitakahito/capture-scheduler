@@ -8,16 +8,18 @@ capture-ledger の `POST /api/crawls` が起点を受け取り（URL の配列�
 flow は `f/waggle/crawl_level` で、1 回の実行が 1 段。
 
 ```
-plan_level       ホストで束ね、robots.txt を 1 ホスト 1 回引く
+plan_level           ホストで束ね、robots.txt を 1 ホスト 1 回引く
   ↓
-compile_scripts  TypeScript のスクリプトを型検査して JavaScript にする（ts-compile-service）
+compile_scripts      TypeScript のスクリプトを型検査して JavaScript にする（ts-compile-service）
   ↓
-for-each         ホストごとに並列（parallelism = host_parallelism）
-  crawl_host       1 ホスト内は逐次。完了 → 間隔 → 次
+for-each             ホストごとに並列（parallelism = host_parallelism）
+  crawl_host           1 ホスト内は逐次。完了 → 間隔 → 次
   ↓
-report_level     capture-ledger に報告し、次の段があるかを受け取る
+report_level         capture-ledger に報告し、次の段があるかを受け取る
   ↓
-index_level      台帳に載ったぶんを索引に載せるよう capture-ledger に頼む
+replay_bundle_level  クロールの合本（replay が 1 つのアーカイブとして開く）を書き直すよう capture-ledger に頼む
+  ↓
+index_level          台帳に載ったぶんを索引に載せるよう capture-ledger に頼む
 ```
 
 `compile_scripts` は、この flow で唯一、スタックの外のサービスを呼ぶ段 ——
@@ -26,6 +28,20 @@ compose の `ts-compile` として動く。1 本でも型が通らなければ�
 flow は `fail_crawl` へ落ち、クロールは診断の件数と最初の 5 件を reason に載せて `failed` で終わる。
 reason は台帳の上限の 2,000 字に切る。超えると台帳が報告を断り、クロールは running のまま残って、
 後のクロールを全部塞ぐ。型が通らないスクリプトはページに届かない。
+
+`replay_bundle_level` も報告の後に走る。段の深さ（`depth`）を capture-ledger の `POST /api/crawls/:id/replay-bundle`
+に送ると、capture-ledger がクロールの**合本**を新しい版として保管庫の `org/<組織>/crawls/<クロール>/r<版>/` に書く
+—— そのクロールのそれまでの WACZ を全部並べた `replay.json` と、その頁の行の `pages.json` の組。replay は
+`replay.json` を 1 つのアーカイブとして開くので、ある WACZ の頁から別の WACZ の頁へリンクで行ける。どの WACZ を
+入れるかと版の番号は capture-ledger が決め、`depth` は記録されるだけ。`index_level` より前に置くのは、合本が
+OpenSearch に頼らないから —— 索引の段が落ちても合本は書かれる。
+
+合本は撮った物から作る派生物で、作り直せる（capture-ledger の `pnpm run replay-bundle:rebuild --crawl <id>`）。
+だから**この段は、台帳が 200 で答えたものでは投げない** —— 保管庫に書けなかった（`error`）、検められなかった
+WACZ がある（`failed` が 1 以上。次の合本が拾い直す）、入れる WACZ がまだ無い（`rev: null`）。1 行のログに書いて
+返す。投げると索引の段が飛び、`fail_crawl` がクロールを `failed` で締める（次の段が既に走っていても）。投げるのは、
+台帳が 200 で答えなかったとき（400 は本文の形、401 はトークン、404 はクロールが無いか、トークンの名前にクロールの
+許可が無いか、capture-ledger が古く口が無い、5xx）と、答えの形が違うときだけ。
 
 `index_level` は報告の後に走るので、そのとき capture-ledger はもうクロールを `succeeded` にしている（または
 次の段を始めている）。全文検索は capture-ledger の必須の部品なので、この段は何も飛ばさない —— 台帳が 404
@@ -107,7 +123,7 @@ BrowserHive は queue も pool も持たない。`POST /captures` は 1 往復�
 
 ## 設定は変数から読む
 
-`crawl_host` と `report_level` と `index_level` は接続先を**引数では受けない**。
+`crawl_host` と `report_level` と `replay_bundle_level` と `index_level` は接続先を**引数では受けない**。
 Windmill は schema の既定値を **UI からの実行にしか埋めない**ので、webhook で
 起こすと何も届かない —— BrowserHive の宛先が undefined で
 「Channel target must be a string」になった。

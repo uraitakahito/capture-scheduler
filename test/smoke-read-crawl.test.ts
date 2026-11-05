@@ -175,6 +175,16 @@ describe("知らない失敗", () => {
     expect(reading?.fix).toMatch(DIG);
   });
 
+  it("合本の段（replay_bundle）の Unable to connect は、API に届かないと読む", () => {
+    // 合本の段も段の報告と同じ宛先 (u/admin/waggle_api_url) を叩く
+    expect(
+      readStepFailure(
+        "replay_bundle",
+        "Unable to connect. Is the computer able to access the url?",
+      ),
+    ).toMatch(/API に届かない .* container→api/);
+  });
+
   it("段の報告以外の段で Unable to connect が出ても、API のせいにはしない", () => {
     expect(
       readStepFailure("hosts", "Unable to connect. Is the computer able to access the url?"),

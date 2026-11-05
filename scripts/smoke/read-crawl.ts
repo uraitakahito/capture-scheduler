@@ -114,8 +114,8 @@ export interface Reading {
 
 const DIG = `run を開いて、落ちた段の log を見る (${sectionUrl(SECTIONS.digFailures)})`;
 
-/** 段の報告・索引・締めは、どれも capture-ledger の API を叩く段。 */
-const API_STEPS = new Set(["report", "index", "failure"]);
+/** 段の報告・合本・索引・締めは、どれも capture-ledger の API を叩く段。 */
+const API_STEPS = new Set(["report", "replay_bundle", "index", "failure"]);
 
 /**
  * 段の失敗の文 (台帳の `[段] 文`、または落ちた段の job の文) を、直し方に当てる。

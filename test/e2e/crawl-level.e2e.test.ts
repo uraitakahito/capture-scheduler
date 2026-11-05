@@ -113,8 +113,9 @@ const resetFixtures = async (): Promise<void> => {
 /**
  * クロールの最後の段の run (`lastJob`) が終わるまで待ち、その job を返す。
  *
- * **succeeded だけを待たない。** 台帳は段の報告の時点でクロールを succeeded にし、flow の索引の段は
- * その後に走る —— succeeded の直後に検索すると、索引より先になりうる (CAPTURE-53 の調べ)。
+ * **succeeded だけを待たない。** 台帳は段の報告の時点でクロールを succeeded にし、flow の合本の段と索引の段は
+ * その後に走る —— succeeded の直後に検索すると、索引より先になりうる (CAPTURE-53 の調べ)。合本も同じ。
+ * flow の run は最後の段 (index) まで走り終えて初めて CompletedJob になるので、段を足してもここで待てる。
  */
 const lastRunFinished = async (crawlId: string): Promise<Record<string, unknown>> => {
   const windmillToken = process.env["WINDMILL_TOKEN"];
@@ -187,7 +188,7 @@ beforeAll(async () => {
 });
 
 describe("クロールが flow を通って索引まで終わる", () => {
-  it("robots が禁じたページに触れず、取り込み、検索に出る", async () => {
+  it("robots が禁じたページに触れず、取り込み、合本に入り、検索に出る", async () => {
     // capture-fixtures のリクエストログを白紙に戻す。ここから先に届いたものだけを見る。
     await fetch(`${FIXTURES_HOST}/__reset`, { method: "POST" });
 
@@ -225,7 +226,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
 
     // 完了を待つ。取り込みは本物のブラウザなので分単位になりうる。
     let state = "running";
-    // ③ で「この回の取り込み」を絞るのに使う。台帳が記録した開始時刻で、この試験の時計ではない。
+    // ② と ④ で「この回の取り込み」を絞るのに使う。台帳が記録した開始時刻で、この試験の時計ではない。
     let startedAt = Number.NaN;
     for (let i = 0; i < 100 && state === "running"; i++) {
       await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -255,8 +256,9 @@ describe("クロールが flow を通って索引まで終わる", () => {
     expect(Object.keys(counts)).toContain("/links/hub");
 
     // ── ② 索引まで flow の中で終わったか ────────────────────────────
-    // index step は report の後に並んでいる。**台帳は report の時点で succeeded にする**ので、
-    // succeeded を見た時点では、最後の段の索引はまだ走っているかもしれない。run の終わりを待つ。
+    // report の後に合本の段 (replay_bundle) と索引の段 (index) が並んでいる。**台帳は report の時点で
+    // succeeded にする**ので、succeeded を見た時点では、最後の段の合本も索引もまだ走っているかもしれない。
+    // run の終わりを待つ (③ の合本もこれを待ってから見る)。
     const lastRun = await lastRunFinished(crawlId);
     expect(
       lastRun["success"],
@@ -289,7 +291,41 @@ describe("クロールが flow を通って索引まで終わる", () => {
     }
     expect(ourHits.length, "この回のクロールのアーカイブが索引に載っていない").toBeGreaterThan(0);
 
-    // ── ③ 成果物が受け口を通ったか ──────────────────────────────────
+    // ── ③ 合本が書かれたか ──────────────────────────────────────────
+    // **run が緑でも、合本が書けたとは限らない。** 合本の段は台帳が 200 で返す失敗 (保管庫に書けない・
+    // 検められない WACZ・入れる WACZ が無い) では投げない (クロールを止めないため) ので、② の run の成功は
+    // その証拠にならない。台帳が指す合本を見る。段ごとに版が増え、台帳が指すのは書き終えたいちばん
+    // 大きい版 —— 最後の段の run を待った後なので、この回のアーカイブを全部含む版を指している。
+    const detail = await json(await fetch(`${WAGGLE}/api/crawls/${crawlId}`, { headers: auth() }));
+    const replayBundle = detail["replayBundle"] as
+      | { key: unknown; rev: unknown; pages: unknown; error: unknown }
+      | null
+      | undefined;
+    expect(
+      replayBundle,
+      "台帳がこのクロールの合本を指していない (replayBundle が null か無い) —— " +
+        "最後の段の run の replay_bundle の段の log を見る",
+    ).toBeTruthy();
+    expect(
+      replayBundle?.error,
+      "合本を保管庫に書けなかった (台帳の replay_bundle_error)",
+    ).toBeNull();
+    expect(
+      Number.isInteger(replayBundle?.rev),
+      `版が整数でない: ${String(replayBundle?.rev)}`,
+    ).toBe(true);
+    expect(Number(replayBundle?.rev)).toBeGreaterThanOrEqual(1);
+    // 置き場は版ごとに書いたら変えない。鍵が持ち主 (組織) とクロールと版を言う
+    expect(replayBundle?.key).toBe(
+      `org/acme/crawls/${crawlId}/r${String(replayBundle?.rev)}/replay.json`,
+    );
+    // 1 本の WACZ の pages.jsonl には、文書の行が 1 つ以上ある
+    expect(
+      Number(replayBundle?.pages),
+      `合本の頁の行 (${String(replayBundle?.pages)}) が、この回のアーカイブ (${String(crawlArchives.size)} 本) より少ない`,
+    ).toBeGreaterThanOrEqual(crawlArchives.size);
+
+    // ── ④ 成果物が受け口を通ったか ──────────────────────────────────
     // **受け口の有無は capture-ledger に訊く。** トークン無しの PUT は、口が在ればトークンの検査で
     // 401、無ければ route ごと無いので 404。走らせる人に env で宣言させる形は採らない ——
     // 宣言を忘れた回が緑で通る。dispatch が口を載せ忘れていた間 (capture-ledger #226 から)、

@@ -63,7 +63,7 @@ because the point is to carry the arguments capture-ledger actually sends:
 `capture_formats`, `signing`, `scripts`, `variables`, `secrets`, and `artifact_sink` where
 capture-ledger serves the sink. **`respect_robots` is not among them.**
 
-The first one asserts four things:
+The first one asserts five things:
 
 1. **capture-fixtures never received `/links/hidden`**, which its robots.txt disallows. The
    verdict comes from the _other end's_ request log, because the ledger can only
@@ -71,14 +71,18 @@ The first one asserts four things:
 2. the crawl succeeded and captured at least one page
 3. after the last level's run has finished, `GET /api/search?q=hub` returns a hit from one of this
    crawl's archives. The test waits for the run, not just for `succeeded`: the ledger marks the crawl
-   `succeeded` at the level report, before the flow's index step runs, so a search right at
-   `succeeded` can come before the indexing. Hits are narrowed to this crawl's archives, so an
+   `succeeded` at the level report, before the flow's replay bundle and index steps run, so a search
+   right at `succeeded` can come before the indexing. Hits are narrowed to this crawl's archives, so an
    earlier crawl of the same page does not pass the check
-4. if capture-ledger serves the sink — an unauthenticated `PUT /api/sink/…` answers
+4. the ledger points at a replay bundle of the crawl (`replayBundle` in `GET /api/crawls/:id`): no
+   `error`, a revision of 1 or more, the key `org/acme/crawls/<crawl>/r<revision>/replay.json`, and at least
+   as many page rows as the crawl has archives. A green run does not show this — the replay bundle
+   step does not throw when the ledger answers 200 with a failure, so that one failure cannot stop the crawl
+5. if capture-ledger serves the sink — an unauthenticated `PUT /api/sink/…` answers
    401 rather than 404 — every archive of the crawl has an `objectKey` under
    `org/acme/<YYYY-MM>/`. A flat key means the sink was never handed out and
    BrowserHive wrote into its own bucket. That is what happened from capture-ledger
-   #226 until it was fixed, and such a crawl passes the first three.
+   #226 until it was fixed, and such a crawl passes the first four.
 
 Breaking `?? true` in `plan_level.ts` and deploying turns **both** the unit test
 and the e2e red, and the e2e shows capture-fixtures receiving the forbidden page. That pair
