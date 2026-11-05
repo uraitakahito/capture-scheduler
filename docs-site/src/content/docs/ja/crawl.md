@@ -137,7 +137,7 @@ JS にして hash を打ち直し、BrowserHive は JS の hash を照合する�
 capture-ledger へ運ぶ（段の報告の `compiled`）。台帳はそれをクロールの TS の hash の隣に書き、
 後の段が違う hash を報告すれば 409 で断る。スクリプトが空のクロール（`scripts: []`）も 1 段として通る。
 サービスは 200 で scripts 無しを返し、ページでは何も走らず、報告には typescript と hostTypes が付く。
-その場で書いた JS（`scripts` の `inline` の要素）も同じ道を通る。capture-ledger がクロールに
+その場で書いた TS（`scripts` の `inline` の要素）も同じ道を通る。capture-ledger がクロールに
 `inline-<name>` で固定し、flow は台帳のスクリプトと同じく変換して差し込む。
 
 `scripts` を必須にしてあるのは `capture_formats` と同じ理由。BrowserHive v11.0.0 は

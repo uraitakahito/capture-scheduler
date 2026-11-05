@@ -1,5 +1,5 @@
 /**
- * クロールの語を、旧い言い方で書いていないかを見張る。規則は下の RULES の 4 つ。
+ * クロールの語を、旧い言い方で書いていないかを見張る。規則は下の RULES の 5 つ。
  *
  * ## なぜ要るのか
  *
@@ -18,6 +18,10 @@
  *   試験とコメントの注記で 8 か所。browserhive・capture-ledger・dashboard も同じ日にそろえている）。「網」は
  *   読み手に通じにくい。基盤のネットワーク（私設ネットワーク・default ネットワーク）は「ネットワーク」と
  *   書く。「安全網」「網羅」は別の語で、見ない
+ * - **クロールの頼みに書く物は「その場の TS」と書く。** 2026-11 に（Jira CAPTURE-83）、「その場の JS」から
+ *   そろえた（docs と試験で 17 行）。`scripts` の `inline` は compile の段で strict の TypeScript として検査されるのに、
+ *   JS と名乗っていた。JS になるのは変換の後なので、走った JS・JS の hash・束ねた JS はそのまま（capture-ledger と
+ *   dashboard も見張っている）
  *
  * 書き手（人と Claude）は長くこの形で書いてきたので、見張らなければ戻ってくる。
  *
@@ -31,6 +35,7 @@
  * - 「起こす」: クロールを始める意味の形（OKOSU。capture-ledger・dashboard と同じ並び）
  * - 「目録」: 全部
  * - 「網」: 「安全網」「網羅」の外に立つ「網」
+ * - 「その場の JS」: 形の並び（OLD_INLINE。capture-ledger・dashboard と同じ並び）
  *
  * ## 見ないもの
  *
@@ -55,6 +60,13 @@ const NOT_NET = /安全網|網羅/gu;
 const OKOSU =
   /クロールを起こ|クロールは起こ|取り込みを起こ|取り込みの実行を起こ|起こしたクロール|起こせ(ます|ません|る|ない|れば|ば|て)|起こす(面|欄|口)|起こした(人|本人|行)|起こしました|起こしてよ|下敷きにして起こ|「起こす」|"起こす"/u;
 
+/**
+ * その場で書く物の古い呼び名（2026-11 まで）。JS になるのは変換の後なので、走った JS・JS の hash は当てない。
+ * 足すときは、それらと `jsSha256` に当たらないことを確かめる。
+ */
+const OLD_INLINE =
+  /その場の JS|その場で書いた JS|JS の名前|JS の箱|書きかけの JS|この JS の id|その JS の id|\binline JS\b/u;
+
 const RULES: { find: (line: string) => boolean; say: string }[] = [
   {
     find: (line) => line.replace(ALLOWED, "").includes("種"),
@@ -71,6 +83,10 @@ const RULES: { find: (line: string) => boolean; say: string }[] = [
   {
     find: (line) => line.replace(NOT_NET, "").includes("網"),
     say: "「網」が残っています。network は「通信」（通信の記録・通信が静まる・通信に載せる）、基盤のネットワークは「ネットワーク」と書きます。",
+  },
+  {
+    find: (line) => OLD_INLINE.test(line),
+    say: "その場で書く物の古い呼び名が残っています。書く物は TypeScript なので、「その場の TS」と書きます（走った JS・JS の hash はそのまま）。",
   },
 ];
 
