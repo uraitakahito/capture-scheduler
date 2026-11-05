@@ -22,7 +22,7 @@ import { membersContaining, readWacz, settingsOf } from "./helpers/wacz.js";
  * (`flow.yaml` の input_transforms) と、頁の中の受け皿 (`__bh.vars` / `__bh.secrets`。BrowserHive v22.0.0)
  * に届くかは、本物を通さないと言えない。判定は 3 か所で採る:
  *
- *   - **頁の中に届いたか** —— その場の JS が印を capture-fixtures に送る。相手のリクエストログで見る
+ *   - **頁の中に届いたか** —— その場の TS が印を capture-fixtures に送る。相手のリクエストログで見る
  *   - **台帳の行** —— `GET /api/crawls/:id` の `variables` (値) と `secrets` (名前と path)
  *   - **WACZ** —— `datapackage.json` の `settings.variables` (値) と `settings.secrets` (名前だけ)。シークレットの値は
  *     **全 member のどこにも無い**。同じ探し方で、変数として渡した値は見つかる (対照)
@@ -31,7 +31,7 @@ import { membersContaining, readWacz, settingsOf } from "./helpers/wacz.js";
  * 前の回の WACZ や run の履歴に残っていても、この回の判定には混ざらない。
  */
 
-/** 印を送る、その場の JS。読む口は `__bh.vars` / `__bh.secrets` (capture-scripts v0.6.0 の `types/host.d.ts`)。 */
+/** 印を送る、その場の TS。読む口は `__bh.vars` / `__bh.secrets` (capture-scripts v0.6.0 の `types/host.d.ts`)。 */
 const sendsVariable = (name: string): string =>
   `(() => {\n  void fetch("/plain-html?var=" + encodeURIComponent(String(globalThis.__bh.vars.${name})));\n})();\n`;
 

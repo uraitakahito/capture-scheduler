@@ -163,7 +163,7 @@ const runScript = async (path: string, args: Record<string, unknown>): Promise<u
 };
 
 /**
- * 走った口を、ページの中から印に残すその場の JS。`run` は試験ごとの token、`state` は走ったときの
+ * 走った口を、ページの中から印に残すその場の TS。`run` は試験ごとの token、`state` は走ったときの
  * `document.readyState` —— 遷移の前に走れば `loading`、読み込みの後なら `complete` になる。
  *
  * **同じ文字列を behavior でも preload でも送れる形にする**（await を使わない IIFE）。読み込みの後なら、
@@ -595,10 +595,10 @@ describe("クロールが flow を通って索引まで終わる", () => {
   });
 
   /**
-   * **その場の JS は、台帳のスクリプトと同じ道でページの中まで届く。** 台帳はスクリプトとして登録せずに行の写しを作り
+   * **その場の TS は、台帳のスクリプトと同じ道でページの中まで届く。** 台帳はスクリプトとして登録せずに行の写しを作り
    * (`inline-<name>`・版 1)、flow は区別せずに変換して BrowserHive へ渡す。並びは頼んだとおり。
    */
-  it("その場の JS と台帳のスクリプトを並べると、頼んだ順に写り、どちらもページの中で走る", async () => {
+  it("その場の TS と台帳のスクリプトを並べると、頼んだ順に写り、どちらもページの中で走る", async () => {
     await resetFixtures();
     const run = randomUUID().slice(0, 8);
     const got = await finished(
@@ -631,7 +631,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
         headers: auth(),
       }),
     );
-    expect(back["source"], "名前の口が、書いた JS を返さない").toBe(probe(run));
+    expect(back["source"], "名前の口が、書いた TS を返さない").toBe(probe(run));
     // どちらも変換され、走った JS の hash が報告で台帳に戻っている
     for (const script of scripts) {
       expect(script.jsSha256, `${script.id}: JS の hash が台帳に戻っていない`).toMatch(
@@ -644,7 +644,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
     expect(counts["/assets/hero.svg"], "取り込みが届いていない").toBeGreaterThan(0);
     expect(
       counts[mark(run, "complete")] ?? 0,
-      "その場の JS が、読み込みの後に走っていない",
+      "その場の TS が、読み込みの後に走っていない",
     ).toBeGreaterThan(0);
     expect(counts["/assets/hero-2x.svg"] ?? 0, "台帳の autofetch が走っていない").toBeGreaterThan(
       0,
@@ -652,14 +652,14 @@ describe("クロールが flow を通って索引まで終わる", () => {
   });
 
   /**
-   * **同じ JS を、遷移の前で頼み直す。** 2 本とも同じ source なので、2 本目は ts-compile-service の
+   * **同じ TS を、遷移の前で頼み直す。** 2 本とも同じ source なので、2 本目は ts-compile-service の
    * cache に当たる。cache が答えごと覚えていた版 (v0.2.2 まで) は 1 本目の phase (behavior) を返し、
    * crawl_host は読み込みの後で走らせる —— どこにも誤りが出ないまま、印は complete になる。
    *
    * 印の token は 2 本で 1 つにする。変えると source が変わって cache に当たらず、この試験は何も
    * 言わない。どちらのクロールの印かは、間の `/__reset` で分ける。
    */
-  it("同じ JS を遷移の前で頼み直すと、遷移の前に走る", async () => {
+  it("同じ TS を遷移の前で頼み直すと、遷移の前に走る", async () => {
     const run = randomUUID().slice(0, 8);
     const crawl = async (phase: "behavior" | "preload") =>
       finished(
@@ -691,10 +691,10 @@ describe("クロールが flow を通って索引まで終わる", () => {
   });
 
   /**
-   * **型の通らないその場の JS は、compile の段でクロールごと落ちる。** 台帳の broken の試験と違い、
-   * CLI で台帳に入れて消す手間が無い —— その場の JS は行の写しにだけ在る。
+   * **型の通らないその場の TS は、compile の段でクロールごと落ちる。** 台帳の broken の試験と違い、
+   * CLI で台帳に入れて消す手間が無い —— その場の TS は行の写しにだけ在る。
    */
-  it("型の通らないその場の JS は、compile の段でクロールごと落ちる", async () => {
+  it("型の通らないその場の TS は、compile の段でクロールごと落ちる", async () => {
     const got = await finished(
       await startCrawl({
         seeds: [`${FIXTURES}/plain-html`],
@@ -714,7 +714,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
     const reason = String(got["error"]);
     expect(reason, "落ちた段が compile ではない").toContain("compile 422");
     expect(reason, "型エラーの code が error に無い").toContain("TS2322");
-    expect(reason, "診断が、その場の JS を名指していない").toContain("inline-broken.ts");
+    expect(reason, "診断が、その場の TS を名指していない").toContain("inline-broken.ts");
   });
 
   /**
@@ -722,7 +722,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
    * 診断は数百件になる。全部を reason に載せると台帳の /failed（2,000 字まで）が 400 で断り、
    * running の行が残って、次のクロールが全部 409 になる（v0.24.2 まで）。
    */
-  it("型の誤りが多い JS でも、クロールは failed で締まり、次を塞がない", async () => {
+  it("型の誤りが多い TS でも、クロールは failed で締まり、次を塞がない", async () => {
     // 1 行に 1 件（TS2322）。300 件の診断を全部載せると、reason は 2,000 字を大きく超える
     const lines = Array.from({ length: 300 }, (_, i) => `  const v${String(i)}: number = "x";`);
     const got = await finished(
@@ -743,7 +743,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
     expect(got["state"], "締まらずに running のまま —— 失敗の文を台帳が断った").toBe("failed");
     const reason = String(got["error"]);
     expect(reason, "件数が error に無い").toContain("型の誤り 300 件");
-    expect(reason, "最初の診断が、その場の JS の行を名指していない").toContain(
+    expect(reason, "最初の診断が、その場の TS の行を名指していない").toContain(
       "inline-many.ts:2:9 TS2322",
     );
     expect(reason.length, "reason が台帳の上限を超えた").toBeLessThanOrEqual(2000);

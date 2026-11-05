@@ -94,20 +94,20 @@ e2e のほうは capture-fixtures が禁じられたページを受け取った�
   既定に入らない（capture-scripts v0.5.0 から）。
 - **型の通らないスクリプトは、compile の段でクロールごと落ちる。** 診断の件数と最初の 5 件が、
   クロールの `error` に残る。
-  台帳のスクリプト（台帳の CLI で壊れたスクリプトを足して消す）と、その場の JS の両方で見る。
-- **その場の JS は、頼んだ順に走る。** `/plain-html?inline=<token>&state=<document.readyState>` を
+  台帳のスクリプト（台帳の CLI で壊れたスクリプトを足して消す）と、その場の TS の両方で見る。
+- **その場の TS は、頼んだ順に走る。** `/plain-html?inline=<token>&state=<document.readyState>` を
   取りに行き、ログに印を残す。遷移の前に走れば `loading`、読み込みの後なら `complete`。
-- **同じその場の JS を `preload` で頼み直すと、遷移の前に走る。** 2 本とも同じ source なので、
+- **同じその場の TS を `preload` で頼み直すと、遷移の前に走る。** 2 本とも同じ source なので、
   2 本目は ts-compile-service の cache に当たる。答えごと覚えていた cache は 1 本目の `behavior` を
   返し、印は `complete` になった。ts-compile-service v0.2.2 までがその形で、この試験はそれに対して赤い。
 - **型の誤りがいくつあっても、クロールは failed で締まり、次を塞がない。** 型の誤りを数百件出す
-  その場の JS で始める。`error` が件数を言い、台帳の上限の 2,000 字に収まることと、続けて始めた
+  その場の TS で始める。`error` が件数を言い、台帳の上限の 2,000 字に収まることと、続けて始めた
   1 本が通ることを見る。v0.24.2 までは診断を全部載せたので台帳が断り、クロールは running のまま残った。
-- **クロールごとの変数が頁に届く。** `POST /api/crawls` の `variables` で渡した値を、その場の JS（`params` で
+- **クロールごとの変数が頁に届く。** `POST /api/crawls` の `variables` で渡した値を、その場の TS（`params` で
   宣言）が `__bh.vars` から読んで `/plain-html?var=<値>` を取りに行く。同じ値が台帳の `GET /api/crawls/:id` の
   `variables` と、WACZ の `datapackage.json` の `settings.variables` に在る。
 - **シークレットが頁に届き、記録には残らない。** 試験が `f/waggle_secrets/e2e_probe` に無作為の値を置き、その場の
-  JS が `__bh.secrets.e2e_probe` の長さだけを `/plain-html?len=<長さ>` で送る。値そのものは WACZ の全 member・
+  TS が `__bh.secrets.e2e_probe` の長さだけを `/plain-html?len=<長さ>` で送る。値そのものは WACZ の全 member・
   台帳の答え・Windmill の run の引数のどこにも無く、`settings.secrets` に名前だけ在る。対照は、同じ値を変数で
   渡した取り込み —— そちらでは同じ探し方で WACZ に見つかる。
 - **宣言した required のシークレットが Windmill に無ければ、台帳が 400 で名指し、クロールの行は立たない。**
