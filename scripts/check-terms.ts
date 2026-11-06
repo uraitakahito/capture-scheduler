@@ -1,5 +1,5 @@
 /**
- * クロールの語を、旧い言い方で書いていないかを見張る。規則は下の RULES の 5 つ。
+ * クロールの語を、旧い言い方で書いていないかを見張る。規則は下の RULES の 6 つ。
  *
  * ## なぜ要るのか
  *
@@ -11,7 +11,7 @@
  *   「目を覚まさせる」に読める。プロセス・job・flow の「起こす」（API を起こし直す・webhook で起こす・
  *   次の段を起こす）は別の意味で、見ない
  * - **ページで走らせる物は「スクリプト」、置き場は「台帳」と書く。** 2026-10 に「目録」からそろえた
- *   （doctor の札「スクリプト」・Windmill の説明・docs・試験の文で 62 か所。capture-ledger と dashboard も同じ）。
+ *   （doctor の点検の名前「スクリプト」・Windmill の説明・docs・試験の文で 62 か所。capture-ledger と dashboard も同じ）。
  *   「目録」は browserhive と wacz-validator では WACZ の中の storage の目録を指す。この repo はそれを
  *   持たないので、全部見る
  * - **network は「通信」と書く。** 2026-11 に「網」（network の 1 字の直訳）から「通信」へそろえた（docs・
@@ -22,6 +22,8 @@
  *   そろえた（docs と試験で 17 行）。`scripts` の `inline` は compile の段で strict の TypeScript として検査されるのに、
  *   JS と名乗っていた。JS になるのは変換の後なので、走った JS・JS の hash・束ねた JS はそのまま（capture-ledger と
  *   dashboard も見張っている）
+ * - **スクリプトの `sites` は「対象サイト」と書く。** 2026-11 に「札」からそろえた。「札」は tag を 1 字で写した
+ *   書き手の癖で、読み手に通じない（browserhive・capture-ledger・dashboard も見張っている）
  *
  * 書き手（人と Claude）は長くこの形で書いてきたので、見張らなければ戻ってくる。
  *
@@ -36,6 +38,7 @@
  * - 「目録」: 全部
  * - 「網」: 「安全網」「網羅」の外に立つ「網」
  * - 「その場の JS」: 形の並び（OLD_INLINE。capture-ledger・dashboard と同じ並び）
+ * - 「札」: 全部
  *
  * ## 見ないもの
  *
@@ -87,6 +90,10 @@ const RULES: { find: (line: string) => boolean; say: string }[] = [
   {
     find: (line) => OLD_INLINE.test(line),
     say: "その場で書く物の古い呼び名が残っています。書く物は TypeScript なので、「その場の TS」と書きます（走った JS・JS の hash はそのまま）。",
+  },
+  {
+    find: (line) => line.includes("札"),
+    say: "「札」が残っています。スクリプトの `sites` は「対象サイト」と書きます。",
   },
 ];
 
