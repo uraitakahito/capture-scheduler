@@ -49,8 +49,8 @@ next level may already be running. It throws only when the ledger does not answe
 401 (the token), 404 (no such crawl, no crawl permission for the token's name, or a capture-ledger too
 old to have the endpoint), 5xx — or answers in the wrong shape.
 
-`index_level` runs after the report, so by then capture-ledger has already marked the crawl
-`succeeded` (or started the next level). Full-text search is a required part of capture-ledger, so
+`index_level` runs after the report, so by then capture-ledger has already closed the crawl
+(or started the next level). Full-text search is a required part of capture-ledger, so
 the step skips nothing: it throws when the ledger answers 404 (no such crawl, or no crawl permission
 for the token's name), 503 (OpenSearch did not answer), or 202 with `failed` above 0 (an archive was
 left out of the index). On the last level that leaves the crawl `succeeded` and only the Windmill run

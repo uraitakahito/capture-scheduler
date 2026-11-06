@@ -1,6 +1,6 @@
 {
   "case": "F3: 名前の引けない URL (http://nonexistent.invalid/)",
-  "recorded": "2026-09-19 capture-ledger develop 9fe6a03 (v0.43.0 の手前) と Windmill CE v1.806.0 で実測",
+  "recorded": "2026-09-19 capture-ledger develop 9fe6a03 (v0.43.0 の手前) と Windmill CE v1.806.0 で実測。state・stopReason・error・pagesFailed は capture-ledger v0.77.0 の締め方に合わせて手で直した",
   "start": {
     "status": 202,
     "body": {
@@ -11,8 +11,8 @@
     "crawlId": "bba6b700-b226-45a3-bb81-5ef1172c380d",
     "seeds": ["http://nonexistent.invalid/"],
     "rules": [{ "follow": "same-origin" }],
-    "state": "succeeded",
-    "stopReason": "max_depth",
+    "state": "failed",
+    "stopReason": "failed",
     "maxDepth": 0,
     "maxPages": 30,
     "perHostDelayMs": 2000,
@@ -21,7 +21,8 @@
     "finishedAt": "2026-09-19T14:23:21.666Z",
     "pagesDiscovered": 0,
     "pagesCaptured": 0,
-    "error": null,
+    "pagesFailed": 1,
+    "error": "1 枚も撮れませんでした（取れず 1・見送り 0）。最初の理由: CAPTURE_STATUS_FAILED: net::ERR_NAME_NOT_RESOLVED at http://nonexistent.invalid/",
     "lastJob": {
       "id": "01a0ba0c-d609-5280-0008-08a22dc56fd6",
       "depth": 0

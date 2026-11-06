@@ -170,20 +170,12 @@ export const splitStep = (error: string): { step?: string; message: string } => 
 
 /**
  * running でなくなったクロール。撮れていれば undefined (中身を取り出せるかは smoke が見る)。
+ *
+ * **succeeded は 1 枚以上撮れたクロールだけ** (capture-ledger v0.77.0 から)。1 枚も撮れなければ台帳が failed で締め、
+ * error は段の名前の無い文になる。段の失敗 (`[段] 文`) とはそれで分かれる。
  */
 export const readFinished = (crawl: Crawl): Reading | undefined => {
-  if (crawl.state === "succeeded" && crawl.pagesCaptured > 0) return undefined;
-  if (crawl.state === "succeeded") {
-    const [first] = crawl.failures ?? [];
-    if (first === undefined) {
-      return {
-        evidence: "succeeded だが 1 ページも撮れていない。取れなかったページの記録も無い",
-        fix: `robots.txt で飛ばしたか、capture-ledger が v0.43.0 より古い —— ${DIG}`,
-      };
-    }
-    const reason = first.reason ?? "(理由の記録が無い)";
-    return { evidence: `${first.url} —— ${reason}`, fix: readPageFailure(reason) };
-  }
+  if (crawl.state === "succeeded") return undefined;
   if (crawl.error === null) {
     return {
       evidence: `${crawl.state} (${crawl.stopReason ?? "理由なし"})、台帳に error が無い`,
@@ -191,7 +183,18 @@ export const readFinished = (crawl: Crawl): Reading | undefined => {
     };
   }
   const { step, message } = splitStep(crawl.error);
-  return { evidence: `台帳の error: ${crawl.error}`, fix: readStepFailure(step, message) };
+  if (step !== undefined) {
+    return { evidence: `台帳の error: ${crawl.error}`, fix: readStepFailure(step, message) };
+  }
+  const [first] = crawl.failures ?? [];
+  if (first === undefined) {
+    return {
+      evidence: `台帳の error: ${crawl.error}`,
+      fix: `取れなかったページの記録が無い。全部を robots.txt で見送った —— ${DIG}`,
+    };
+  }
+  const reason = first.reason ?? "(理由の記録が無い)";
+  return { evidence: `${first.url} —— ${reason}`, fix: readPageFailure(reason) };
 };
 
 /**

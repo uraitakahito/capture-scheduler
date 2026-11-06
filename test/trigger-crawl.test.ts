@@ -215,8 +215,32 @@ describe("完了を待つ", () => {
       crawlId: "c1",
       pagesDiscovered: 0,
       pagesCaptured: 0,
+      pagesFailed: 0,
       stopReason: null,
     });
+  });
+
+  it("取れなかったページの数を返す", async () => {
+    polling([{ state: "succeeded", pagesCaptured: 2, pagesFailed: 3, stopReason: "completed" }]);
+    await expect(main("http://w", "tok", undefined, 60_000, 5)).resolves.toMatchObject({
+      outcome: "succeeded",
+      pagesCaptured: 2,
+      pagesFailed: 3,
+    });
+  });
+
+  it("1 枚も撮れず failed で締まったクロールは、台帳の文で投げる (run が赤くなる)", async () => {
+    polling([
+      {
+        state: "failed",
+        pagesCaptured: 0,
+        stopReason: "failed",
+        error: "1 枚も撮れませんでした（取れず 1・見送り 0）。最初の理由: http_error: HTTP 404",
+      },
+    ]);
+    await expect(main("http://w", "tok", undefined, 60_000, 5)).rejects.toThrow(
+      "c1 は失敗しました: 1 枚も撮れませんでした（取れず 1・見送り 0）。最初の理由: http_error: HTTP 404",
+    );
   });
 
   it("max_depth で終わっても成功として扱う", async () => {

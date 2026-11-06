@@ -78,13 +78,36 @@ describe("台帳の error で終わったとき (締める段が締めた)", () 
   });
 });
 
-describe("succeeded・0 ページで終わったとき", () => {
+describe("1 枚も撮れず failed で終わったとき", () => {
   it("F3 名前の引けない URL → 取れなかったページとその理由を出す", () => {
     const reading = readFinished(crawlOf("f3-unresolvable"));
     expect(reading?.evidence).toBe(
       "http://nonexistent.invalid/ —— CAPTURE_STATUS_FAILED: net::ERR_NAME_NOT_RESOLVED at http://nonexistent.invalid/",
     );
     expect(reading?.fix).toMatch(/^ページの名前が引けない/);
+  });
+
+  it("取れなかったページが無ければ、全部を見送ったと言う", () => {
+    const reading = readFinished({
+      ...crawlOf("f3-unresolvable"),
+      error: "1 枚も撮れませんでした（取れず 0・見送り 1）。最初の理由: robots",
+      failures: [],
+    });
+    expect(reading?.evidence).toBe(
+      "台帳の error: 1 枚も撮れませんでした（取れず 0・見送り 1）。最初の理由: robots",
+    );
+    expect(reading?.fix).toMatch(/全部を robots\.txt で見送った/);
+  });
+});
+
+describe("succeeded で終わったとき", () => {
+  it("取れなかったページが混ざっても何も言わない (1 枚以上撮れている)", () => {
+    expect(
+      readFinished({
+        ...crawlOf("ok"),
+        failures: [{ url: "https://site.test/x", depth: 1, reason: "http_error: HTTP 404" }],
+      }),
+    ).toBeUndefined();
   });
 });
 
