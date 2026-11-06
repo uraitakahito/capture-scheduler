@@ -39,6 +39,11 @@ schema:
       type: integer
       description: ""
       default: null
+    user_agent:
+      type: string
+      description: ""
+      default: null
+      originalType: string
   required:
     - candidates
     - per_host_delay_ms

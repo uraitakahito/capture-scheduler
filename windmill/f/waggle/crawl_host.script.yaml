@@ -110,6 +110,11 @@ schema:
       description: ""
       default: null
       format: resource-record
+    user_agent:
+      type: string
+      description: ""
+      default: null
+      originalType: string
   required:
     - crawl_id
     - host

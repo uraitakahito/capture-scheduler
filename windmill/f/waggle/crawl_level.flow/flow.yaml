@@ -41,6 +41,10 @@ value:
           host_parallelism:
             type: javascript
             expr: flow_input.host_parallelism
+          # 字に BrowserHive があれば、robots をその名前で照らす
+          user_agent:
+            type: javascript
+            expr: flow_input.user_agent
     # **TS のスクリプトを JS にする。** 台帳が持つのは書いたままの TS (sha256 は TS のバイト列)。
     # BrowserHive が評価するのは JS (sha256 は JS のバイト列)。その継ぎ目がこの段で、
     # 変換するのは ts-compile-service —— 型が通らなければ 422 でこの段が落ち、failure_module が
@@ -103,6 +107,11 @@ value:
                 secrets:
                   type: javascript
                   expr: flow_input.secrets
+                # 頼まれた User-Agent。**flow は運ぶだけで解かない** ({chrome} を解くのは BrowserHive)。
+                # 台帳は必ず文字列を送る (指定なしは "")。ここを書き忘れると null で届き、crawl_host が投げる。
+                user_agent:
+                  type: javascript
+                  expr: flow_input.user_agent
             # **BrowserHive が全部居ないときだけ** crawl_host は投げる (ServerUnavailable)。
             # 1 ページの失敗は投げずに結果に載せるので、ここで再試行されるのは
             # 「口が 1 つも無い」状態だけ —— 再起動を待つぶんの間隔で 2 回。
@@ -294,8 +303,13 @@ schema:
       description: クロールごとのシークレット (名前 → Windmill の変数の path)。crawl_host が解き、スクリプトが __bh.secrets で読む。値は記録に残らない
       additionalProperties:
         type: string
+    user_agent:
+      # 頼まれた User-Agent。capture-ledger がクロールの頼みから固定し、**必ず送る** (指定なしは "")。
+      type: string
+      description: 頼まれた User-Agent。打った字のままで、{chrome} は BrowserHive が解く。空なら browser の字のまま撮る
+      default: ""
   # capture-ledger が送るのは crawl_id / depth / frontier / 間隔 / 並列度 /
-  # capture_formats / signing / scripts / variables / secrets と、受け口を出している配備では
+  # capture_formats / signing / scripts / variables / secrets / user_agent と、受け口を出している配備では
   # artifact_sink。並列度は plan_level が BrowserHive の口の数で頭打ちにしてから for-loop に渡る。
   # capture-ledger は自分がコンテナからどう見えるかを知らないし、issuer の鍵も持っていない。
   #

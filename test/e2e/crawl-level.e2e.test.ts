@@ -12,7 +12,7 @@ import { describe, it, expect, beforeAll } from "vitest";
  * Windmill の口 (`/jobs/run/f/...`) を直接叩けば速いが、それでは意味が無い。
  * この試験の目的は **capture-ledger が実際に送る引数**を通すことで、capture-ledger が送るのは
  * `crawl_id` / `depth` / `frontier` / `per_host_delay_ms` / `host_parallelism` /
- * `capture_formats` / `signing` / `scripts` / `variables` / `secrets` と、受け口を出している配備では
+ * `capture_formats` / `signing` / `scripts` / `variables` / `secrets` / `user_agent` と、受け口を出している配備では
  * `artifact_sink`。
  * `respect_robots` は**送られない**。
  *
