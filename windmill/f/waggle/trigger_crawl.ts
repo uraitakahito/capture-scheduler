@@ -42,6 +42,7 @@ interface CrawlState {
   finishedAt: string | null;
   pagesDiscovered: number | null;
   pagesCaptured: number | null;
+  pagesFailed: number | null;
   error: string | null;
 }
 
@@ -50,6 +51,7 @@ export interface Result {
   crawlId?: string;
   pagesDiscovered?: number;
   pagesCaptured?: number;
+  pagesFailed?: number;
   stopReason?: string | null;
 }
 
@@ -157,6 +159,7 @@ export async function main(
     const counts = {
       pagesDiscovered: crawl.pagesDiscovered ?? 0,
       pagesCaptured: crawl.pagesCaptured ?? 0,
+      pagesFailed: crawl.pagesFailed ?? 0,
     };
     if (crawl.state === "failed") {
       throw new Error(`${crawlId} は失敗しました: ${crawl.error ?? "(理由なし)"}`);
@@ -179,8 +182,9 @@ export async function main(
       );
     }
 
-    // succeeded は「最後まで走った」であって「全部取れた」ではない。
-    // 打ち切りでも succeeded で終わる —— 理由は `stopReason` が語る。
+    // succeeded は「最後まで走り、1 枚以上撮れた」であって「全部取れた」ではない。
+    // 打ち切りでも succeeded で終わる —— 理由は `stopReason` が語る。取れなかった数は `pagesFailed`。
+    // 1 枚も撮れなければ capture-ledger が failed で締めるので、上で投げて run が赤くなる。
     //
     // **対象一覧からの取り込みは常に `max_depth` で終わる。** 深さ 0 なので
     // 「次の段は無い」が「深さの上限に当たった」として記録される。異常ではない。
