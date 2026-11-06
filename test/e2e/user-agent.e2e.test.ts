@@ -131,17 +131,43 @@ describe("クロールごとの User-Agent", () => {
     expect(new Set(userAgentArgOf(jobs, "crawl_host"))).toEqual(new Set([""]));
   });
 
-  it("BrowserHive を含まない字は 400 で断り、相手に何も届かない", async () => {
+  it("BrowserHive を含まない字でも撮り、相手にその字が届く", async () => {
+    await resetFixtures();
+    const seed = `${FIXTURES}/plain-html`;
+    const asked = "{chrome}";
+
+    const got = await api.finished(
+      await api.start({ seeds: [seed], maxDepth: 0, userAgent: asked }),
+    );
+    expect(got["state"], String(got["error"])).toBe("succeeded");
+    expect(got["userAgent"]).toBe(asked);
+
+    const archive = await api.archiveOf(seed, String(got["startedAt"]));
+    const recorded = settingsOf(await readWacz(await api.signedUrl(archive.id)))[
+      "userAgent"
+    ] as string;
+    expect(recorded).toMatch(/ Chrome\/.* Safari\/[\d.]+$/);
+    expect(recorded).not.toContain("HeadlessChrome");
+    expect(recorded).not.toContain("{chrome}");
+    expect(recorded).not.toContain("BrowserHive");
+    expect(new Set((await seenByFixtures()).map((r) => r.userAgent))).toEqual(new Set([recorded]));
+
+    const jobs = await jobsOf(got);
+    expect(userAgentArgOf(jobs, "plan_level")).toEqual([asked]);
+    expect(new Set(userAgentArgOf(jobs, "crawl_host"))).toEqual(new Set([asked]));
+  });
+
+  it("形に合わない字は 400 で断り、相手に何も届かない", async () => {
     await resetFixtures();
 
     const { status, text } = await api.post({
       seeds: [`${FIXTURES}/plain-html`],
       maxDepth: 0,
-      userAgent: "curl/8.0",
+      userAgent: "クローラー",
     });
 
     expect(status, text).toBe(400);
-    expect(text).toContain("userAgent must contain BrowserHive");
+    expect(text).toContain("userAgent must be printable ASCII");
     expect(await seenByFixtures()).toEqual([]);
   });
 });
