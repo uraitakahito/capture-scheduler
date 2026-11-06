@@ -19,35 +19,35 @@ produces a successful archive. The スクリプト (scripts) check in `doctor` b
 
 ```sh
 curl -s -o /dev/null -w '%{http_code}\n' -H 'authorization: Bearer dev-key' http://127.0.0.1:8090/stores
-# 200 means it is up. 000 means it is not → cd ~/projects/crawler/capture-ledger && pnpm run stack:up
+# 200 means it is up. 000 means it is not → cd ../capture-ledger && pnpm run stack:up
 ```
 
 `dev-key` is the development OpenFGA's default key. With the stack down, `fga:grant` below stops
 with "OpenFGA (http://localhost:8090) に届きません" (OpenFGA is not reachable).
 
 Every code block below starts with a `cd` that says which repo it runs in (this assumes both repos
-are cloned side by side under `~/projects/crawler/`; adjust if yours live elsewhere). Run a
+are cloned side by side under the same parent directory, and you are at the root of one of them). Run a
 capture-scheduler command inside capture-ledger and pnpm only says `Missing script`.
 
 :::tip[All of it at once: one command in capture-ledger]
-`pnpm run dev:up` over in capture-ledger runs 16 steps in order — **including the ones on this
+`pnpm run dev:up` over in capture-ledger runs the bring-up steps in order — **including the ones on this
 page**: it brings Windmill up, bootstraps it, loads the flow, hands over the keys,
 and finishes with `doctor`. What it runs there are **this repo's own commands**, and **no file
 of this repo's is written from over there** (the lines for capture-ledger are fetched by
 its own `pnpm run connect`).
 
 ```sh
-cd ~/projects/crawler/capture-ledger && pnpm run dev:up
+cd ../capture-ledger && pnpm run dev:up
 ```
 
-This page is the capture-scheduler half of those 16 steps, done one at a time. Both roads end
+This page is the capture-scheduler half of those steps, done one at a time. Both roads end
 in the same place.
 :::
 
 ## Bring it up
 
 ```sh
-cd ~/projects/crawler/capture-scheduler
+cd ../capture-scheduler
 sudo container system dns create capture-scheduler   # once per machine
 ./setup.sh
 container-compose up -d
@@ -67,7 +67,7 @@ pnpm run windmill:push        # upload the scripts, the flow and the schedule
 Changing capture-ledger's settings is the job of a command you run **there**:
 
 ```sh
-cd ~/projects/crawler/capture-ledger
+cd ../capture-ledger
 pnpm run connect              # reads the lines above into capture-ledger's .env.local
 ```
 
@@ -108,7 +108,7 @@ Start `oidc:issuer` **before** the API: the API fetches the issuer's keys at sta
 cannot come up in JWT mode without it.
 
 ```sh
-cd ~/projects/crawler/capture-ledger
+cd ../capture-ledger
 pnpm run oidc:issuer   # keep it running
 pnpm run api           # stop the one from §6 first, then use the same command
 ```
@@ -129,7 +129,7 @@ Put the token the Windmill flow calls capture-ledger with, and the address it ca
 Windmill's variables:
 
 ```sh
-cd ~/projects/crawler/capture-scheduler
+cd ../capture-scheduler
 pnpm run windmill:capture-ledger-token   # the token, the API address as a container sees it, and the ts-compile-service address
 ```
 
@@ -166,7 +166,7 @@ capture-ledger API   ◄── Windmill (a token with sub=windmill, orgs=[acme])
 Write that permission (on the capture-ledger side, once; `fga:revoke` takes it back):
 
 ```sh
-cd ~/projects/crawler/capture-ledger
+cd ../capture-ledger
 pnpm run fga:grant submitter windmill acme
 # windmill は acme のクロールを始められます (書いた: user:windmill submitter organization:acme)
 #   = "windmill may start crawls for acme (wrote: …)"
@@ -179,7 +179,7 @@ command to type, with the names capture-ledger actually saw.
 ## Check it: take one capture
 
 ```sh
-cd ~/projects/crawler/capture-scheduler
+cd ../capture-scheduler
 pnpm run doctor   # runs the checks in order; all ✓ means a crawl is set up to run to the end
 pnpm run smoke    # captures a capture-fixtures page once; "撮れた" (captured) once the WACZ comes back and search finds it
 ```
@@ -192,7 +192,7 @@ their answers differ by network (a router may answer `127.0.0.1`).
 `dev:up` does not start capture-fixtures, so start it before smoke:
 
 ```sh
-cd ~/projects/crawler/capture-ledger
+cd ../capture-ledger
 pnpm run stack:up --profile capture-fixtures capture-fixtures
 ```
 
@@ -256,7 +256,7 @@ timeout, on Ctrl-C — so the next run is never blocked by a 409. To follow it i
 `run` URL smoke prints ([Windmill UI: "Digging into failures"](/windmill-ui/#digging-into-failures--a-real-one)).
 
 ```sh
-cd ~/projects/crawler/capture-scheduler
+cd ../capture-scheduler
 pnpm run smoke http://capture-fixtures.capture-ledger:8080/links/hub   # capture a different URL (search is not checked: no known word)
 pnpm run smoke --timeout 300          # how long to wait (seconds, default 180)
 pnpm run smoke --no-doctor            # skip the checks (re-running right after a fix)
@@ -322,7 +322,7 @@ With `CAPTURE_LEDGER_OIDC_ISSUER` set, capture-ledger accepts **only** JWTs. The
 capture-ledger v0.45.0). Leave the API's settings as they are and paste a token:
 
 ```sh
-cd ~/projects/crawler/capture-ledger
+cd ../capture-ledger
 pnpm run --silent oidc:token --subject "$(whoami)" --org acme | pbcopy
 open http://127.0.0.1:7070/
 ```
