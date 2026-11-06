@@ -34,7 +34,7 @@ import * as wmill from "windmill-client";
 
 /**
  * robots を照らす名前。字に `BrowserHive` があれば、その名前で照らす (robots-parser は名指しの組が先で、無ければ `*`)。
- * 無ければ、撮るときの字は browser のものなので `*` の規則を見る。線は capture-ledger の `userAgent` の検査と同じ。
+ * 無ければ、相手にその名前を見せていないので `*` の規則を見る (RFC 9309 §2.2.1: 名前は送る User-Agent に含める)。
  * robots.txt を取りに行くときの字は変えない。
  */
 export const robotsToken = (userAgent: string | null): string =>
