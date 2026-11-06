@@ -105,16 +105,16 @@ schema:
       items:
         type: string
       originalType: string[]
-    variables:
-      type: object
-      description: ""
-      default: null
-      format: resource-record
     user_agent:
       type: string
       description: ""
       default: null
       originalType: string
+    variables:
+      type: object
+      description: ""
+      default: null
+      format: resource-record
   required:
     - crawl_id
     - host
