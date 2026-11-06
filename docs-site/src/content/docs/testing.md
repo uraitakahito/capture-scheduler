@@ -124,6 +124,22 @@ log, which counts every request by its full URL, query string included.
   WACZ.
 - **A required secret missing from Windmill is refused by the ledger with a 400 that names it, and
   no crawl row is created.**
+- **Zod in a script works on a page with a strict CSP** (`zod.e2e.test.ts`). The seed is
+  capture-fixtures' `/csp/strict`, whose `script-src 'self'` forbids eval and reports violations to
+  `/csp/report`. An inline script defines a `z.object` synchronously, calls `parse` after an `await`,
+  then fetches `/plain-html?zod=<mark>`. The mark arrives and `/csp/report` is hit 0 times. The control
+  is a script on the same page that calls `new Function` after an `await`, and its report does arrive.
+  The control waits too because during the synchronous part of `page.evaluate`, CDP allows eval and
+  the CSP is not consulted.
+- **BrowserHive waits for a script that reads Zod to finish.** After a script that awaits 1.5 seconds,
+  N in the page log's `script … finished after N ms` is at least 1,500. JavaScript wrapped in a
+  function loses the Promise as its completion value and looks finished within milliseconds.
+- **The JavaScript that ran stays on record.** The `source` in the WACZ's `behaviors/custom.jsonl`
+  has `// zod <version> (MIT)` and no `import`.
+- **A value of the wrong shape leaves the crawl succeeded and names the field.** With `safeParse` and
+  `__bh.log.error`, the crawl succeeds and the page log's error line has the field's name.
+- **An `import` in a form that is not accepted fails the crawl at compile**: `import { z as zod }`
+  ends failed with `BH0003` in `error`.
 
 ## The nightly loop refuses to guess
 

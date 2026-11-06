@@ -111,6 +111,17 @@ e2e のほうは capture-fixtures が禁じられたページを受け取った�
   台帳の答え・Windmill の run の引数のどこにも無く、`settings.secrets` に名前だけ在る。対照は、同じ値を変数で
   渡した取り込み —— そちらでは同じ探し方で WACZ に見つかる。
 - **宣言した required のシークレットが Windmill に無ければ、台帳が 400 で名指し、クロールの行は立たない。**
+- **スクリプトの Zod が、厳しい CSP のページで動く**（`zod.e2e.test.ts`）。起点は capture-fixtures の `/csp/strict`
+  （`script-src 'self'` で eval を禁じ、違反を `/csp/report` へ報告させる）。その場の TS が `z.object` を同期で定義し、
+  `await` の後で `parse` して `/plain-html?zod=<印>` を取りに行く。印が届き、`/csp/report` は 0 回。
+  対照は同じページで `await` の後に `new Function` を呼ぶ 1 本で、`/csp/report` が届く。対照も `await` の後なのは、
+  `page.evaluate` の同期の間は CDP が eval を許し、CSP に当たらないから。
+- **BrowserHive が Zod を読むスクリプトの終わりを待つ。** `await` で 1.5 秒待つスクリプトの後で、ページのログの
+  `script … finished after N ms` の N が 1,500 以上。関数で包んだ JS は完了値が Promise でなくなり、数 ms で終わった形になる。
+- **走った JS が記録に残る。** WACZ の `behaviors/custom.jsonl` の `source` に `// zod <版> (MIT)` が在り、`import` は無い。
+- **形が合わないときは成功のまま、項目が残る。** `safeParse` と `__bh.log.error` のスクリプトで、クロールは succeeded、
+  ページのログの error の行に項目の名前が在る。
+- **受けない `import` の形は、compile の段でクロールごと落ちる。** `import { z as zod }` で failed、`error` に `BH0003`。
 
 ## 日次のループは推測しない
 
