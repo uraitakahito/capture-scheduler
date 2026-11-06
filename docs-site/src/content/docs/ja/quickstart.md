@@ -20,35 +20,35 @@ Windmill は capture-ledger のスタックの 2 つを使う。OpenFGA には�
 
 ```sh
 curl -s -o /dev/null -w '%{http_code}\n' -H 'authorization: Bearer dev-key' http://127.0.0.1:8090/stores
-# 200 なら動いている。000 なら止まっている → cd ~/projects/crawler/capture-ledger && pnpm run stack:up
+# 200 なら動いている。000 なら止まっている → cd ../capture-ledger && pnpm run stack:up
 ```
 
 `dev-key` は開発用の OpenFGA の既定の鍵。止まったままだと、下の `fga:grant` が
 「OpenFGA (http://localhost:8090) に届きません」で止まる。
 
 以下のコードブロックは、どれも 1 行目の `cd` で「どの repo で打つか」を示す（2 つの repo は
-`~/projects/crawler/` に並べて clone してある前提。別の場所なら読み替える）。capture-scheduler の
+同じ親ディレクトリに並べて clone してあり、どちらかの根で打つ前提）。capture-scheduler の
 コマンドを capture-ledger で打つと、pnpm は `Missing script` としか言わない。
 
 :::tip[まとめてなら、capture-ledger の 1 本で済みます]
-capture-ledger で `pnpm run dev:up` を打つと、**このページの手順も含めて** 16 段を順に
+capture-ledger で `pnpm run dev:up` を打つと、**このページの手順も含めて** 立ち上げの段を順に
 起こします —— Windmill を立て、bootstrap し、flow を入れ、鍵を渡し、最後に
 `doctor` まで。向こうが打つのは**この repo のコマンド**で、**ファイルはこの repo の中に
 しか書かれません**（capture-ledger に渡す行は、向こうの `pnpm run connect` が
 取りに来ます）。
 
 ```sh
-cd ~/projects/crawler/capture-ledger && pnpm run dev:up
+cd ../capture-ledger && pnpm run dev:up
 ```
 
-このページは、その 16 段のうち capture-scheduler 側を 1 つずつ手でやる道です。
+このページは、そのうち capture-scheduler 側を 1 つずつ手でやる道です。
 どちらでも同じところに着きます。
 :::
 
 ## 立ち上げる
 
 ```sh
-cd ~/projects/crawler/capture-scheduler
+cd ../capture-scheduler
 sudo container system dns create capture-scheduler   # マシンごとに 1 度だけ
 ./setup.sh
 container-compose up -d
@@ -68,7 +68,7 @@ pnpm run windmill:push        # script・flow・schedule を入れる
 capture-ledger の設定を書き換えるのは、**向こうで打つコマンドの仕事**です:
 
 ```sh
-cd ~/projects/crawler/capture-ledger
+cd ../capture-ledger
 pnpm run connect              # 上の行を読み、capture-ledger の .env.local に書く
 ```
 
@@ -109,7 +109,7 @@ API が設定を読むのは**起動のときの 1 度だけ**なので、走っ
 居ないと JWT の設定で立ち上がれません。
 
 ```sh
-cd ~/projects/crawler/capture-ledger
+cd ../capture-ledger
 pnpm run oidc:issuer   # 動かし続ける
 pnpm run api           # §6 で起こしたものを止めてから、同じ口でもう一度
 ```
@@ -129,7 +129,7 @@ Archive API listening on 0.0.0.0:7070 — identity: JWT (http://127.0.0.1:9099);
 Windmill の flow が capture-ledger を呼ぶためのトークンと、呼ぶ先を、Windmill の変数に入れる:
 
 ```sh
-cd ~/projects/crawler/capture-scheduler
+cd ../capture-scheduler
 pnpm run windmill:capture-ledger-token   # トークンと、コンテナから見た API の宛先と、ts-compile-service の宛先を入れる
 ```
 
@@ -166,7 +166,7 @@ capture-ledger API   ◄── Windmill（sub=windmill, orgs=[acme] のトーク
 その許可を 1 行書き込む（capture-ledger 側で 1 度だけ。取り消すのは `fga:revoke`）:
 
 ```sh
-cd ~/projects/crawler/capture-ledger
+cd ../capture-ledger
 pnpm run fga:grant submitter windmill acme
 # windmill は acme のクロールを始められます (書いた: user:windmill submitter organization:acme)
 ```
@@ -178,7 +178,7 @@ pnpm run fga:grant submitter windmill acme
 ## 確かめる —— 1 本撮れるまで
 
 ```sh
-cd ~/projects/crawler/capture-scheduler
+cd ../capture-scheduler
 pnpm run doctor   # 点検を順に。全部 ✓ なら、クロールが最後まで走る設定になっている
 pnpm run smoke    # capture-fixtures の頁を 1 本撮り、WACZ を取り出せて検索に当たれば「撮れた」
 ```
@@ -192,7 +192,7 @@ smoke が既定で撮るのは、capture-ledger のスタックにいる
 `dev:up` では立ち上がらないので、smoke の前に立ち上げておく:
 
 ```sh
-cd ~/projects/crawler/capture-ledger
+cd ../capture-ledger
 pnpm run stack:up --profile capture-fixtures capture-fixtures
 ```
 
@@ -253,7 +253,7 @@ smoke をもう一度。自分が始めたクロールは、失敗しても時�
 [Windmill UI の「失敗を掘る」](/windmill-ui/#失敗を掘る--実例-1-つ)）。
 
 ```sh
-cd ~/projects/crawler/capture-scheduler
+cd ../capture-scheduler
 pnpm run smoke http://capture-fixtures.capture-ledger:8080/links/hub   # 撮る URL を変える（当たる語が分からないので、検索は照らさない）
 pnpm run smoke --timeout 300          # 待つ上限（秒。既定 180）
 pnpm run smoke --no-doctor            # 点検を飛ばす（直した直後の撮り直し）
@@ -317,7 +317,7 @@ picker（`http://127.0.0.1:7070/`）もそれに合わせて、名乗りの 2 �
 （capture-ledger v0.45.0 から）。API の設定は変えずに、トークンを貼って読む:
 
 ```sh
-cd ~/projects/crawler/capture-ledger
+cd ../capture-ledger
 pnpm run --silent oidc:token --subject "$(whoami)" --org acme | pbcopy
 open http://127.0.0.1:7070/
 ```
