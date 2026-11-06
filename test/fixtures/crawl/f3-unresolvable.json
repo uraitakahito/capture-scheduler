@@ -1,6 +1,6 @@
 {
   "case": "F3: 名前の引けない URL (http://nonexistent.invalid/)",
-  "recorded": "2026-09-19 capture-ledger develop 9fe6a03 (v0.43.0 の手前) と Windmill CE v1.806.0 で実測。state・stopReason・error・pagesFailed は capture-ledger v0.77.0 の締め方に合わせて手で直した",
+  "recorded": "2026-09-19 capture-ledger develop 9fe6a03 (v0.43.0 の手前) と Windmill CE v1.806.0 で実測。state・stopReason・error・pagesFailed・failures は 2026-11-06 のクロール 7960d9d4 (capture-ledger v0.77.0) の答えに合わせた",
   "start": {
     "status": 202,
     "body": {
@@ -22,16 +22,17 @@
     "pagesDiscovered": 0,
     "pagesCaptured": 0,
     "pagesFailed": 1,
-    "error": "1 枚も撮れませんでした（取れず 1・見送り 0）。最初の理由: CAPTURE_STATUS_FAILED: net::ERR_NAME_NOT_RESOLVED at http://nonexistent.invalid/",
+    "error": "1 枚も撮れませんでした（取れず 1・見送り 0）。最初の理由: failed: net::ERR_NAME_NOT_RESOLVED at http://nonexistent.invalid/",
     "lastJob": {
       "id": "01a0ba0c-d609-5280-0008-08a22dc56fd6",
       "depth": 0
     },
     "failures": [
       {
+        "page": "220",
         "url": "http://nonexistent.invalid/",
         "depth": 0,
-        "reason": "CAPTURE_STATUS_FAILED: net::ERR_NAME_NOT_RESOLVED at http://nonexistent.invalid/"
+        "reason": "failed: net::ERR_NAME_NOT_RESOLVED at http://nonexistent.invalid/"
       }
     ]
   },

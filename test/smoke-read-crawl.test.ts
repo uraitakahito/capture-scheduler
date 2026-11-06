@@ -82,7 +82,7 @@ describe("1 枚も撮れず failed で終わったとき", () => {
   it("F3 名前の引けない URL → 取れなかったページとその理由を出す", () => {
     const reading = readFinished(crawlOf("f3-unresolvable"));
     expect(reading?.evidence).toBe(
-      "http://nonexistent.invalid/ —— CAPTURE_STATUS_FAILED: net::ERR_NAME_NOT_RESOLVED at http://nonexistent.invalid/",
+      "http://nonexistent.invalid/ —— failed: net::ERR_NAME_NOT_RESOLVED at http://nonexistent.invalid/",
     );
     expect(reading?.fix).toMatch(/^ページの名前が引けない/);
   });
