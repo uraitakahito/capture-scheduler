@@ -171,6 +171,15 @@ BrowserHive から写しているものは他に無い。`crawl_host` は Browse
 置き、腐りを捕まえる番人を付けていた。だから口は `http(s)://` の URL で、`crawl_host` は
 古い `host:port` の形を変数の名前を挙げて断る。
 
+## クロールごとの User-Agent
+
+クロールごとに `User-Agent` を頼める（capture-ledger の `POST /api/crawls` の `userAgent`）。capture-ledger は
+`user_agent` として必ず送り、頼まれていなければ空の字になる。**flow は運ぶだけで解かない** —— `crawl_host` は字を
+BrowserHive へ渡し、`{chrome}` を browser の字から Headless を外した物にするのは BrowserHive で、空なら鍵ごと送らない。
+入力が届かないと `crawl_host` は投げる。黙って browser の字のまま撮っても、クロールは成功に見えるため。`plan_level` は
+robots.txt の規則を照らすのに使う: 字に `BrowserHive` があればその名前で（その組が先で、無ければ `*`）、無ければ
+`*` で照らす。robots.txt を取りに行く要求は変わらない。
+
 ## クロールごとの値 —— 変数とシークレット
 
 スクリプトは、クロールごとに違う値を 2 つの口で受け取る。宣言するのは

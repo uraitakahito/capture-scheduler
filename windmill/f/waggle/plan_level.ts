@@ -32,8 +32,13 @@
 import robotsParser from "robots-parser";
 import * as wmill from "windmill-client";
 
-/** BrowserHive の User-Agent はブラウザのものなので、robots では `*` の規則を見る。 */
-const USER_AGENT = "*";
+/**
+ * robots を照らす名前。字に `BrowserHive` があれば、その名前で照らす (robots-parser は名指しの組が先で、無ければ `*`)。
+ * 無ければ、撮るときの字は browser のものなので `*` の規則を見る。線は capture-ledger の `userAgent` の検査と同じ。
+ * robots.txt を取りに行くときの字は変えない。
+ */
+export const robotsToken = (userAgent: string | null): string =>
+  /\bBrowserHive\b/.test(userAgent ?? "") ? "BrowserHive" : "*";
 
 export interface Candidate {
   url: string;
@@ -123,7 +128,9 @@ export async function main(
   per_host_delay_ms: number,
   respect_robots: boolean | null = true,
   host_parallelism: number | null = null,
+  user_agent: string | null = null,
 ): Promise<Plan> {
+  const token = robotsToken(user_agent);
   // **`null` を「未設定」として扱う。既定引数では足りない。**
   //
   // flow の input_transform は `flow_input.respect_robots` を評価し、渡されていなければ
@@ -155,7 +162,7 @@ export async function main(
 
     const allowed: string[] = [];
     for (const c of list) {
-      if (robots !== undefined && robots.isDisallowed(c.url, USER_AGENT) === true) {
+      if (robots !== undefined && robots.isDisallowed(c.url, token) === true) {
         skipped.push({ url: c.url, reason: "robots" });
         continue;
       }
@@ -166,7 +173,7 @@ export async function main(
 
     // #region delay
     // **長いほうを採る。** 相手が言っている値をこちらの都合で縮めない。
-    const crawlDelaySec = robots?.getCrawlDelay(USER_AGENT);
+    const crawlDelaySec = robots?.getCrawlDelay(token);
     const delayMs =
       typeof crawlDelaySec === "number" && Number.isFinite(crawlDelaySec)
         ? Math.max(per_host_delay_ms, Math.round(crawlDelaySec * 1000))

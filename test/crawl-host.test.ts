@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  askedUserAgent,
   captureHost,
   describeRefusal,
   given,
@@ -654,6 +655,42 @@ describe("ページで走らせるスクリプト", () => {
  * 変数から解いた名前 → 値。この層は中身を見ず、要求の `variables` / `secrets` に載せるだけ。
  * 頁の中では受け皿の `__bh.vars` / `__bh.secrets` になる (BrowserHive v22.0.0)。
  */
+describe("頼まれた User-Agent", () => {
+  const formats = { png: false, webp: false, html: false, links: false, mhtml: false, wacz: true };
+  const sendWith = async (userAgent?: string) => {
+    const seen: unknown[] = [];
+    await captureHost(
+      [fakeEndpoint("bh-1", { seen })],
+      "m",
+      ["a"],
+      "c1",
+      { formats, signing: false, scripts: [], ...(userAgent !== undefined && { userAgent }) },
+      0,
+      0,
+      FAST,
+    );
+    return seen[0] as { userAgent?: unknown };
+  };
+
+  it("打った字のまま要求に載せる（{chrome} を解かない）", async () => {
+    expect((await sendWith("{chrome} BrowserHive")).userAgent).toBe("{chrome} BrowserHive");
+  });
+
+  it("空の字なら鍵ごと送らない", async () => {
+    expect(await sendWith("")).not.toHaveProperty("userAgent");
+  });
+
+  it("届かなければ投げる。null は flow か台帳の取り違えで、黙って Headless のまま撮らせない", () => {
+    expect(() => askedUserAgent(null)).toThrow(/user_agent/);
+    expect(() => askedUserAgent(undefined)).toThrow(/user_agent/);
+  });
+
+  it("空の字は「指定なし」としてそのまま通す", () => {
+    expect(askedUserAgent("")).toBe("");
+    expect(askedUserAgent("{chrome} BrowserHive")).toBe("{chrome} BrowserHive");
+  });
+});
+
 describe("クロールごとの値", () => {
   const formats = { png: false, webp: false, html: false, links: false, mhtml: false, wacz: true };
   const sendWith = async (extra: {

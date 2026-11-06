@@ -3,6 +3,7 @@ import {
   endpointCount,
   main,
   parallelismFor,
+  robotsToken,
   type Candidate,
 } from "../windmill/f/waggle/plan_level.js";
 
@@ -100,6 +101,69 @@ describe("robots を読むかどうか", () => {
     );
     const plan = await main([at("http://m:8080/a")], 1000, true);
     expect(plan.groups[0]!.urls).toEqual(["http://m:8080/a"]);
+  });
+});
+
+describe("robots を照らす名前", () => {
+  const TWO_GROUPS = [
+    "User-agent: BrowserHive",
+    "Disallow: /named-only",
+    "Crawl-delay: 7",
+    "",
+    "User-agent: *",
+    "Disallow: /everyone",
+    "Crawl-delay: 3",
+    "",
+  ].join("\n");
+  const CANDIDATES = [at("http://m:8080/named-only"), at("http://m:8080/everyone")];
+
+  it("字に BrowserHive があれば、名指しの組で照らす", async () => {
+    robotsServing(TWO_GROUPS);
+    const plan = await main(CANDIDATES, 1000, true, null, "{chrome} BrowserHive");
+    expect(plan.skipped).toEqual([{ url: "http://m:8080/named-only", reason: "robots" }]);
+    expect(plan.groups[0]!.urls).toEqual(["http://m:8080/everyone"]);
+  });
+
+  it("空の字なら * の組で照らす", async () => {
+    robotsServing(TWO_GROUPS);
+    const plan = await main(CANDIDATES, 1000, true, null, "");
+    expect(plan.skipped).toEqual([{ url: "http://m:8080/everyone", reason: "robots" }]);
+    expect(plan.groups[0]!.urls).toEqual(["http://m:8080/named-only"]);
+  });
+
+  it("届かなければ（null）* の組で照らす", async () => {
+    robotsServing(TWO_GROUPS);
+    const plan = await main(CANDIDATES, 1000, true, null, null);
+    expect(plan.skipped).toEqual([{ url: "http://m:8080/everyone", reason: "robots" }]);
+  });
+
+  it("Crawl-delay も同じ組から読む", async () => {
+    robotsServing(TWO_GROUPS);
+    const named = await main([at("http://m:8080/a")], 500, true, null, "Probe/1 BrowserHive");
+    expect(named.groups[0]!.delayMs).toBe(7000);
+    robotsServing(TWO_GROUPS);
+    const everyone = await main([at("http://m:8080/a")], 500, true, null, "");
+    expect(everyone.groups[0]!.delayMs).toBe(3000);
+  });
+
+  it("名指しの組が無ければ、BrowserHive でも * の組に落ちる", async () => {
+    robotsServing(HIDDEN);
+    const plan = await main(
+      [at("http://m:8080/links/hidden")],
+      1000,
+      true,
+      null,
+      "{chrome} BrowserHive",
+    );
+    expect(plan.skipped).toEqual([{ url: "http://m:8080/links/hidden", reason: "robots" }]);
+  });
+
+  it("名前は語として探す", () => {
+    expect(robotsToken("{chrome} BrowserHive")).toBe("BrowserHive");
+    expect(robotsToken("BrowserHive/25")).toBe("BrowserHive");
+    expect(robotsToken("NotBrowserHiveAtAll")).toBe("*");
+    expect(robotsToken("")).toBe("*");
+    expect(robotsToken(null)).toBe("*");
   });
 });
 

@@ -196,6 +196,16 @@ BrowserHive's gRPC `.proto` as a Windmill resource, with a guard to catch it rot
 The endpoints are therefore `http(s)://` URLs; `crawl_host` refuses the old
 `host:port` form and names the variable.
 
+## Per-crawl User-Agent
+
+A crawl can ask for its own `User-Agent` (`userAgent` on capture-ledger's `POST /api/crawls`).
+capture-ledger always sends it as `user_agent`, empty when none was asked for. **The flow carries it and
+does not resolve it**: `crawl_host` passes the text to BrowserHive, which turns `{chrome}` into the browser's own
+value without Headless, and leaves the key out when it is empty. `crawl_host` throws when the input does
+not arrive, because a crawl that silently kept the browser's value would still succeed. `plan_level` uses it to
+read robots.txt rules: text containing `BrowserHive` is matched under that name (its group first, then
+`*`); otherwise under `*`. The request that fetches robots.txt does not change.
+
 ## Per-crawl values — variables and secrets
 
 A script receives values that differ from crawl to crawl through two slots. They are declared in

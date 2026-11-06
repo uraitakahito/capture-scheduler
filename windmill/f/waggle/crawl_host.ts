@@ -99,6 +99,11 @@ export interface CaptureSettings {
    */
   variables?: Record<string, string>;
   /**
+   * 頼まれた User-Agent。打った字のままで、`{chrome}` を解くのは BrowserHive (繋いだ browser の字を知っている)。
+   * 無いか空なら鍵ごと送らず、browser の字のまま撮る。
+   */
+  userAgent?: string;
+  /**
    * クロールごとのシークレット (名前 → **解いた後の値**)。解くのは `main` —— 台帳が渡すのは
    * Windmill の変数の path で、`resolveSecrets` が `f/waggle_secrets/` の下だけを `getVariable` で読む。
    * BrowserHive は値をどこにも書かず、`settings.secrets` に名前だけ残す。ここでも log にも
@@ -453,6 +458,19 @@ export const given = <T>(value: T | null | undefined): T | undefined =>
   value === null ? undefined : value;
 
 /**
+ * 頼まれた User-Agent を読む。台帳は**必ず文字列を送る** (指定なしは `""`)。`null` は flow か台帳の取り違えで、
+ * 黙って撮らせると、指定した字が届かなくても `HeadlessChrome` のまま成功する。**export は試験のため。**
+ */
+export const askedUserAgent = (value: string | null | undefined): string => {
+  if (value === null || value === undefined) {
+    throw new Error(
+      "user_agent が届いていない (flow.yaml の input_transforms と capture-ledger の版を確かめる)",
+    );
+  }
+  return value;
+};
+
+/**
  * スクリプトのシークレットを置くフォルダ。**この外の path は解かない。** path を組むのは台帳で、
  * 台帳も同じ線で断る (二重の検査) —— ここまで外の path が届いたなら、運ぶ途中で入れ替わったか
  * 台帳が壊れたかのどちらかで、黙って読んでよい物ではない。doctor の `SECRETS_FOLDER_NAME`
@@ -518,6 +536,10 @@ const captureOne = async (
     // 空なら鍵ごと送らない。
     ...bagOf("variables", capture.variables),
     ...bagOf("secrets", capture.secrets),
+    // 頼まれた字。解かずに渡す。空なら鍵ごと送らない。
+    ...(capture.userAgent === undefined || capture.userAgent === ""
+      ? {}
+      : { userAgent: capture.userAgent }),
   };
 
   for (let attempt = 1; ; attempt += 1) {
@@ -680,7 +702,13 @@ export async function main(
    * BrowserHive への要求にだけ載せる。
    */
   secrets?: Record<string, string>,
+  /**
+   * 頼まれた User-Agent。capture-ledger が**必ず送る** (指定なしは `""`)。`null` は取り違えなので投げる
+   * (`askedUserAgent`)。この層は中身を見ない。
+   */
+  user_agent?: string | null,
 ): Promise<PageResult[]> {
+  const userAgent = askedUserAgent(user_agent);
   // **設定は変数から読む。引数では受けない。**
   // Windmill は schema の既定値を UI からの実行にしか埋めない —— webhook で起こすと
   // 引数は素通りで、宛先が undefined のまま落ちる (実測)。capture-ledger は自分が
@@ -709,6 +737,7 @@ export async function main(
       ...(sink === undefined ? {} : { artifactSink: sink }),
       variables: given(variables) ?? {},
       secrets: resolved,
+      userAgent,
     },
     per_host_delay_ms,
     initial_delay_ms,

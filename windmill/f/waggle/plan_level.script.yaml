@@ -27,6 +27,10 @@ schema:
             description: ""
             originalType: string
       originalType: record[]
+    host_parallelism:
+      type: number
+      description: ""
+      default: null
     per_host_delay_ms:
       type: number
       description: ""
@@ -35,10 +39,11 @@ schema:
       type: boolean
       description: ""
       default: true
-    host_parallelism:
-      type: integer
+    user_agent:
+      type: string
       description: ""
       default: null
+      originalType: string
   required:
     - candidates
     - per_host_delay_ms

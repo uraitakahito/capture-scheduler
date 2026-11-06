@@ -58,7 +58,7 @@ vitest は必ず「No test files found, exiting with code 1」を先に出し、
 どの試験も、Windmill の実行の口ではなく **capture-ledger の API** でクロールを始める —— 目的が
 「capture-ledger が実際に送る引数」を運ぶことだから: `crawl_id` / `depth` / `frontier` /
 `per_host_delay_ms` / `host_parallelism` / `capture_formats` / `signing` / `scripts` / `variables` /
-`secrets` と、受け口を出している配備では `artifact_sink` で、**`respect_robots` は入っていない**。
+`secrets` / `user_agent` と、受け口を出している配備では `artifact_sink` で、**`respect_robots` は入っていない**。
 
 最初の試験が見ているのは 5 つ:
 

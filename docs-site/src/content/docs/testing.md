@@ -60,7 +60,7 @@ cost a round trip.
 Each test starts a crawl through capture-ledger's API — **not** Windmill's run endpoint —
 because the point is to carry the arguments capture-ledger actually sends:
 `crawl_id`, `depth`, `frontier`, `per_host_delay_ms`, `host_parallelism`,
-`capture_formats`, `signing`, `scripts`, `variables`, `secrets`, and `artifact_sink` where
+`capture_formats`, `signing`, `scripts`, `variables`, `secrets`, `user_agent`, and `artifact_sink` where
 capture-ledger serves the sink. **`respect_robots` is not among them.**
 
 The first one asserts five things:
