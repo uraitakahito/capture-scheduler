@@ -13,6 +13,11 @@
  * flow は failure_module (`fail_crawl`) へ落ち、台帳のクロールは failed になる。**通らない TS を
  * 黙って走らせない** —— 走らせれば「何も起きなかったのに成功したアーカイブ」が出る。
  *
+ * ## 渡した変数の名前も送る
+ *
+ * 必須の変数が渡されているかは変換サービスが見る (足りなければ 422 と BH0001)。送るのは名前だけで、値は
+ * 送らない —— 値の中身を検査するのは台帳で、ここを通る値を増やさない。
+ *
  * ## hash の継ぎ目
  *
  * 台帳 → ここは TS の sha256 で、ここ → BrowserHive は JS の sha256 で継ぐ。変換サービスが
@@ -39,6 +44,8 @@ export interface Compiled {
   hostTypes: string;
   /** 同じ TS の並びを、変換サービスが前にも変換していたか */
   cached: boolean;
+  /** スクリプトごとの変数の宣言 (defineParams)。入力と同じ並び。この段は中身を見ない */
+  declarations?: unknown[];
 }
 
 /** 変換サービスの診断 1 件 (ts-compile-service の model/main.smithy の Diagnostic)。 */
@@ -66,23 +73,30 @@ export const readAnswer = (status: number, errorType: string | null, body: unkno
   if (status === 200) return body as Compiled;
   const record = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
   const diagnostics = record["diagnostics"];
+  const missing = record["missingVariables"];
+  const lacking =
+    Array.isArray(missing) && missing.length > 0 ? `足りない変数 ${missing.join(", ")}。` : "";
   // **診断を全部は載せない。** 束ねた JS を貼ると数百件 (async.js で 708 件・9 万字) になり、
   // 台帳の /failed (reason は 2,000 字まで) が 400 で断って、クロールが running のまま残る
   const detail = Array.isArray(diagnostics)
     ? `型の誤り ${String(diagnostics.length)} 件。最初の ${String(Math.min(SHOWN, diagnostics.length))} 件: ` +
       (diagnostics as Diagnostic[]).slice(0, SHOWN).map(oneLine).join(" / ")
     : JSON.stringify(record["fieldList"] ?? body);
-  throw new Error(`compile ${String(status)} ${errorType ?? ""}: ${detail}`);
+  throw new Error(`compile ${String(status)} ${errorType ?? ""}: ${lacking}${detail}`);
 };
 
-export async function main(scripts: CrawlScript[]): Promise<Compiled> {
+export async function main(
+  scripts: CrawlScript[],
+  // 省いた入力は null で届く (Windmill は schema の既定値を webhook の実行では埋めない)
+  variables: Record<string, string> | null,
+): Promise<Compiled> {
   // **設定は変数から読む。引数では受けない。** Windmill は schema の既定値を UI からの実行にしか
   // 埋めない —— webhook で起こすと引数は素通りになる (`crawl_host.ts` に詳しい)。
   const base = await wmill.getVariable("u/admin/ts_compile_url");
   const res = await fetch(`${base}/compile`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ scripts }),
+    body: JSON.stringify({ scripts, variableNames: Object.keys(variables ?? {}) }),
     // 固まるより落ちる。初回の型検査でも 1 秒かからない (実測 608 ms)
     signal: AbortSignal.timeout(30_000),
   });

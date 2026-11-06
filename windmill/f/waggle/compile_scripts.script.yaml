@@ -44,5 +44,10 @@ schema:
             description: ""
             originalType: string
       originalType: record[]
+    variables:
+      type: object
+      description: ""
+      default: null
+      format: resource-record
   required:
     - scripts

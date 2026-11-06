@@ -61,10 +61,36 @@ describe("compile_scripts", () => {
       scripts: [script("autoscroll", "js")],
     };
     nextAnswer = { status: 200, body: compiled };
-    const out = await main([script("autoscroll", "ts")]);
+    const out = await main([script("autoscroll", "ts")], { query: "個人情報" });
     expect(out).toEqual(compiled);
-    // 送ったのは台帳のスクリプトそのもの
-    expect(received).toEqual({ scripts: [script("autoscroll", "ts")] });
+    // 送ったのは台帳のスクリプトそのものと、変数の名前だけ。値は送らない
+    expect(received).toEqual({
+      scripts: [script("autoscroll", "ts")],
+      variableNames: ["query"],
+    });
+  });
+
+  it("省いた variables は null で届き、名前の無い要求になる", async () => {
+    nextAnswer = { status: 200, body: {} };
+    await main([script("autoscroll", "ts")], null);
+    expect(received).toEqual({ scripts: [script("autoscroll", "ts")], variableNames: [] });
+  });
+
+  it("必須の変数が足りない 422 は、足りない名前を文の頭で言う", () => {
+    expect(() =>
+      readAnswer(422, "CompileFailed", {
+        missingVariables: ["query"],
+        diagnostics: [
+          {
+            file: "s.ts",
+            line: 20,
+            col: 7,
+            code: "BH0001",
+            message: "必須の変数 query が渡されていない",
+          },
+        ],
+      }),
+    ).toThrow(/^compile 422 CompileFailed: 足りない変数 query。型の誤り 1 件。.*BH0001/);
   });
 
   it("422 (型エラー) は診断ごと投げる —— flow は failure_module へ落ちる", async () => {
@@ -79,7 +105,7 @@ describe("compile_scripts", () => {
         ],
       },
     };
-    await expect(main([script("bad", "ts")])).rejects.toThrow(
+    await expect(main([script("bad", "ts")], null)).rejects.toThrow(
       /compile 422 CompileFailed: .*TS2322/,
     );
   });
@@ -121,7 +147,7 @@ describe("compile_scripts", () => {
   it("変換サービスが居なければ投げる (黙って TS を先へ渡さない)", async () => {
     VARS["u/admin/ts_compile_url"] = "http://127.0.0.1:1";
     try {
-      await expect(main([script("autoscroll", "ts")])).rejects.toThrow();
+      await expect(main([script("autoscroll", "ts")], null)).rejects.toThrow();
     } finally {
       VARS["u/admin/ts_compile_url"] = base;
     }

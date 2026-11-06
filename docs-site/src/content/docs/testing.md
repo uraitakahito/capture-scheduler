@@ -113,9 +113,12 @@ log, which counts every request by its full URL, query string included.
   stays within the ledger's 2,000 characters, and that the next crawl is accepted. Up to v0.24.2
   the reason carried every diagnostic, the ledger refused it, and the crawl stayed `running`.
 - **A per-crawl variable reaches the page.** The value sent as `variables` on `POST /api/crawls` is
-  read by an inline script (declared through `params`) from `__bh.vars` and fetched as
+  read by an inline script through `defineParams` and fetched as
   `/plain-html?var=<value>`. The same value appears in the ledger's `GET /api/crawls/:id` under
   `variables` and in the WACZ's `datapackage.json` under `settings.variables`.
+- **A required variable left out is refused before the crawl starts.** `400 missing variables` with
+  `BH0001` in `diagnostics`; no crawl row is created and capture-fixtures receives nothing. A value that
+  does not fit the declaration (an empty string for `.min(1)`) is `400 invalid variables`.
 - **A secret reaches the page and leaves no trace in the records.** The test puts a random value in
   `f/waggle_secrets/e2e_probe`; the inline script sends only the length of `__bh.secrets.e2e_probe`
   as `/plain-html?len=<length>`. The value itself is in none of the WACZ members, the ledger's

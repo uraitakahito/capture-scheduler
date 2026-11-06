@@ -653,7 +653,7 @@ describe("ページで走らせるスクリプト", () => {
 /**
  * **クロールごとの値を運ぶ。** 変数は台帳が固定した名前 → 値、シークレットは `main` が Windmill の
  * 変数から解いた名前 → 値。この層は中身を見ず、要求の `variables` / `secrets` に載せるだけ。
- * 頁の中では受け皿の `__bh.vars` / `__bh.secrets` になる (BrowserHive v22.0.0)。
+ * 頁の中では受け皿の `__bh.vars` (スクリプトは `defineParams` で読む) / `__bh.secrets` になる。
  */
 describe("頼まれた User-Agent", () => {
   const formats = { png: false, webp: false, html: false, links: false, mhtml: false, wacz: true };
