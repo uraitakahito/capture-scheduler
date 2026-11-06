@@ -532,7 +532,8 @@ const captureOne = async (
     ...toPreload(capture.scripts),
     // 在れば BrowserHive はここへ押し出し、自前の保管庫へは書かない。
     ...(capture.artifactSink === undefined ? {} : { artifactSink: capture.artifactSink }),
-    // クロールごとの値。変数は受け皿の `__bh.vars`、シークレットは `__bh.secrets` で頁に届く。
+    // クロールごとの値。変数は受け皿の `__bh.vars` (スクリプトは `defineParams` で読む)、シークレットは
+    // `__bh.secrets` で頁に届く。
     // 空なら鍵ごと送らない。
     ...bagOf("variables", capture.variables),
     ...bagOf("secrets", capture.secrets),

@@ -19,7 +19,7 @@ import { membersContaining, readWacz, settingsOf } from "./helpers/wacz.js";
  * 残るべき所にだけ残る。**
  *
  * 単体で見えるのは「crawl_host が要求に載せる形」までで、flow が `variables` / `secrets` を運ぶか
- * (`flow.yaml` の input_transforms) と、頁の中の受け皿 (`__bh.vars` / `__bh.secrets`。BrowserHive v22.0.0)
+ * (`flow.yaml` の input_transforms) と、頁の中の受け皿 (`defineParams` が読む `__bh.vars` と `__bh.secrets`)
  * に届くかは、本物を通さないと言えない。判定は 3 か所で採る:
  *
  *   - **頁の中に届いたか** —— その場の TS が印を capture-fixtures に送る。相手のリクエストログで見る
@@ -31,9 +31,9 @@ import { membersContaining, readWacz, settingsOf } from "./helpers/wacz.js";
  * 前の回の WACZ や run の履歴に残っていても、この回の判定には混ざらない。
  */
 
-/** 印を送る、その場の TS。読む口は `__bh.vars` / `__bh.secrets` (capture-scripts v0.6.0 の `types/host.d.ts`)。 */
+/** 印を送る、その場の TS。変数は `defineParams` で読む (capture-scripts v0.11.0 の `types/host.d.ts`)。 */
 const sendsVariable = (name: string): string =>
-  `(() => {\n  void fetch("/plain-html?var=" + encodeURIComponent(String(globalThis.__bh.vars.${name})));\n})();\n`;
+  `import { z } from "zod";\n\n(async () => {\n  const { ${name} } = defineParams(z.object({ ${name}: z.string().min(1) }));\n  void fetch("/plain-html?var=" + encodeURIComponent(${name}));\n})();\n`;
 
 /** シークレットは**長さだけ**を送る。値を通信に載せれば WARC に残り、「残らない」の判定が自分で崩れる。 */
 const sendsSecretLength = (name: string): string =>
@@ -103,7 +103,6 @@ describe("クロールごとの値 —— 変数とシークレット", () => {
               name: "probe",
               phase: "behavior",
               source: sendsVariable("probe"),
-              params: [{ name: "probe", kind: "variable", required: true, summary: "印にする値" }],
             },
           },
         ],
@@ -218,7 +217,6 @@ describe("クロールごとの値 —— 変数とシークレット", () => {
               name: "probe",
               phase: "behavior",
               source: sendsVariable("probe"),
-              params: [{ name: "probe", kind: "variable", required: true, summary: "対照" }],
             },
           },
         ],
@@ -234,6 +232,47 @@ describe("クロールごとの値 —— 変数とシークレット", () => {
     expect(found.some((name) => name.startsWith("archive/") || name.startsWith("indexes/"))).toBe(
       true,
     );
+  });
+
+  /**
+   * **必須の変数を渡さなければ、始める前に断る (CAPTURE-20)。** 判定は ts-compile-service の `BH0001` で、台帳が行を
+   * 立てる前に訊く。行は立たず、相手のサイトへの要求も 1 本も出ない。
+   */
+  it("必須の変数を渡さなければ、400 と BH0001 で断り、行も相手への要求も残らない", async () => {
+    await resetFixtures();
+    const { status, text } = await api.post({
+      seeds: [`${FIXTURES}/plain-html`],
+      maxDepth: 0,
+      scripts: [{ inline: { name: "probe", phase: "behavior", source: sendsVariable("probe") } }],
+    });
+    expect(status, text).toBe(400);
+    const body = JSON.parse(text) as {
+      error?: string;
+      names?: string[];
+      diagnostics?: { code: string; file: string }[];
+    };
+    expect(body.error).toBe("missing variables");
+    expect(body.names).toEqual(["probe"]);
+    expect(body.diagnostics).toMatchObject([{ code: "BH0001", file: "inline-probe.ts" }]);
+
+    const running = await api.get("/api/crawls?state=running");
+    expect(running["crawls"], "断ったのにクロールが立っている").toEqual([]);
+    expect(await requestCounts(), "断ったのに相手へ要求が飛んだ").toEqual(
+      expect.not.objectContaining({ "/plain-html": expect.anything() as unknown }),
+    );
+  });
+
+  it("宣言の形に合わない値は、400 invalid variables で断る", async () => {
+    const { status, text } = await api.post({
+      seeds: [`${FIXTURES}/plain-html`],
+      maxDepth: 0,
+      variables: { probe: "" },
+      scripts: [{ inline: { name: "probe", phase: "behavior", source: sendsVariable("probe") } }],
+    });
+    expect(status, text).toBe(400);
+    const body = JSON.parse(text) as { error?: string; names?: string[] };
+    expect(body.error).toBe("invalid variables");
+    expect(body.names).toEqual(["probe"]);
   });
 
   /**

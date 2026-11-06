@@ -208,9 +208,11 @@ read robots.txt rules: text containing `BrowserHive` is matched under that name 
 
 ## Per-crawl values — variables and secrets
 
-A script receives values that differ from crawl to crawl through two slots. They are declared in
-the `params` of [capture-scripts](https://github.com/uraitakahito/capture-scripts)' `catalog.json`
-(from v0.6.0) and read through BrowserHive v22.0.0's host object, `__bh.vars` / `__bh.secrets`.
+A script receives values that differ from crawl to crawl through two slots. A variable is declared and
+read with [capture-scripts](https://github.com/uraitakahito/capture-scripts)' `defineParams` (from
+v0.11.0). A secret is declared in the `params` of `catalog.json` and read through BrowserHive's host
+object as `__bh.secrets`. Both reach the page through the host object: in the JavaScript, `defineParams`
+becomes `__bh.vars`.
 **The flow carries both and looks at neither.**
 
 | Slot        | What the ledger sends                                                                                                                    | What `crawl_host` does                                                                                                     | What the records keep                                                                             |

@@ -103,9 +103,11 @@ e2e のほうは capture-fixtures が禁じられたページを受け取った�
 - **型の誤りがいくつあっても、クロールは failed で締まり、次を塞がない。** 型の誤りを数百件出す
   その場の TS で始める。`error` が件数を言い、台帳の上限の 2,000 字に収まることと、続けて始めた
   1 本が通ることを見る。v0.24.2 までは診断を全部載せたので台帳が断り、クロールは running のまま残った。
-- **クロールごとの変数が頁に届く。** `POST /api/crawls` の `variables` で渡した値を、その場の TS（`params` で
-  宣言）が `__bh.vars` から読んで `/plain-html?var=<値>` を取りに行く。同じ値が台帳の `GET /api/crawls/:id` の
+- **クロールごとの変数が頁に届く。** `POST /api/crawls` の `variables` で渡した値を、その場の TS が `defineParams` で
+  読んで `/plain-html?var=<値>` を取りに行く。同じ値が台帳の `GET /api/crawls/:id` の
   `variables` と、WACZ の `datapackage.json` の `settings.variables` に在る。
+- **必須の変数を渡さなければ、始める前に断る。** `400 missing variables` で、`diagnostics` に `BH0001`。クロールの行は
+  立たず、capture-fixtures に要求は届かない。宣言の形に合わない値（`.min(1)` に空の字）は `400 invalid variables`。
 - **シークレットが頁に届き、記録には残らない。** 試験が `f/waggle_secrets/e2e_probe` に無作為の値を置き、その場の
   TS が `__bh.secrets.e2e_probe` の長さだけを `/plain-html?len=<長さ>` で送る。値そのものは WACZ の全 member・
   台帳の答え・Windmill の run の引数のどこにも無く、`settings.secrets` に名前だけ在る。対照は、同じ値を変数で

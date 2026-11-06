@@ -182,9 +182,10 @@ robots.txt の規則を照らすのに使う: 字に `BrowserHive` があれば�
 
 ## クロールごとの値 —— 変数とシークレット
 
-スクリプトは、クロールごとに違う値を 2 つの口で受け取る。宣言するのは
-[capture-scripts](https://github.com/uraitakahito/capture-scripts) の `catalog.json` の `params`
-（v0.6.0 から）、読むのは BrowserHive v22.0.0 の受け皿 `__bh.vars` / `__bh.secrets`。
+スクリプトは、クロールごとに違う値を 2 つの口で受け取る。変数はスクリプトが
+[capture-scripts](https://github.com/uraitakahito/capture-scripts) の `defineParams`（v0.11.0 から）で宣言して読み、
+シークレットは `catalog.json` の `params` で宣言して BrowserHive の受け皿 `__bh.secrets` で読む。頁に届くのは
+どちらも受け皿で、`defineParams` は JS で `__bh.vars` に置き換わる。
 **flow はどちらも運ぶだけで中身を見ない。**
 
 | 口          | 台帳が送る物                                                                                                 | `crawl_host` がすること                                                                    | 記録に残る物                                                             |

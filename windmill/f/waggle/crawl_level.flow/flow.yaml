@@ -58,6 +58,10 @@ value:
           scripts:
             type: javascript
             expr: flow_input.scripts
+          # 必須の変数が渡されているかを見るのに、名前だけを送る (値は送らない)
+          variables:
+            type: javascript
+            expr: flow_input.variables
     - id: hosts
       summary: ホストごとに並列、ホスト内は逐次
       value:
@@ -292,7 +296,7 @@ schema:
       # クロールごとの変数。capture-ledger がクロールの頼みから固定し、v0.67.0 から**必ず送る**
       # (無ければ {})。flow は運ぶだけで中身を見ない。BrowserHive が記録に残す。
       type: object
-      description: クロールごとの変数 (名前 → 値)。スクリプトが __bh.vars で読む。値は記録に残る
+      description: クロールごとの変数 (名前 → 値)。スクリプトが defineParams で読む。値は記録に残る
       additionalProperties:
         type: string
     secrets:
