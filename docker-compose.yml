@@ -106,7 +106,7 @@ services:
   # /healthz の hostTypes が「受け皿の型 (capture-scripts の types/host.d.ts) をどの tag から
   # 写したか」。台帳が取り込んだ capture-scripts の tag と同じでなければ、向こうで通った TS がここで 422 になりうる。
   ts-compile:
-    image: ghcr.io/uraitakahito/ts-compile-service:v0.4.0
+    image: ghcr.io/uraitakahito/ts-compile-service:v0.5.0
     environment:
       - PORT=8080
       - HOST=0.0.0.0
