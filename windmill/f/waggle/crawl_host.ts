@@ -148,7 +148,7 @@ export interface PageResult {
    * 範囲の絞り込みと重複排除もあちらに在る。ここで読むと、S3 の資格情報を Windmill にも
    * 配ることになり、「見つけた URL は何か」の判断材料が 2 か所に散る。
    *
-   * 到達性は理由ではない: store は crawler で 1 つ (`seaweedfs.crawler-storage`) で、
+   * 到達性は理由ではない: store は Web Capture で 1 つ (`seaweedfs.crawler-storage`) で、
    * **別ドメインのコンテナからも host からも届く** (実測)。
    */
   linksLocation?: string;

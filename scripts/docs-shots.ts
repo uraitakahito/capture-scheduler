@@ -172,7 +172,7 @@ const main = async () => {
   // 以降は cookie で認証する。UI は token cookie を読む
   await browser.setCookie({ name: "token", value: token, domain: "127.0.0.1", path: "/" });
 
-  // ② workspace の選択画面。ここで crawler をクリックすると localStorage に
+  // ② workspace の選択画面。ここで `crawler` をクリックすると localStorage に
   //    保存され、以降のルートが workspace 抜きの URL で開けるようになる
   await page.goto(`${BASE}/user/workspaces`, { waitUntil: "networkidle2" });
   await waitForText(page, "Select a workspace");
