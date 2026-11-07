@@ -102,6 +102,26 @@ describe("報告の送り方", () => {
   });
 });
 
+describe("run のログ", () => {
+  it("終わった理由を書き、打ち切りとは言わない", async () => {
+    // `completed` は全部辿った印。「completed で打ち切り」と書くと、ログが逆のことを言う。
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    responding(200, { next: [], stopReason: "completed" });
+    await main("c-1", 1, CAPTURED, COMPILED);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("(終わり: completed)"));
+    expect(log.mock.calls.flat().join()).not.toContain("打ち切り");
+    log.mockRestore();
+  });
+
+  it("次の段があるときは理由を書かない", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    responding(200, { next: [{ url: "http://m/b", host: "m", depth: 1 }], stopReason: null });
+    await main("c-1", 0, CAPTURED, COMPILED);
+    expect(log.mock.calls.flat().join()).not.toContain("終わり");
+    log.mockRestore();
+  });
+});
+
 describe("失敗したときの言い分", () => {
   it("401 には issuer 再起動の示唆を付ける", async () => {
     // **この一言で原因が即分かった実績がある。** issuer は起動のたびに鍵を作り直すので、
