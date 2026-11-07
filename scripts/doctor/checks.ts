@@ -643,7 +643,7 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
             ok: false,
             need:
               "capture-fixtures が待っていない → " +
-              "cd ../capture-ledger && pnpm run stack:up --profile capture-fixtures",
+              "cd ../capture-ledger && pnpm run stack:up --profile capture-fixtures capture-fixtures",
           },
     e2eOnly: true,
   },
