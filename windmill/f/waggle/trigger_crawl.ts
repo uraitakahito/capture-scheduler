@@ -186,8 +186,8 @@ export async function main(
     // 打ち切りでも succeeded で終わる —— 理由は `stopReason` が語る。取れなかった数は `pagesFailed`。
     // 1 枚も撮れなければ capture-ledger が failed で締めるので、上で投げて run が赤くなる。
     //
-    // **対象一覧からの取り込みは常に `max_depth` で終わる。** 深さ 0 なので
-    // 「次の段は無い」が「深さの上限に当たった」として記録される。異常ではない。
+    // **対象一覧からの取り込みは、まだ撮っていないリンクがあれば `max_depth`、無ければ `completed` で終わる。**
+    // 深さ 0 なのでリンクは数えるだけで辿らない。どちらも異常ではない。
     console.log(`完了: ${JSON.stringify({ ...counts, stopReason: crawl.stopReason })}`);
     return { outcome: "succeeded", crawlId, ...counts, stopReason: crawl.stopReason };
   }

@@ -103,7 +103,8 @@ export async function main(
   const outcome = (await res.json()) as LevelOutcome;
   console.log(
     `深さ ${String(depth)}: ${String(results.length)} 件を報告、次は ${String(outcome.next.length)} 件` +
-      (outcome.stopReason === null ? "" : ` (${outcome.stopReason} で打ち切り)`),
+      // 理由が付くのは終わったときだけ。`completed` は全部辿った印なので、「打ち切り」とは書かない
+      (outcome.stopReason === null ? "" : ` (終わり: ${outcome.stopReason})`),
   );
   return outcome;
 }
