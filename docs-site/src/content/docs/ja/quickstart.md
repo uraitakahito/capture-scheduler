@@ -228,7 +228,7 @@ DNS が覚えるため）。
 見る。台帳は段の報告の時点でクロールを succeeded にし、flow の合本の段と索引の段はその後に
 走るので、smoke は段の run の終わりを待つ。合本の段の答え（書けた・検められなかった WACZ が 0 本）を
 照らし —— 合本の段はそれらの失敗では投げないので、run が緑でも書けたとは限らない —— 台帳が指す
-合本の `replay.json` を replay の `/wacz/`（`127.0.0.1:8899`。capture-ledger のスタックの replay）から
+合本の `replay.json` を replayweb-server の `/wacz/`（`127.0.0.1:8899`。capture-ledger のスタックの replayweb-server）から
 読んで、この回の archive が `resources` に在るかを見る。続けて索引の段の答え（載らなかった 0 本・
 載せた 1 本以上）を照らす。最後に、印で台帳の検索を引き、この回の archive の当たりの時点が、
 WACZ のページ一覧から予想した時点（写しの行があれば写しの時点、無ければ文書の行の 1 件 `page`）と
@@ -241,7 +241,7 @@ WACZ のページ一覧から予想した時点（写しの行があれば写し
 run      http://127.0.0.1:8000/run/01a0ba19-…?workspace=crawler
 終わり   succeeded (max_depth) —— 撮ったページ 1・6 秒
 取り出す archive 928d640f-… の先頭が PK (WACZ = zip)
-合本     r1 を書いた —— 頁 3・WACZ 1 本。replay の /wacz/org/acme/crawls/545e912c-…/r1/replay.json にこの回の archive が在る
+合本     r1 を書いた —— 頁 3・WACZ 1 本。replayweb-server の /wacz/org/acme/crawls/545e912c-…/r1/replay.json にこの回の archive が在る
 索引     載せたアーカイブ 1 本・載らなかった 0 本・索引の件数 2
 検索     「smokemh5k2x1fq3」で archive 928d640f-… の after-load・after-behaviors が当たる (ページ一覧から予想した時点と同じ)
 撮れた   http://capture-fixtures.capture-ledger:8080/marked/page/smoke?tag=smokemh5k2x1fq3

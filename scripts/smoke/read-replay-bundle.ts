@@ -1,10 +1,10 @@
 /**
- * smoke が、撮った 1 本が **合本に入り、replay から読める** ところまでを読む (CAPTURE-57)。
+ * smoke が、撮った 1 本が **合本に入り、replayweb-server から読める** ところまでを読む (CAPTURE-57)。
  *
  * flow は段の報告の後に合本の段 (`replay_bundle_level.ts`) を走らせ、capture-ledger がクロールの合本 (`replay.json` と
  * `pages.json` の組) を保管庫の `org/<組織>/crawls/<クロール>/r<版>/` に書く。合本の段は、台帳が 200 で返す失敗
  * (保管庫に書けない・検められない WACZ・入れる WACZ が無い) では投げない (クロールを止めないため) ので、**run が
- * 緑でも、合本が書けたとは限らない** —— smoke は合本の段の答えを読み、台帳が指す合本の `replay.json` を replay の
+ * 緑でも、合本が書けたとは限らない** —— smoke は合本の段の答えを読み、台帳が指す合本の `replay.json` を replayweb-server の
  * `/wacz/<鍵>` から読んで、この回の archive が `resources` に入っているかまで照らす。
  *
  * 入出力を持たない。訊くのは `smoke.ts`。
@@ -164,9 +164,9 @@ export const readLedgerReplayBundle = (
   return { replayBundle: { key, rev } };
 };
 
-/** replay の `/wacz/<鍵>` の URL。鍵は区切りごとに符号にする (replay は区切りごとに 1 度だけ解く)。 */
-export const replayKeyUrl = (replayOrigin: string, key: string): string =>
-  `${replayOrigin}/wacz/${key.split("/").map(encodeURIComponent).join("/")}`;
+/** replayweb-server の `/wacz/<鍵>` の URL。鍵は区切りごとに符号にする (replayweb-server は区切りごとに 1 度だけ解く)。 */
+export const replayJsonKeyUrl = (replaywebServerOrigin: string, key: string): string =>
+  `${replaywebServerOrigin}/wacz/${key.split("/").map(encodeURIComponent).join("/")}`;
 
 /** `resources[].path` (`/wacz/` ＋ 区切りごとに符号にした鍵) を、保管庫の鍵に戻す。戻せなければ undefined。 */
 const keyOfPath = (path: unknown): string | undefined => {
@@ -179,7 +179,7 @@ const keyOfPath = (path: unknown): string | undefined => {
 };
 
 /**
- * replay から読んだ `replay.json` を照らす。JSON として読め、この回の archive の鍵 (`objectKey`) が `resources` に
+ * replayweb-server から読んだ `replay.json` を照らす。JSON として読め、この回の archive の鍵 (`objectKey`) が `resources` に
  * 在れば undefined。
  *
  * @param status 届かなければ undefined
@@ -193,7 +193,7 @@ export const readReplayJson = (
   if (status === undefined) {
     return {
       evidence: `${url} に届かない`,
-      fix: "capture-ledger のスタックの replay が答えない → cd ../capture-ledger && pnpm run stack:up",
+      fix: "capture-ledger のスタックの replayweb-server が答えない → cd ../capture-ledger && pnpm run stack:up",
     };
   }
   if (status !== 200) {
@@ -201,10 +201,10 @@ export const readReplayJson = (
       evidence: `GET ${url} → ${String(status)} ${body.slice(0, 200)}`,
       fix:
         status === 404
-          ? "台帳が指す合本が、replay の読む保管庫に無い —— capture-ledger の保管庫の bucket と、replay の S3_BUCKET_URL が同じか"
+          ? "台帳が指す合本が、replayweb-server の読む保管庫に無い —— capture-ledger の保管庫の bucket と、replayweb-server の S3_BUCKET_URL が同じか"
           : status === 502 || status === 504
-            ? "replay が保管庫に届かない —— 保管庫が動いているか、replay の S3_BUCKET_URL を見る"
-            : "replay の /wacz/ が保管庫の物をそのまま返していない —— replay の版 (capture-ledger の .upstream/replay)",
+            ? "replayweb-server が保管庫に届かない —— 保管庫が動いているか、replayweb-server の S3_BUCKET_URL を見る"
+            : "replayweb-server の /wacz/ が保管庫の物をそのまま返していない —— replayweb-server の版 (capture-ledger の .upstream/replayweb-server)",
     };
   }
   let parsed: unknown;
@@ -217,7 +217,7 @@ export const readReplayJson = (
   if (!Array.isArray(resources)) {
     return {
       evidence: `${url} の中身が合本の replay.json でない (JSON でないか、resources が無い): ${body.slice(0, 120)}`,
-      fix: "capture-ledger が書いた replay.json を、保管庫で直に見る (replay の /wacz/ が別の物を返していないか)",
+      fix: "capture-ledger が書いた replay.json を、保管庫で直に見る (replayweb-server の /wacz/ が別の物を返していないか)",
     };
   }
   const keys = resources.map((resource) =>

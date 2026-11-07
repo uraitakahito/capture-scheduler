@@ -9,7 +9,7 @@
  *
  * **合本と索引と検索まで見る (CAPTURE-57・CAPTURE-53)。** 台帳は段の報告の時点で succeeded にし、合本の段と
  * 索引の段はその後に走るので、段の run の終わりを待つ。合本の段の答え (書けた・検められなかった 0 本) を照らし、
- * 台帳が指す合本の `replay.json` を replay の `/wacz/<鍵>` から読んで、この回の archive が入っているかを見る
+ * 台帳が指す合本の `replay.json` を replayweb-server の `/wacz/<鍵>` から読んで、この回の archive が入っているかを見る
  * (`smoke/read-replay-bundle.ts`)。合本の段は台帳の 200 の失敗では投げない (クロールを止めないため) ので、
  * run が緑でも合本が書けたとは限らない。続けて索引の段の答え (載らなかった 0 本・載せた 1 本以上) を照らす。
  * 既定の頁 (capture-fixtures の印付きの頁。印は撮るたびに変える) なら、その印で台帳の検索を引き、
@@ -51,7 +51,7 @@ import {
   readReplayBundleStep,
   readReplayJson,
   replayBundleJobOf,
-  replayKeyUrl,
+  replayJsonKeyUrl,
 } from "./smoke/read-replay-bundle.js";
 import {
   compareSearchHits,
@@ -87,11 +87,11 @@ function stop(label: string, text: string): never {
 /** 既定で撮る capture-fixtures (capture-ledger のスタックの物。BrowserHive のコンテナがこの名前を引く)。 */
 const FIXTURES = "http://capture-fixtures.capture-ledger:8080";
 /**
- * host から見た capture-ledger のスタックの replay (compose が loopback の 8899 に出す口)。合本の `replay.json` を
- * `/wacz/<鍵>` から読む —— replay が合本を開くときと同じ口で読めるかを見る。`API` と同じく、台帳の
+ * host から見た capture-ledger のスタックの replayweb-server (compose が loopback の 8899 に出す口)。合本の `replay.json` を
+ * `/wacz/<鍵>` から読む —— ReplayWeb.page が合本を開くときと同じ口で読めるかを見る。`API` と同じく、台帳の
  * 開発のスタックの決まった口。
  */
-const REPLAY = "http://127.0.0.1:8899";
+const REPLAYWEB_SERVER = "http://127.0.0.1:8899";
 /** 既定の頁と、検索に使う語 (撮るたびに変わる印)。URL を渡したときは無い。 */
 const target =
   positionals[0] === undefined
@@ -505,8 +505,8 @@ const pointed = readLedgerReplayBundle(
   replayBundleOutcome.rev,
 );
 if ("problem" in pointed) report(pointed.problem, crawl);
-// replay は匿名で読む (保管庫も匿名で読める) ので、名乗らずに引く。
-const replayJsonUrl = replayKeyUrl(REPLAY, pointed.replayBundle.key);
+// replayweb-server は匿名で読む (保管庫も匿名で読める) ので、名乗らずに引く。
+const replayJsonUrl = replayJsonKeyUrl(REPLAYWEB_SERVER, pointed.replayBundle.key);
 const replayJson = await (async (): Promise<{ status: number | undefined; body: string }> => {
   try {
     const res = await fetch(replayJsonUrl, { signal: AbortSignal.timeout(10_000) });
@@ -515,18 +515,18 @@ const replayJson = await (async (): Promise<{ status: number | undefined; body: 
     return { status: undefined, body: "" };
   }
 })();
-const replayProblem = readReplayJson(
+const replayJsonProblem = readReplayJson(
   replayJsonUrl,
   replayJson.status,
   replayJson.body,
   archive.objectKey,
 );
-if (replayProblem !== undefined) report(replayProblem, crawl);
+if (replayJsonProblem !== undefined) report(replayJsonProblem, crawl);
 say(
   "合本",
   `r${String(replayBundleOutcome.rev)} を書いた —— 頁 ${String(replayBundleOutcome.pages)}・` +
     `WACZ ${String(replayBundleOutcome.members)} 本。` +
-    `replay の /wacz/${pointed.replayBundle.key} にこの回の archive が在る`,
+    `replayweb-server の /wacz/${pointed.replayBundle.key} にこの回の archive が在る`,
 );
 
 // ── 索引 ──────────────────────────────────────────────────────────────
