@@ -16,14 +16,11 @@
 #
 # 上流 (windmill-labs/windmill) の docker-compose.yml は 8 サービス —— db、server、
 # worker ×3、native worker、indexer、LSP、Caddy。あれは「1 台で本番を張る」ための形で、
-# ここが要るのは **capture-ledger の実行 API を時刻どおりに叩くこと** だけ。
+# ここが要るのは **capture-ledger が投げた段を実行すること** だけ。
 #
 # `MODE=standalone` は server と worker を 1 プロセスで兼ねる。**ただし standalone の
-# NUM_WORKERS は 1 に固定**で、これだけでは日次の経路が詰まる。`trigger_crawl` は
-# クロールが終わるまで待ち (失敗を実行履歴に赤で残すため)、その待っている間に capture-ledger が
-# `crawl_level` を**同じ Windmill へ投げ返す** —— 1 本しかない worker を奪い合って、
-# 投げ返されたフローは永久に queue で待つ。実測で確かめた: `trigger_crawl` を取り消した
-# 途端にフローが動き出した。だから worker をもう 1 本、別サービスとして立てる。
+# NUM_WORKERS は 1 に固定**なので、段を進めている間は手で流す script や docs の撮影が待たされる。
+# だから worker をもう 1 本、別サービスとして立てる。
 #
 # **`windmill-full` イメージは使わない** —— amd64 しか publish されていないため
 # (registry で確認済み)。素の `windmill` には arm64 がある。
@@ -74,10 +71,8 @@ services:
 
   # 2 本目の worker。**server は兼ねない** (`MODE=worker`)。
   #
-  # 要るのは並列度そのものではなく、**待つ仕事と待たれる仕事を同時に持てること**。
-  # `trigger_crawl` が 1 本目を占めている間に、投げ返された `crawl_level` がここで走る。
-  # 段が深くなっても同時に走るのは「待っている trigger_crawl」と「進んでいるフロー」の
-  # 2 つなので、2 本で足りる。
+  # 走るクロールは全体で 1 本なので、並列度のためではない。段を進めている間も、手で流す script や
+  # doctor の確かめの job を待たせないため。2 本で足りる。
   #
   # port は開けない。worker は DB を通して仕事を取るだけで、誰からも呼ばれない。
   windmill-worker:

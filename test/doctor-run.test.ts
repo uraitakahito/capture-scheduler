@@ -58,6 +58,9 @@ describe("本物の点検の並び", () => {
         "スクリプト",
         // シークレットのフォルダは push と同じく workspace の子。
         "シークレットのフォルダ",
+        // 残った schedule の点検も workspace の子で、トークンの期限は変数の子。
+        "schedule",
+        "トークンの期限",
       ].sort(),
     );
     for (const r of skipped) expect(r).toMatchObject({ reason: "先に windmill を" });
@@ -71,9 +74,9 @@ describe("本物の点検の並び", () => {
     expect(stateOf(results, "can_submit")).toMatchObject({ state: "skip", reason: "先に jwt を" });
   });
 
-  it("点検は 18 本で、e2e のときだけ 2 本増える", () => {
-    expect(CHECKS.filter((c) => c.e2eOnly !== true)).toHaveLength(18);
-    expect(CHECKS).toHaveLength(20);
+  it("点検は 20 本で、e2e のときだけ 3 本増える", () => {
+    expect(CHECKS.filter((c) => c.e2eOnly !== true)).toHaveLength(20);
+    expect(CHECKS).toHaveLength(23);
   });
 
   it("crawl route が ✗ なら、合本の口は訊かない（台帳は webhook が無いと両方の口を出さない）", async () => {

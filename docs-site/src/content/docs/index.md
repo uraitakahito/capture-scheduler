@@ -1,31 +1,27 @@
 ---
 title: capture-scheduler
-description: Runs capture-ledger's crawls on Windmill — has BrowserHive capture them one level at a time, and starts one every day at 04:00
+description: Runs capture-ledger's crawls on Windmill — has BrowserHive capture them one level at a time
 ---
 
 capture-scheduler runs [capture-ledger](https://uraitakahito.github.io/capture-ledger/)'s crawls
-**on [Windmill](https://www.windmill.dev/)**. It has two jobs.
+**on [Windmill](https://www.windmill.dev/)**. capture-ledger hands a crawl over one level at a time,
+through a webhook. The flow groups that level's URLs by host, checks robots.txt, has BrowserHive
+capture them over HTTP, and returns what it found. **The flow in this repository is the only thing
+that calls BrowserHive** — capture-ledger no longer talks to it.
 
-- **Capture** — capture-ledger hands a crawl over one level at a time, through a webhook. The flow
-  groups that level's URLs by host, checks robots.txt, has BrowserHive capture them over HTTP, and
-  returns what it found. Crawls it did not start run here too. **The flow in this repository is the
-  only thing that calls BrowserHive** — capture-ledger no longer talks to it.
-- **Start** — every day at 04:00 it asks capture-ledger for a crawl seeded from the enabled rows of
-  `capture_targets` (`POST /api/crawls`) and watches it to the end.
-
-The on-time part is **Windmill's schedule** itself; this repository holds its settings
-(`daily.schedule.yaml`) and the script it starts. Most of what is here is on the capturing side.
+When to start is capture-ledger's too: the clock for scheduled crawls runs inside its API process,
+and this repository holds no schedule.
 
 ## The boundary
 
-|                               |                                                                                                                                                                                                                                    |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **capture-ledger decides**    | what (`capture_targets` or seed URLs), how far (depth, rules, limits), how politely (the policy values) and in which formats; it records what happened and decides whether there is another level                                  |
-| **capture-scheduler decides** | when to start (the schedule) and how to carry a level out (grouping by host, capping parallelism at the number of BrowserHive endpoints, one page at a time per host with a pause after each, robots.txt, picking a free endpoint) |
+|                               |                                                                                                                                                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **capture-ledger decides**    | what (seed URLs), when (schedules), how far (depth, rules, limits), how politely (the policy values) and in which formats; it records what happened and decides whether there is another level    |
+| **capture-scheduler decides** | how to carry a level out (grouping by host, capping parallelism at the number of BrowserHive endpoints, one page at a time per host with a pause after each, robots.txt, picking a free endpoint) |
 
-So this repository contains **no URLs**. The targets and the policy values arrive from capture-ledger.
+So this repository contains **no URLs**. The URLs and the policy values arrive from capture-ledger.
 
-That split is worth keeping. A scheduler that also knows what to capture becomes
+That split is worth keeping. A runner that also knows what to capture becomes
 a second place to look when the wrong thing is captured — and the two places
 disagree eventually. The exception is robots.txt: the flow drops the pages it forbids, and reports
 each of them back to capture-ledger with the reason, so the ledger still has the record.
@@ -38,24 +34,27 @@ whether there is another level is capture-ledger's call. See [Following links](/
 That path is where the interesting constraints are, because it is the one that
 touches someone else's server repeatedly.
 
-## Starting: the nightly crawl
+## Starting: capture-ledger's clock
 
-The nightly job asks capture-ledger for a crawl seeded from every enabled
-row of `capture_targets` (`fromTargets`), at depth 0 — the list is captured, its
-links are not followed. See [Schedule](/schedule/).
+This repository starts nothing on its own. A schedule is a row in capture-ledger's table
+`crawl_schedules`, and a tick inside its API process starts a crawl when one is due. Schedules are
+made on the 新しいクロール (New crawl) view of
+[capture-workbench](https://github.com/uraitakahito/capture-workbench) or with `POST /api/schedules`,
+and operated from its 定期実行 (Schedules) tab. See capture-ledger's
+[Schedules](https://uraitakahito.github.io/capture-ledger/schedules/).
 
-There used to be a second thing, a _run_: the same set of targets, submitted all
-at once. A run was a depth-0 crawl without the pacing, so it was folded into the
-crawl and `POST /api/runs` is gone. The nightly capture now waits between pages
-of the same host, like every other crawl.
+A scheduled run reaches this repository like any other crawl: the same webhook, the same flow, the
+same gap between pages of a host.
+
+To take one capture by hand, use the 新しいクロール (New crawl) view or `pnpm run smoke`.
 
 ## Where things are
 
-| I want to…                            | Page                         |
-| ------------------------------------- | ---------------------------- |
-| bring the stack up for the first time | [Quickstart](/quickstart/)   |
-| understand the crawl flow             | [Following links](/crawl/)   |
-| change when the nightly job runs      | [Schedule](/schedule/)       |
-| know what Windmill CE silently skips  | [Windmill CE](/windmill-ce/) |
-| run or extend the tests               | [Testing](/testing/)         |
-| push a change back to Windmill        | [Development](/development/) |
+| I want to…                            | Page                                                                                    |
+| ------------------------------------- | --------------------------------------------------------------------------------------- |
+| bring the stack up for the first time | [Quickstart](/quickstart/)                                                              |
+| understand the crawl flow             | [Following links](/crawl/)                                                              |
+| change when crawls run                | [Schedules in capture-ledger](https://uraitakahito.github.io/capture-ledger/schedules/) |
+| know what Windmill CE silently skips  | [Windmill CE](/windmill-ce/)                                                            |
+| run or extend the tests               | [Testing](/testing/)                                                                    |
+| push a change back to Windmill        | [Development](/development/)                                                            |

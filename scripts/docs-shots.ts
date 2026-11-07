@@ -211,14 +211,7 @@ const main = async () => {
       route: "/scripts/get/f%2Fwaggle%2Fcrawl_host",
       wait: "crawl_host",
     },
-    { file: "11-schedules.png", route: "/schedules", wait: "trigger_crawl" },
     { file: "12-variables.png", route: "/variables", wait: "waggle_token" },
-    // 手で 1 回起こす入口。Run のフォームは get ページの中に居る
-    {
-      file: "14-trigger-script.png",
-      route: "/scripts/get/f%2Fwaggle%2Ftrigger_crawl",
-      wait: "trigger_crawl",
-    },
   ];
 
   for (const s of shots) {

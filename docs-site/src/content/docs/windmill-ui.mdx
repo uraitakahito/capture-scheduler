@@ -13,9 +13,7 @@ import runStep from "../../assets/windmill-ui/06-run-step.png";
 import errReport from "../../assets/windmill-ui/08-run-error-report.png";
 import flowDetail from "../../assets/windmill-ui/09-flow-detail.png";
 import scriptForm from "../../assets/windmill-ui/10-script-form.png";
-import schedules from "../../assets/windmill-ui/11-schedules.png";
 import variables from "../../assets/windmill-ui/12-variables.png";
-import trigger from "../../assets/windmill-ui/14-trigger-script.png";
 
 Windmill ships its own web UI. In this deployment that UI **is**
 capture-scheduler's admin screen — there is nothing extra to run.
@@ -56,17 +54,16 @@ Runs, Schedules, Variables, Resources.
   alt="crawler workspace home, with Home / Runs / Variables / Resources / Schedules in the sidebar"
 />
 
-What the UI is for: looking, firing one run by hand, pausing something
-temporarily. **Permanent changes are made in the repo and pushed.** Even the
-schedule's `enabled` flag lives in `daily.schedule.yaml`, so a pause made in
-the UI comes back on the next `windmill:push`. Sync deletes **in both
-directions** — see [Development](/development/).
+What the UI is for: looking, and running a script by hand. **Permanent changes
+are made in the repo and pushed** — an edit made in the UI is undone by the next
+`windmill:push`. Sync deletes **in both directions** — see
+[Development](/development/).
 
 ## Runs — read the history first
 
 **Whether a crawl ran or failed, this is the first screen.** Path tells you
 the step kind — `f/waggle/crawl_level` is the flow itself, `crawl_host` and
-friends are its steps. A `daily` row was fired by the schedule.
+friends are its steps.
 
 <Image
   src={runsList}
@@ -139,17 +136,17 @@ The script code is readable in the UI's Edit view and in the repo's
 `windmill/f/waggle/`, but the **repo is the source of truth**. Edit it in the
 UI and the next `windmill:push` reverts it.
 
-## Schedules — when it runs
+## Schedules — empty on purpose
 
-`f/waggle/daily` is the only schedule. Cron `0 0 4 * * *` (04:00 Asia/Tokyo
-daily) fires `trigger_crawl`. The toggle on the right is `enabled`.
+This repository holds no schedule, so this screen stays empty. The clock for scheduled crawls is in
+[capture-ledger](https://uraitakahito.github.io/capture-ledger/schedules/). Schedules are made on the
+新しいクロール (New crawl) view of
+[capture-workbench](https://github.com/uraitakahito/capture-workbench) and operated from its 定期実行
+(Schedules) tab.
 
-<Image src={schedules} alt="Schedules: f/waggle/daily with its cron, timezone and enabled toggle" />
-
-**Flip the toggle off and it comes back**, because `enabled: true` in
-`daily.schedule.yaml` is the source of truth and the next `windmill:push`
-restores it. To stop it for good, edit the yaml and push. What it means is on
-[Schedule](/schedule/).
+**A row here is a leftover**, and it can start crawls apart from capture-ledger's schedules. An old
+checkout's `windmill:push` can bring one back. The `schedule` line of `pnpm run doctor` says so, and
+`windmill:push` from the current repo removes it.
 
 ## Variables
 
@@ -165,25 +162,22 @@ exposed in the UI.
 Resources stay empty: this repo puts nothing there (until v0.22 a copy of
 BrowserHive's `.proto` lived there, under the States tab).
 
-## Firing one run by hand
+## Taking one capture by hand
 
-Open `trigger_crawl` and there is a Run form. The schema descriptions read in
-Japanese (`waggle_url` = the capture-api as seen from a container, `token` =
-the dev issuer's JWT, omit `limit` to seed every enabled row). `variables` takes the variables a
-script declared in its `params`, as name → value JSON (leave it out and nothing is sent; an unknown
-name is refused by the ledger with a 400 that names it). The picture below was taken before the
-`variables` field existed.
+Not from here: a crawl starts in capture-ledger. Use the 新しいクロール (New crawl) view of
+capture-workbench, or `pnpm run smoke` ([Quickstart](/quickstart/#check-it-take-one-capture)). The Run
+form in this UI is for scripts that stand alone, such as the ones on
+[Inspecting what was dropped](/inspect/).
 
-<Image src={trigger} alt="The trigger_crawl Run form: Waggle Url, Token, Limit inputs" />
-
-But **a schema `default` is only filled in for UI runs** (a CE trap; see
-[Windmill CE](/windmill-ce/)). It never reaches a run from a schedule or
-webhook, which is why `daily` passes values from variables instead.
+**A schema `default` is only filled in for UI runs** (a CE trap; see
+[Windmill CE](/windmill-ce/)). It never reaches a webhook run, which is why the
+flow's scripts read their settings from variables instead
+([Following links](/crawl/)).
 
 ## The variable ledger — which script provisions what
 
-`windmill:push` only uploads **what is in git** (scripts, the flow, the
-schedule). Variables are provisioned by a separate script. Confuse the two and
+`windmill:push` only uploads **what is in git** (the scripts and the flow).
+Variables are provisioned by a separate script. Confuse the two and
 push stays green while the flow dies on its first `getVariable`.
 
 | Path                            | Contents                                                                                                                                                  | Provisioned by                                                                             |
@@ -211,7 +205,7 @@ pnpm run windmill:bootstrap            # recreates the workspace, prints a fresh
                                        # → paste the WINDMILL_TOKEN= line into .env
                                        # → paste the four lines after it at the end of
                                        #   capture-ledger's .env and restart its API
-pnpm run windmill:push                 # scripts / flow / schedule
+pnpm run windmill:push                 # scripts / flow
 pnpm run windmill:capture-ledger-token # the five variables
 cd ../capture-ledger
 pnpm run fga:grant submitter windmill acme  # let windmill start crawls for acme

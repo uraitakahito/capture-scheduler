@@ -92,5 +92,7 @@ Windmill の flow エディタは flow 全体・1 step・途中まで、を実�
 
 ## schedule の error handler は Enterprise 限定
 
-日次の実行が失敗しても、実行履歴に赤が残るだけで誰にも知らせない。
+いまはこれに頼る物が無い —— この repo に schedule は無く、
+[定期の回](https://uraitakahito.github.io/capture-ledger/ja/schedules/)の状態は capture-ledger が返す。
+flow の実行が失敗しても、実行履歴に赤が残るだけで誰にも知らせないのは同じ。
 [開発](/development/) の範囲外の項を見ること。

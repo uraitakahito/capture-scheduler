@@ -1,17 +1,17 @@
 ---
 title: 試験
-description: 何も要らない単体と、スタック一式が要る e2e 1 件。なぜ両方要るのか
+description: 何も要らない単体と、スタック一式が要る e2e。なぜ両方要るのか
 ---
 
 ```sh
 pnpm run test        # 単体。スタック不要、数秒
-pnpm run test:e2e    # e2e 1 件。スタックが要る
+pnpm run test:e2e    # e2e。スタックが要る
 pnpm run check       # audit / format / env / typecheck / 単体 / CI との一致 / docs サイト
 ```
 
 `pretest:e2e` が先に doctor を `--e2e` 付きで走らせ、足りないものを名指しする ——
-[クイックスタートの「確かめる」](/quickstart/#確かめる--1-本撮れるまで)の点検に、capture-fixtures と、
-試験が名乗る `e2e` のクロールの許可（`fga:grant submitter e2e acme`）を足した物。立っているかだけで
+[クイックスタートの「確かめる」](/quickstart/#確かめる--1-本撮れるまで)の点検に、capture-fixtures と、走っている定期の回が
+無いことと、試験が名乗る `e2e` のクロールの許可（`fga:grant submitter e2e acme`）を足した物。立っているかだけで
 なく、クロールが最後まで走る設定かも見る —— どれかが外れていると、クロールは段の報告のところで
 初めて落ち、`running` のまま残る。全文検索もその 1 つ —— capture-ledger は OpenSearch
 （`CAPTURE_LEDGER_OPENSEARCH_URL`。台帳の `dev:up` が書く）が無ければ起動しない。それでも API が動いたまま
@@ -85,7 +85,7 @@ e2e のほうは capture-fixtures が禁じられたページを受け取った�
 
 ### ページの中で走るもの
 
-残りは、クロールがページの中で走らせるスクリプトを見る。判定はやはり capture-fixtures の
+残りの多くは、クロールがページの中で走らせるスクリプトを見る。判定はやはり capture-fixtures の
 リクエストログで、query を含む URL ごとに全部の要求を数えている。
 
 - **台帳のスクリプトは、頼んだときだけ走る。** 名指した autofetch が `/assets/hero-2x.svg` を
@@ -125,34 +125,19 @@ e2e のほうは capture-fixtures が禁じられたページを受け取った�
   ページのログの error の行に項目の名前が在る。
 - **受けない `import` の形は、compile の段でクロールごと落ちる。** `import { z as zod }` で failed、`error` に `BH0003`。
 
-## 日次のループは推測しない
+### 定期の回
 
-`trigger_crawl.ts` は**日次の取り込みの成否を決めている唯一の場所**で、
-e2e はそこを触らない —— あちらは自分で起点を capture-ledger に投げるので、この script を通らない。
-以前は覆いが 1 つも無かった —— `POLL_INTERVAL_MS` が 15 秒の定数で、しかも sleep が
-最初の問い合わせより**前**に入るため、試験 1 本が 15 秒かかったから。
+時計は capture-ledger の中に在り（[定期実行](https://uraitakahito.github.io/capture-ledger/ja/schedules/)）、
+この repo は渡された段を撮るだけ。だから `schedule.e2e.test.ts` は端から端を見る —— `POST /api/schedules` で予定を作り、
+`POST /api/schedules/:id/run`（いま撮る）で 1 本頼むと、本物の flow を通って撮れ、クロールの行に予定の名前が残る。
+同じファイルで、止める・再開する・消すと、読めない cron・短すぎる周期・同じ名前を台帳が断ることも見る。
 
-いまは `poll_interval_ms` を引数で受ける。`crawl_host` の busy 待ちと同じ手で、
-実タイマーの ms スケールで回せる。
-
-知っておくべき砦はこれ:
-
-```ts
-if (crawl.state !== "succeeded") throw new Error(`知らない状態「…」`);
-```
-
-これが無いと、script が知らない状態は **2 つの比較を素通りして** `succeeded` を
-件数 0 で返す。**名前がずれたときの見え方がまさにこれ** —— そして実際に一度起きた:
-capture-ledger の `runs.status` が `runs.state` になったとき、改名前の script を改名後の
-API に当てて、ここが発火することを確かめた。走らなかった実行を緑と報告する代わりに、
-原因の見当まで添えて落ちた。その後 `runs` は `crawls` に畳まれたが、砦はそのまま
-移り、いまは `crawl.state` を見ている。
-
-線の形を守っているものは他に無い —— capture-ledger 側に response schema は無く、こちらは
-`as CrawlState` の素のキャスト。
+**試験の中で定期の回を待たない。** 止めるのは入口の doctor で、`--e2e` の**定期の回**が、走っている回があれば ✗ になる。
+e2e が走り始めれば直近のクロールが新しいので、周回は静かな時間（既定 10 分）で待つ。
 
 ## 覆えていないもの
 
-e2e はクロールの起点を URL で渡すので、
-**`fromTargets`**（`capture_targets` を起点にする道 —— 日次が通るのはこちら）はどこでも回っていない。
-capture-ledger 側のその経路は、両側の単体試験でしか触れていない。
+期限で始まる回は e2e を通らない —— 静かな時間を待つので試験にならず、待たない「いま撮る」を使っている。
+周回の判定は台帳の単体と `schedules-smoke` に任せている。
+
+「いま撮る」は e2e の最中でも静かな時間を待たない。別の予定で押すと、試験と試験の間に回が始まり、次の試験が 409 になる。

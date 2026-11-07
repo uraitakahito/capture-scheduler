@@ -3,8 +3,8 @@ title: Following links
 description: How one crawl level runs — grouped by host, parallel across hosts, sequential within one, with the gap after completion
 ---
 
-capture-ledger's `POST /api/crawls` takes seed URLs — or `fromTargets`, the enabled rows
-of `capture_targets` — and hands capture-scheduler **one level at a time**. The flow is
+capture-ledger's `POST /api/crawls` takes seed URLs (a scheduled run starts from what its schedule
+pinned) and hands capture-scheduler **one level at a time**. The flow is
 `f/waggle/crawl_level`; one execution is one level.
 
 ```
@@ -254,6 +254,6 @@ push` deletes remote folders that are absent locally). The variables inside are 
   place (it logs the names). What BrowserHive does on its side — keep it out of the archive, mask it in
   its logs, and the fact that page JavaScript can read it — is in BrowserHive's docs.
 
-`trigger_crawl` (the nightly run) accepts `variables` too. It does not take secrets — the ledger binds
-the names a script declared to the Windmill variables, so a nightly crawl and a hand-started one get the
-same values.
+A schedule's `request` has the shape of `POST /api/crawls`, so it takes `variables` too. It does not
+take secrets — the ledger binds the names a script declared to the Windmill variables, on every run, so a
+scheduled run and a hand-started crawl get the same values.

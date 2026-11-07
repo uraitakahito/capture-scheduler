@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
  * project は 2 つ。**設定ファイルは 1 つ。**
  *
  *   unit —— 既定。スタックを一切要らない。`pnpm test` はこれだけを走らせる。
- *   e2e  —— 動いているスタックに対して 1 本だけ。`pnpm run test:e2e` で opt-in。
+ *   e2e  —— 動いているスタックに対して流す。`pnpm run test:e2e` で opt-in。
  *
  * 分ける理由は、e2e が **単体では定義上見えないもの**を見ているから ——
  * flow が script に引数を渡す経路は TypeScript の外に在り、型でも単体でも触れない。
