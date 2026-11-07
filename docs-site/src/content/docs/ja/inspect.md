@@ -24,7 +24,7 @@ robots.txt で見送ったページは出ても、**規則で落としたリン�
 - **落とした物**をホスト名ごとに: 規則で落としたリンク、どの規則にも当たらなかったリンク（これも
   落とす）、robots.txt のために取らなかったページ。
 
-前の 8 字は dashboard と Windmill の run の画面に出る形。script は capture-ledger のクロールの一覧の
+前の 8 字は [capture-workbench](https://github.com/uraitakahito/capture-workbench) と Windmill の run の画面に出る形。script は capture-ledger のクロールの一覧の
 新しいページから引き当て、2 本が同じ字で始まれば、どちらも選ばずに両方を名指して止まる。
 
 ## inspect_domain

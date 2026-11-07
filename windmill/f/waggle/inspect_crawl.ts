@@ -49,7 +49,7 @@ interface Listed {
 
 export type Getter = <T>(path: string) => Promise<T>;
 
-/** 画面の言い方 (dashboard の規則の表と同じ)。 */
+/** 画面の言い方 (capture-workbench の規則の表と同じ)。 */
 export const ACTION_LABEL: Record<Action, string> = {
   follow: "撮って辿る",
   capture: "撮るだけ",
@@ -62,7 +62,7 @@ export const LIST_PAGES = 10;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /**
- * クロールの id を引き当てる。全部の id でも、前の字 (dashboard と run の画面に出る 8 字) でもよい。
+ * クロールの id を引き当てる。全部の id でも、前の字 (workbench と run の画面に出る 8 字) でもよい。
  *
  * 前の字なら一覧を新しい順に読み、当たる物を集める。**2 本以上当たれば、どれも選ばずに止める** ——
  * 違うクロールを読んで、それと気づかないのが最も悪い。

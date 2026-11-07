@@ -5,7 +5,7 @@
  * 以前の検査は `git ls-files`（追跡している物だけ）で読んでいた。CI は毎回まっさらに checkout するので
  * 未追跡のファイルは在らず、この穴は CI には出ない —— **手元では緑、commit した後の CI で赤**の形で出る。
  * 2026-09-13 の教訓で「走査は `--cached --others --exclude-standard`」と決めたのに、capture-ledger の
- * `check:terms` と browserhive の版の見張りで落ち、CAPTURE-49 で dashboard でも起きた（教訓は「check の前に
+ * `check:terms` と browserhive の版の見張りで落ち、CAPTURE-49 で capture-workbench でも起きた（教訓は「check の前に
  * git add」で済ませていた）。人の手順ではなく、ここで直す。手本は browserhive の scripts/lib/tracked-files.mjs
  * （repo は別々に clone するので、写して持つ）。
  *

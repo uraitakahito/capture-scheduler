@@ -43,7 +43,7 @@ export interface Rendered {
 /**
  * 見出しと、クロール × 規則 × ホスト名の表を描く。純粋な関数 (試験はここを呼ぶ)。
  *
- * クロールは前の 8 字で出す —— dashboard と run の画面に出る形で、`f/waggle/inspect_crawl` にも
+ * クロールは前の 8 字で出す —— capture-workbench と run の画面に出る形で、`f/waggle/inspect_crawl` にも
  * そのまま渡せる。
  */
 export const renderDomain = (

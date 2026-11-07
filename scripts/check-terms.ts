@@ -1,5 +1,5 @@
 /**
- * クロールの語を、旧い言い方で書いていないかを見張る。規則は下の RULES の 7 つ。
+ * クロールの語を、旧い言い方で書いていないかを見張る。規則は下の RULES の 8 つ。
  *
  * ## なぜ要るのか
  *
@@ -7,25 +7,27 @@
  *   試験の注記・Windmill の説明で 15 か所）。capture-ledger も同じ日にそろえている。「種」は読み手に
  *   通じにくく、単独では「しゅ」（種類）とも読める
  * - **クロールは「始める」と書く。** 2026-10 に「起こす」から「始める」へそろえた（doctor・smoke・
- *   Windmill の summary・docs で 51 か所。capture-ledger と dashboard も同じ）。目的語の無い「起こす」は
+ *   Windmill の summary・docs で 51 か所。capture-ledger と capture-workbench も同じ）。目的語の無い「起こす」は
  *   「目を覚まさせる」に読める。プロセス・job・flow の「起こす」（API を起こし直す・webhook で起こす・
  *   次の段を起こす）は別の意味で、見ない
  * - **ページで走らせる物は「スクリプト」、置き場は「台帳」と書く。** 2026-10 に「目録」からそろえた
- *   （doctor の点検の名前「スクリプト」・Windmill の説明・docs・試験の文で 62 か所。capture-ledger と dashboard も同じ）。
+ *   （doctor の点検の名前「スクリプト」・Windmill の説明・docs・試験の文で 62 か所。capture-ledger と capture-workbench も同じ）。
  *   「目録」は browserhive と wacz-validator では WACZ の中の storage の目録を指す。この repo はそれを
  *   持たないので、全部見る
  * - **network は「通信」と書く。** 2026-11 に「網」（network の 1 字の直訳）から「通信」へそろえた（docs・
- *   試験とコメントの注記で 8 か所。browserhive・capture-ledger・dashboard も同じ日にそろえている）。「網」は
+ *   試験とコメントの注記で 8 か所。browserhive・capture-ledger・capture-workbench も同じ日にそろえている）。「網」は
  *   読み手に通じにくい。基盤のネットワーク（私設ネットワーク・default ネットワーク）は「ネットワーク」と
  *   書く。「安全網」「網羅」は別の語で、見ない
  * - **クロールの頼みに書く物は「その場の TS」と書く。** 2026-11 に（Jira CAPTURE-83）、「その場の JS」から
  *   そろえた（docs と試験で 17 行）。`scripts` の `inline` は compile の段で strict の TypeScript として検査されるのに、
  *   JS と名乗っていた。JS になるのは変換の後なので、走った JS・JS の hash・束ねた JS はそのまま（capture-ledger と
- *   dashboard も見張っている）
+ *   capture-workbench も見張っている）
  * - **スクリプトの `sites` は「対象サイト」と書く。** 2026-11 に「札」からそろえた。「札」は tag を 1 字で写した
- *   書き手の癖で、読み手に通じない（browserhive・capture-ledger・dashboard も見張っている）
+ *   書き手の癖で、読み手に通じない（browserhive・capture-ledger・capture-workbench も見張っている）
  * - **repo の一式は「Web Capture」と書く。** 2026-11 に「crawler」からそろえた。crawler はふつうの名詞と紛れ、
  *   動いている識別子（`crawler-storage`・Windmill の workspace の id）とも同じ字になる（capture-ledger も見張っている）
+ * - **7080 番の Web アプリは「capture-workbench」、文で短く書くときは「workbench」と書く。** 2026-11 に「dashboard」から
+ *   そろえた（repo の改名に合わせて）。この repo に Grafana の dashboard は無いので、語を全部見る（capture-ledger も同じ）
  *
  * 書き手（人と Claude）は長くこの形で書いてきたので、見張らなければ戻ってくる。
  *
@@ -36,13 +38,14 @@
  *
  * - 「種」: 熟語（種類・種別）と、数のあとの「N 種」の外に立つ「種」。種類の意味でも、単独の「種」は
  *   書かない（「この種の」は「こうした」と書く）
- * - 「起こす」: クロールを始める意味の形（OKOSU。capture-ledger・dashboard と同じ並び）
+ * - 「起こす」: クロールを始める意味の形（OKOSU。capture-ledger・capture-workbench と同じ並び）
  * - 「目録」: 全部
  * - 「網」: 「安全網」「網羅」の外に立つ「網」
- * - 「その場の JS」: 形の並び（OLD_INLINE。capture-ledger・dashboard と同じ並び）
+ * - 「その場の JS」: 形の並び（OLD_INLINE。capture-ledger・capture-workbench と同じ並び）
  * - 「札」: 全部
  * - 「crawler」: 一式の意味の形の並び（OLD_SUITE。capture-ledger と同じ並び）。`crawler-storage`・`/w/crawler/`・
  *   `workspace crawler`・試験の入力値・ふつうの名詞は見ない
+ * - 「dashboard」: 全部（大文字小文字を問わない）
  *
  * ## 見ないもの
  *
@@ -61,7 +64,7 @@ const ALLOWED = /種類|種別|\d\s?種/gu;
 /** 「網」を network の意味に取れない形（安全網・網羅）。 */
 const NOT_NET = /安全網|網羅/gu;
 /**
- * クロールを始める意味の「起こす」の形。capture-ledger・dashboard と同じ並び。
+ * クロールを始める意味の「起こす」の形。capture-ledger・capture-workbench と同じ並び。
  * 足すときは、プロセス・job・flow の「起こす」（webhook で起こす・次の段を起こす）に当たらないことを確かめる。
  */
 const OKOSU =
@@ -110,6 +113,10 @@ const RULES: { find: (line: string) => boolean; say: string }[] = [
   {
     find: (line) => OLD_SUITE.test(line),
     say: "repo の一式の古い呼び名が残っています。一式は「Web Capture」と書きます（crawler-storage・workspace の id・ふつうの名詞の crawler はそのまま）。",
+  },
+  {
+    find: (line) => /dashboard/iu.test(line),
+    say: "「dashboard」が残っています。7080 番の Web アプリは「capture-workbench」、文で短く書くときは「workbench」と書きます。",
   },
 ];
 

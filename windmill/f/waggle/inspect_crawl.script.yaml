@@ -11,7 +11,7 @@ schema:
   properties:
     crawl:
       type: string
-      description: クロールの id。前の 8 字 (dashboard と run の画面に出る形) でもよい
+      description: クロールの id。前の 8 字 (capture-workbench と run の画面に出る形) でもよい
       default: null
       originalType: string
   required:
