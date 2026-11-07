@@ -71,12 +71,11 @@ describe("readPush", () => {
     content: { repo, windmill },
   });
 
-  it("script の中身が同じで、flow と schedule が在れば ✓", () => {
+  it("script の中身が同じで、flow が在れば ✓", () => {
     expect(
       readPush([
         script("f/waggle/crawl_host", "a", "a"),
         { path: "f/waggle/crawl_level", kind: "flow", exists: true },
-        { path: "f/waggle/daily", kind: "schedule", exists: true },
       ]),
     ).toEqual({ ok: true });
   });
@@ -96,7 +95,6 @@ describe("readPush", () => {
       script("f/waggle/crawl_host", "a", undefined),
       script("f/waggle/plan_level", "new", "old"),
       { path: "f/waggle/crawl_level", kind: "flow", exists: false },
-      { path: "f/waggle/daily", kind: "schedule", exists: true },
     ]);
     expect(need(verdict)).toMatch(
       /^Windmill に無い: f\/waggle\/crawl_host \(script\)・f\/waggle\/crawl_level \(flow\)。repo と中身が違う: f\/waggle\/plan_level → /,

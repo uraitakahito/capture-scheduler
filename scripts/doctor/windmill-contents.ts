@@ -68,7 +68,7 @@ export const readWorkspace = ({
 /** repo の 1 本と、Windmill に入っているもの。 */
 export interface Deployed {
   path: string;
-  kind: "script" | "flow" | "schedule";
+  kind: "script" | "flow";
   /** 在るか。script は中身が要るので `content` で見る。 */
   exists: boolean;
   /** script だけ。repo の中身と、Windmill の中身 (無ければ undefined)。 */
@@ -76,7 +76,7 @@ export interface Deployed {
 }
 
 /**
- * push が済んでいるか。script は中身まで比べ、flow と schedule は在るかだけを見る ——
+ * push が済んでいるか。script は中身まで比べ、flow は在るかだけを見る ——
  * flow.yaml は script を `!inline` で抱えるので、比べるなら wmill の解決をなぞることになる。
  * flow の差は `windmill:diff` に任せる。
  */
@@ -96,6 +96,22 @@ export const readPush = (items: readonly Deployed[]): Verdict => {
     need: `${parts.join("。")} → pnpm run windmill:push (違いを見るだけなら windmill:diff)`,
   };
 };
+
+/**
+ * Windmill に残っている schedule。**時計は capture-ledger の中に在るので、1 本も無いのが正しい。**
+ *
+ * `push` の点検は repo に在る物しか見ないので、消した物が Windmill に残っていても ✓ のままになる。`daily` を消した後に
+ * 古い checkout から `windmill:push` を打つと、消した schedule が戻る —— 戻ると、台帳の予定と別に毎朝クロールを始める。
+ */
+export const readSchedules = (paths: readonly string[]): Verdict =>
+  paths.length === 0
+    ? { ok: true }
+    : {
+        ok: false,
+        need:
+          `Windmill に schedule が残っている: ${paths.join("・")} → pnpm run windmill:push ` +
+          "(定期実行の時計は capture-ledger に在る。古い checkout の push が戻すことがある)",
+      };
 
 /**
  * スクリプトのシークレット (`catalog.json` の `params` の `kind: secret`) を置くフォルダの名前。
@@ -144,7 +160,7 @@ export const VARIABLES = [
  * 始めれば最後まで走る」と名乗っているので、頼む前にここで言う。
  *
  * 台帳 v0.64.0 から、一覧は既定に入らないスクリプト（capture-scripts のカタログの `default: false`）も
- * `enabled: false` で載せる。名指せば走るが、何も名指さないクロール（毎朝の定期のクロールも）は
+ * `enabled: false` で載せる。名指せば走るが、何も名指さないクロールは
  * 走らせない —— 載っている物が全部 `enabled: false` なら、そのクロールは 400 で断られる。`enabled` の
  * 無い行（v0.64.0 より前の台帳は、有効な物だけを載せていた）は既定に数える。頼む前に言えるのは
  * ここまで —— 対象サイトのある物しか無い台帳は、起点しだいで既定が空になる。

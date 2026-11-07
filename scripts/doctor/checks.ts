@@ -31,6 +31,7 @@ import {
   windmillWorkspace,
 } from "../env.js";
 import { readCanSubmit } from "./can-submit.js";
+import { readScheduledRun, readTokenExpiry } from "./schedule-probes.js";
 import { readHostTsCompile } from "./host-probes.js";
 import { readJwt } from "./jwt-check.js";
 import {
@@ -44,6 +45,7 @@ import { SECTIONS } from "./sections.js";
 import {
   readCatalog,
   readPush,
+  readSchedules,
   readSecretsFolder,
   readVariables,
   readWorkspace,
@@ -203,8 +205,6 @@ const pushedItems = (): { path: string; kind: Deployed["kind"]; file?: string }[
       } else if (entry.name.endsWith(".script.yaml")) {
         const path = at.replace(/\.script\.yaml$/, "");
         items.push({ path, kind: "script", file: join(root, `${path}.ts`) });
-      } else if (entry.name.endsWith(".schedule.yaml")) {
-        items.push({ path: at.replace(/\.schedule\.yaml$/, ""), kind: "schedule" });
       }
     }
   };
@@ -243,6 +243,16 @@ const pushed = async (): Promise<Verdict> => {
   if (failures.length > 0)
     return { ok: false, need: `Windmill に訊けない: ${failures.join("・")}` };
   return readPush(deployed);
+};
+
+/** Windmill に残っている schedule (`readSchedules`)。一覧で訊く —— 消した物の名前は repo に残っていない。 */
+const leftoverSchedules = async (): Promise<Verdict> => {
+  const answer = await windmill(inWorkspace("schedules/list"));
+  const list = answer.status === 200 ? parse(answer.body) : undefined;
+  if (!Array.isArray(list)) {
+    return { ok: false, need: `Windmill に訊けない: schedules/list → ${String(answer.status)}` };
+  }
+  return readSchedules(list.map((one: { path?: unknown }) => String(one.path)));
 };
 
 // ── 立ち上げる: capture-ledger ─────────────────────────────────────────
@@ -322,6 +332,24 @@ const catalogFilled = async (): Promise<Verdict> => {
   if (token === undefined || token === "") return unreadable("u/admin/waggle_token");
   return readCatalog(
     await answerOf(`${API}/api/scripts`, { headers: { authorization: `Bearer ${token}` } }),
+  );
+};
+
+/** flow のトークンの期限 (`readTokenExpiry`)。 */
+const flowTokenExpiry = async (): Promise<Verdict> => {
+  const token = await variable("u/admin/waggle_token");
+  if (token === undefined || token === "") return unreadable("u/admin/waggle_token");
+  return readTokenExpiry(token, Date.now());
+};
+
+/** 走っている定期の回 (`readScheduledRun`)。e2e はこれとぶつかると 409 で落ちる。 */
+const noScheduledRun = async (): Promise<Verdict> => {
+  const token = await variable("u/admin/waggle_token");
+  if (token === undefined || token === "") return unreadable("u/admin/waggle_token");
+  return readScheduledRun(
+    await answerOf(`${API}/api/crawls?state=running`, {
+      headers: { authorization: `Bearer ${token}` },
+    }),
   );
 };
 
@@ -490,9 +518,16 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
   {
     name: "push",
     section: SECTIONS.bringUp,
-    where: "script の中身が repo と同じか・flow と schedule が在るか",
+    where: "script の中身が repo と同じか・flow が在るか",
     needs: ["workspace"],
     probe: pushed,
+  },
+  {
+    name: "schedule",
+    section: SECTIONS.bringUp,
+    where: "Windmill に schedule が残っていないか (定期実行の時計は capture-ledger に在る)",
+    needs: ["workspace"],
+    probe: leftoverSchedules,
   },
   {
     name: "シークレットのフォルダ",
@@ -618,6 +653,14 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
     probe: flowCanSubmit,
   },
   {
+    name: "トークンの期限",
+    section: SECTIONS.grant,
+    where:
+      "変数 u/admin/waggle_token の exp (切れると、回が撮れても報告が 401 で行が running のまま残る)",
+    needs: ["変数"],
+    probe: flowTokenExpiry,
+  },
+  {
     name: "スクリプト",
     section: SECTIONS.grant,
     where: `flow のトークンで GET ${API}/api/scripts (走らせるものが在るか)`,
@@ -645,6 +688,15 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
               "capture-fixtures が待っていない → " +
               "cd ../capture-ledger && pnpm run stack:up --profile capture-fixtures capture-fixtures",
           },
+    e2eOnly: true,
+  },
+  {
+    name: "定期の回",
+    section: SECTIONS.e2e,
+    where: `flow のトークンで GET ${API}/api/crawls?state=running (走っている定期の回が無いか)`,
+    // 試験の中で待たない。e2e が走り始めれば、直近のクロールが新しいので周回は静かな時間で待つ。入口の 1 か所で足りる
+    needs: ["can_submit"],
+    probe: noScheduledRun,
     e2eOnly: true,
   },
   {

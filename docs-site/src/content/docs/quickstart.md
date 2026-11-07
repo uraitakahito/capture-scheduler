@@ -54,7 +54,7 @@ container-compose up -d
 pnpm install
 
 pnpm run windmill:bootstrap   # creates the workspace and a token, and writes two files (below)
-pnpm run windmill:push        # upload the scripts, the flow and the schedule
+pnpm run windmill:push        # upload the scripts and the flow
 ```
 
 **There is nothing to paste any more.** bootstrap writes two files, both inside this repo:
@@ -200,10 +200,11 @@ If the name was looked up before it was started, it may not resolve for about a 
 start (the DNS remembers the "no such name" answer).
 
 **doctor** asks, for each heading of this page, whether that step is done — by asking the things
-the step created. It goes past "is it up": whether the scripts match the repo, whether the token
-Windmill holds may start crawls, whether the API and BrowserHive are reachable from inside the
-worker. A ✗ says what to fix and which section of this page the step
-lives in. Checks that depend on a ✗ do not run and only say "先に … を" (… first) — one thing to
+the step created. It goes past "is it up": whether the scripts match the repo, whether a schedule is
+left in Windmill (the clock is in capture-ledger, and an old checkout's `windmill:push` can bring one
+back), whether the token Windmill holds may start crawls and has time left, whether the API and
+BrowserHive are reachable from inside the worker. A ✗ says what to fix and which section of this
+page the step lives in. Checks that depend on a ✗ do not run and only say "先に … を" (… first) — one thing to
 fix means one ✗.
 
 ```
@@ -238,7 +239,7 @@ predicts: the snapshot stages when the page list has snapshot entries, otherwise
 document (`page`):
 
 ```
-点検     doctor の 18 本とも ✓
+点検     doctor の … 本とも ✓
 始める   POST /api/crawls → 202  crawl 545e912c-…  http://capture-fixtures.capture-ledger:8080/marked/page/smoke?tag=smokemh5k2x1fq3
 待つ     running
 run      http://127.0.0.1:8000/run/01a0ba19-…?workspace=crawler
@@ -293,7 +294,7 @@ host                                   │ container
       ▼                                │
   windmill:capture-ledger-token ───────────────┼──► secret variable u/admin/waggle_token
                                        │            │
-  capture-api 0.0.0.0:7070  ◄───────────┼── trigger_crawl.ts
+  capture-api 0.0.0.0:7070  ◄───────────┼── report_level.ts
 ```
 
 **Keep the dev issuer on loopback.** It mints a token for whoever asks, under
@@ -306,8 +307,13 @@ finished token**.
 
 **Re-run `pnpm run windmill:capture-ledger-token` after restarting the issuer.** It
 generates its keys in memory on every start (deliberately), so the old token
-starts returning 401. The error messages in `report_level.ts` and
-`trigger_crawl.ts` say so, because this is easy to hit and hard to guess.
+starts returning 401. The error message in `report_level.ts` says so, because
+this is easy to hit and hard to guess.
+
+**The token also expires** (`exp`), and on a machine left running nothing reissues it until the next
+`dev:up`. Past that, pages still get captured, but the level report gets 401 and the crawl's row stays
+`running`, blocking every later start. The トークンの期限 (token expiry) line of `doctor` turns ✗ when
+under 24 hours remain; the fix is the same command.
 
 The API does not need a restart. The key's name (kid) changes along with the key, so the API
 refetches the keys as soon as it sees one new token (from capture-ledger v0.42.1; before that the

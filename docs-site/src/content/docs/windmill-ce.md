@@ -96,5 +96,7 @@ BrowserHive's 16,315-byte `.proto` (until v0.22): it did not fit and lived in a
 
 ## Schedule error handlers are Enterprise-only
 
-A failed nightly run leaves a red entry in the run history and notifies nobody.
-See the limits in [Development](/development/).
+Nothing here relies on them: this repository holds no schedule, and capture-ledger reports the
+state of a [scheduled run](https://uraitakahito.github.io/capture-ledger/schedules/) itself. A failed
+run of the flow still leaves a red entry in the run history and notifies nobody. See the limits in
+[Development](/development/).

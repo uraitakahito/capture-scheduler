@@ -17,7 +17,10 @@ pnpm run windmill:push   # make git authoritative and apply it
 `pull` removes local files that are absent remotely. Commit before syncing and
 push before pulling — see [Windmill CE](/windmill-ce/).
 
-`windmill/wmill.yaml` sets `includeSchedules: true`. Secrets are not synced
+`windmill/wmill.yaml` keeps `includeSchedules: true` although this repository holds no schedule: with
+schedules out of the sync, `windmill:push` would not remove one made in the UI or pushed earlier. An old
+checkout's `windmill:push` can bring one back, and it would start crawls apart from capture-ledger's
+schedules, so doctor's `schedule` line checks that none is left. Secrets are not synced
 (`skipSecrets`); `u/admin/waggle_token` is injected through the API by
 `scripts/capture-ledger-token.ts`.
 
@@ -65,7 +68,6 @@ When you drop `puppeteer`, drop its `//devDependencies` note in `package.json` t
 | ---------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | `windmill/f/waggle/*.ts`                       | the scripts Windmill runs, under Bun                                                     |
 | `windmill/f/waggle/crawl_level.flow/flow.yaml` | the flow that runs one crawl level                                                       |
-| `windmill/f/waggle/daily.schedule.yaml`        | when the nightly crawl fires                                                             |
 | `windmill/f/waggle_secrets/folder.meta.yaml`   | the folder for script secrets; the variables inside are placed by a person, never in git |
 | `test/`                                        | unit tests; **never put these under `windmill/f/`** — `sync push` would deploy them      |
 | `scripts/*.ts`                                 | host-side helpers (bootstrap, tokens, checks)                                            |
@@ -100,9 +102,10 @@ stay valid).
 
 ## Out of scope
 
-1. **Nobody is told when it fails.** Schedule error handlers are a Windmill
-   Enterprise feature. A failure leaves a red entry in the run history and waits
-   to be noticed.
+1. **Nobody is told when it fails.** A failed run of the flow leaves a red entry in
+   the run history and waits to be noticed. A scheduled run that fails also shows in
+   [capture-workbench](https://github.com/uraitakahito/capture-workbench), on a band
+   across its views; nothing sends it anywhere.
 2. **No production topology is decided.** Apple Container is for development.
 
 ## Licence

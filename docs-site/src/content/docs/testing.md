@@ -1,17 +1,17 @@
 ---
 title: Testing
-description: Unit tests that need nothing, one end-to-end test that needs the whole stack, and why both layers are required
+description: Unit tests that need nothing, end-to-end tests that need the whole stack, and why both layers are required
 ---
 
 ```sh
 pnpm run test        # unit tests, no stack, a few seconds
-pnpm run test:e2e    # 1 end-to-end test, needs the stack
+pnpm run test:e2e    # end-to-end tests, need the stack
 pnpm run check       # audit, format, env, typecheck, unit tests, CI parity, docs site
 ```
 
 `pretest:e2e` runs doctor with `--e2e` first and names what is missing — the checks of
-[the quickstart's "Check it"](/quickstart/#check-it-take-one-capture), plus capture-fixtures and
-the crawl permission for `e2e`, the name the test uses (`fga:grant submitter e2e acme`). It checks not just that things are up but that a crawl can run to the end — miss any of
+[the quickstart's "Check it"](/quickstart/#check-it-take-one-capture), plus capture-fixtures, no
+scheduled run in progress, and the crawl permission for `e2e`, the name the test uses (`fga:grant submitter e2e acme`). It checks not just that things are up but that a crawl can run to the end — miss any of
 these and a crawl fails only at its level report, staying `running`. Full-text search is part of
 that: capture-ledger does not start without OpenSearch (`CAPTURE_LEDGER_OPENSEARCH_URL`, which its
 `dev:up` writes). OpenSearch can still stop, or be recreated without its index, while the API runs;
@@ -91,7 +91,7 @@ something it thinks it is watching and is not.
 
 ### What runs inside the page
 
-The rest look at the scripts a crawl runs in the page, again from capture-fixtures' request
+Most of the rest look at the scripts a crawl runs in the page, again from capture-fixtures' request
 log, which counts every request by its full URL, query string included.
 
 - **Registered scripts run, and only when asked.** Named, autofetch requests
@@ -144,36 +144,24 @@ log, which counts every request by its full URL, query string included.
 - **An `import` in a form that is not accepted fails the crawl at compile**: `import { z as zod }`
   ends failed with `BH0003` in `error`.
 
-## The nightly loop refuses to guess
+### Scheduled runs
 
-`trigger_crawl.ts` is the only thing that decides whether the nightly capture
-succeeded, and the e2e does not touch it — that test posts its own seed to
-capture-ledger, so the trigger script is never in the picture. It used to have no
-coverage at all, because `POLL_INTERVAL_MS` was a 15-second constant and the
-sleep happens _before_ the first poll — one test, fifteen seconds.
+The clock is in capture-ledger ([Schedules](https://uraitakahito.github.io/capture-ledger/schedules/));
+this repository only runs the levels it is handed. So `schedule.e2e.test.ts` looks end to end: it makes a
+schedule with `POST /api/schedules` and asks for one run with `POST /api/schedules/:id/run` (run now).
+The run goes through the real flow, the page is captured, and the crawl's row names the schedule. The
+same file pauses, resumes and deletes a schedule, and checks that the ledger refuses an unreadable cron,
+a cron that runs too often, and a name already in use.
 
-It now takes `poll_interval_ms` as an argument — the same trick as
-`crawl_host`'s busy wait — so the loop runs on real timers at millisecond scale.
-
-The guard worth knowing about is this one:
-
-```ts
-if (crawl.state !== "succeeded") throw new Error(`知らない状態「…」`);
-```
-
-Without it, a state the script does not recognise falls through **both**
-comparisons and returns `succeeded` with counts of zero. That is exactly what a
-renamed field looks like — and it happened once, for real: capture-ledger's
-`runs.status` became `runs.state`, and the pre-rename script was pointed at the
-post-rename API to watch this fire. It threw, naming the likely cause, instead of
-reporting a green nightly run that never ran. `runs` has since been folded into
-`crawls`; the guard moved with it, unchanged, and now reads `crawl.state`.
-
-Nothing else protects the shape of that response: capture-ledger has no serializer
-schema, and this side does a bare `as CrawlState` cast.
+**No test waits for a scheduled run.** doctor checks once, before any test: with `--e2e`, its 定期の回
+(scheduled run) line is ✗ while one is running. Once the e2e is going, the latest crawl is always recent,
+so the tick holds due runs back for quiet (10 minutes by default).
 
 ## What is not covered
 
-The e2e seeds its crawl with a URL, so nothing exercises `fromTargets` — the path
-that turns `capture_targets` into seeds, which is the one the nightly job takes.
-That path through capture-ledger is covered only by unit tests on both sides.
+A run that starts on its due time does not go through the e2e: it waits for quiet, so the test uses run
+now, which does not. The tick's choices are left to capture-ledger's unit tests and its
+`schedules-smoke`.
+
+Run now does not wait for quiet during an e2e either. Press it on another schedule and a run can start
+between two tests, and the test after it gets 409.

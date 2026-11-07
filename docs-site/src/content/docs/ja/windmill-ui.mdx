@@ -13,9 +13,7 @@ import runStep from "../../../assets/windmill-ui/06-run-step.png";
 import errReport from "../../../assets/windmill-ui/08-run-error-report.png";
 import flowDetail from "../../../assets/windmill-ui/09-flow-detail.png";
 import scriptForm from "../../../assets/windmill-ui/10-script-form.png";
-import schedules from "../../../assets/windmill-ui/11-schedules.png";
 import variables from "../../../assets/windmill-ui/12-variables.png";
-import trigger from "../../../assets/windmill-ui/14-trigger-script.png";
 
 Windmill は Web の管理画面を同梱している。この配備ではそれがそのまま
 capture-scheduler の管理画面になる。別に何かを立てる必要はない。
@@ -56,16 +54,15 @@ Schedules / Variables / Resources の 5 つ。
   alt="crawler workspace のホーム。左に Home・Runs・Variables・Resources・Schedules の sidebar"
 />
 
-UI でやってよいのは「見る」「1 回だけ手で起こす」「一時的に止める」まで。
-**恒久的な変更は repo を直して push する。** schedule の `enabled` も
-`daily.schedule.yaml` に入っているので、UI で止めても次の `windmill:push` で
-動き出す。同期が**両方向とも削除**であることは [開発](/development/) を見ること。
+UI でやってよいのは「見る」「script を手で流す」まで。
+**恒久的な変更は repo を直して push する。** UI で直しても次の `windmill:push` で
+戻る。同期が**両方向とも削除**であることは [開発](/development/) を見ること。
 
 ## Runs —— まず履歴を読む
 
 **クロールが動いたか / 失敗したかは、ここが最初の一枚。**
 Path が段の種類を表す —— `f/waggle/crawl_level` が flow 本体で、
-`crawl_host` などはその中の段。`daily` の行は schedule が起こしたもの。
+`crawl_host` などはその中の段。
 
 <Image src={runsList} alt="Runs の一覧。crawl_level の成功（緑）と失敗（赤）が時刻順に並ぶ" />
 
@@ -123,16 +120,16 @@ flow が for-loop で各 host に対して呼ぶのが `crawl_host` の script�
 script のコードは UI の Edit でも repo の `windmill/f/waggle/` でも読めるが、
 **正は repo**。UI で直すと次の `windmill:push` で戻る。
 
-## Schedules —— いつ走るか
+## Schedules —— 空のまま
 
-`f/waggle/daily` が唯一の schedule。cron `0 0 4 * * *`（毎日 04:00
-Asia/Tokyo）で `trigger_crawl` を起こす。右のトグルが `enabled`。
+この repo に schedule は無いので、この画面は空のまま。定期実行の時計は
+[capture-ledger](https://uraitakahito.github.io/capture-ledger/ja/schedules/) の中に在る。予定を作るのは
+[capture-workbench](https://github.com/uraitakahito/capture-workbench) の「新しいクロール」の画面で、
+操作はタブ「定期実行」から。
 
-<Image src={schedules} alt="Schedules。f/waggle/daily の cron・タイムゾーン・有効トグル" />
-
-**トグルで止めても、`daily.schedule.yaml` の `enabled: true` が正なので
-次の `windmill:push` で戻る。** 恒久的に止めるなら yaml を直して push する。
-意味は [いつ走るか](/schedule/) を見ること。
+**ここに行が在れば、それは消し残し**で、capture-ledger の予定と別にクロールを始めうる。古い checkout の
+`windmill:push` が戻すことがある。`pnpm run doctor` の `schedule` がそれを言い、いまの repo から
+`windmill:push` を打てば消える。
 
 ## Variables
 
@@ -147,23 +144,19 @@ Asia/Tokyo）で `trigger_crawl` を起こす。右のトグルが `enabled`。
 Resources は空のまま —— この repo はそこに何も置かない（v0.22 までは BrowserHive の
 `.proto` の写しが States タブに居た）。
 
-## 手で 1 回だけ起こす
+## 手で 1 本撮る
 
-`trigger_crawl` を開くと Run のフォームがある。schema の説明が日本語で読める
-（`waggle_url` = コンテナから見た capture-api、`token` = dev issuer の JWT、
-`limit` を省くと enabled な行を全部）。`variables` には、スクリプトが `params` で宣言した変数を
-名前 → 値の JSON で書ける（省けば送らない。知らない名前は台帳が 400 で名指す）。下の絵は `variables` の
-欄が付く前に撮った物。
+ここからは撮らない —— クロールを始めるのは capture-ledger。capture-workbench の「新しいクロール」の画面か、
+`pnpm run smoke` を使う（[クイックスタート](/quickstart/#確かめる--1-本撮れるまで)）。この UI の Run のフォームは、
+単独で動く script のためのもの —— [落とした物を Windmill で調べる](/inspect/) の script など。
 
-<Image src={trigger} alt="trigger_crawl の Run フォーム。Waggle Url・Token・Limit の入力欄" />
-
-ただし **schema の `default` は UI からの実行にしか埋まらない**（CE の罠。
-[Windmill CE](/windmill-ce/) を見ること）。schedule や webhook からの実行には
-届かないので、`daily` は変数から値を渡している。
+**schema の `default` は UI からの実行にしか埋まらない**（CE の罠。
+[Windmill CE](/windmill-ce/) を見ること）。webhook からの実行には届かないので、
+flow の script は設定を変数から読む（[リンクを辿る](/crawl/)）。
 
 ## 変数の台帳 —— どの script が何を入れるか
 
-`windmill:push` が入れるのは **git にあるものだけ**（script・flow・schedule）。
+`windmill:push` が入れるのは **git にあるものだけ**（script・flow）。
 変数は別の script が入れる。ここを混同すると、push が緑なのに flow が最初の
 `getVariable` で落ちる。
 
@@ -190,7 +183,7 @@ pnpm run windmill:bootstrap            # workspace を作り直し、新しい t
                                        # → 出た WINDMILL_TOKEN= を .env に貼り直す
                                        # → 続く 4 行を capture-ledger の .env の末尾に
                                        #   貼り直して、あちらの API を起こし直す
-pnpm run windmill:push                 # script / flow / schedule
+pnpm run windmill:push                 # script / flow
 pnpm run windmill:capture-ledger-token # 変数 5 つ
 cd ../capture-ledger
 pnpm run fga:grant submitter windmill acme  # windmill に acme のクロールを許可する

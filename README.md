@@ -4,11 +4,11 @@ Runs [capture-ledger](https://github.com/uraitakahito/capture-ledger)'s crawls o
 [Windmill](https://www.windmill.dev/). capture-ledger hands each crawl over one level at a time;
 a flow here groups that level's URLs by host, checks robots.txt, has
 [BrowserHive](https://github.com/uraitakahito/browserhive) capture them over HTTP, and reports
-back. A Windmill schedule also starts a crawl every day at 04:00 — the on-time part is Windmill's
-own scheduler; this repository holds its settings and the scripts it runs.
+back. When to start is capture-ledger's too: its schedules run on a clock inside the ledger, and this
+repository holds no schedule.
 
 This repository contains **no URLs**. What to capture, how far and how politely is
-capture-ledger's decision; this one decides when to start and how to carry each level out.
+capture-ledger's decision; this one decides how to carry each level out.
 
 ## Documentation
 

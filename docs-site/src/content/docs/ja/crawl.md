@@ -3,7 +3,7 @@ title: リンクを辿る
 description: 1 段の流れ —— ホストで束ね、ホスト間は並列、ホスト内は逐次、間隔は完了の後
 ---
 
-capture-ledger の `POST /api/crawls` が起点を受け取り（URL の配列か、`capture_targets` の有効な行を起点にする `fromTargets`）、
+capture-ledger の `POST /api/crawls` が起点の URL を受け取り（定期の回は、予定に固定した撮り方から始まる）、
 **1 段ずつ** flow に投げる。
 flow は `f/waggle/crawl_level` で、1 回の実行が 1 段。
 
@@ -222,5 +222,5 @@ pnpm run windmill:cli variable add '<値>' f/waggle_secrets/<名前> --secret --
   伏せない）が、`crawl_host` は元から値を log に出さない（出すのは名前だけ）。BrowserHive の側の扱い
   （記録に残さない・ログで伏せる・頁の JS からは読める）は BrowserHive の docs を見ること。
 
-`trigger_crawl`（日次）にも `variables` を渡せる。シークレットは渡さない —— スクリプトが宣言した名前を
-台帳が Windmill の変数に結ぶので、日次でも手で始めたクロールでも同じ値が届く。
+予定の `request` は `POST /api/crawls` と同じ形なので、`variables` も書ける。シークレットは書かない —— スクリプトが
+宣言した名前を、台帳が回ごとに Windmill の変数に結ぶので、定期の回でも手で始めたクロールでも同じ値が届く。

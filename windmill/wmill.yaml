@@ -1,8 +1,8 @@
 # wmill CLI の設定。`wmill sync push` / `pull` がこれを読む。
 #
-# **`includeSchedules: true` が肝。** 既定では schedule は同期されず、UI で作った
-# 定期実行が git のどこにも現れない —— 「いつ走るか」はこの repo が決めることなのに、
-# その設定だけが追跡から漏れる。
+# **`includeSchedules: true` を残す。** この repo に schedule は無い (定期実行の時計は capture-ledger の中)。
+# 同期の対象から外すと、UI で作った schedule や、前に push した schedule が Windmill に残っていても
+# push が消さない。doctor の `schedule` の点検と 2 つで、残らないようにしている。
 defaultTs: bun
 includes:
   - f/**

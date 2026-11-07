@@ -55,7 +55,7 @@ container-compose up -d
 pnpm install
 
 pnpm run windmill:bootstrap   # workspace と token を作り、2 枚のファイルに書く（下）
-pnpm run windmill:push        # script・flow・schedule を入れる
+pnpm run windmill:push        # script・flow を入れる
 ```
 
 **貼る行はもう出ません。**bootstrap が書くのは、この repo の中の 2 枚だけです:
@@ -200,8 +200,9 @@ pnpm run stack:up --profile capture-fixtures capture-fixtures
 DNS が覚えるため）。
 
 **doctor** は、このページの見出しごとに「その手が済んでいるか」を、その手が作ったものに訊く。
-立っているかだけでなく、script の中身が repo と同じか、Windmill が持っているトークンで
-クロールを始められるか、worker の中から API と BrowserHive に届くか、まで見る。✗ は、何を
+立っているかだけでなく、script の中身が repo と同じか、Windmill に schedule が残っていないか（時計は
+capture-ledger の中に在り、古い checkout の `windmill:push` が戻すことがある）、Windmill が持っているトークンで
+クロールを始められるか、その期限まで余裕があるか、worker の中から API と BrowserHive に届くか、まで見る。✗ は、何を
 直すかと、このページのどの節の手かを言う。✗ の点検に頼る点検は走らせず、「先に〇〇を」とだけ
 出す —— 直すものが 1 つなら、✗ も 1 本。
 
@@ -235,7 +236,7 @@ WACZ のページ一覧から予想した時点（写しの行があれば写し
 同じかを照らす:
 
 ```
-点検     doctor の 18 本とも ✓
+点検     doctor の … 本とも ✓
 始める   POST /api/crawls → 202  crawl 545e912c-…  http://capture-fixtures.capture-ledger:8080/marked/page/smoke?tag=smokemh5k2x1fq3
 待つ     running
 run      http://127.0.0.1:8000/run/01a0ba19-…?workspace=crawler
@@ -290,7 +291,7 @@ host                                   │ コンテナ
       ▼                                │
   windmill:capture-ledger-token ───────────────┼──► secret 変数 u/admin/waggle_token
                                        │            │
-  capture-api 0.0.0.0:7070  ◄───────────┼── trigger_crawl.ts
+  capture-api 0.0.0.0:7070  ◄───────────┼── report_level.ts
 ```
 
 **dev issuer は loopback から出さないこと。** あれは頼まれれば誰の名前でもトークンを
@@ -302,8 +303,12 @@ JWT にした意味が消える。
 
 **issuer を再起動したら `pnpm run windmill:capture-ledger-token` をやり直すこと。**
 issuer は起動のたびに鍵をメモリ上で作り直すので（意図された挙動）、古いトークンは
-401 になる。`report_level.ts` と `trigger_crawl.ts` の失敗メッセージがそう書いてあるのは、
+401 になる。`report_level.ts` の失敗メッセージがそう書いてあるのは、
 踏みやすく、かつ status だけからは辿れないため。
+
+**トークンには期限（`exp`）もあり**、動かし続けた機械では次の `dev:up` まで誰も発行し直さない。切れると、
+ページは撮れても段の報告が 401 になり、クロールの行が `running` のまま残って、以後のクロールを全部塞ぐ。
+`doctor` の**トークンの期限**は、残りが 24 時間を切ると ✗ になる。直すのは同じコマンド。
 
 API は起こし直さなくてよい。鍵の名前（kid）も一緒に替わるので、API は新しいトークンを
 1 本見た時点で鍵を取り直す（capture-ledger v0.42.1 から。それより前は kid が固定で、
