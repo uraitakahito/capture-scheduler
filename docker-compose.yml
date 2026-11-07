@@ -57,7 +57,7 @@ services:
       # server と worker を 1 プロセスで兼ねる。
       - MODE=standalone
       # **複合値にしてある。** 素のサービス名を値に書くと container-compose が
-      # その IP に書き換えてしまう (browserhive で実測、replay で 403 になった)。
+      # その IP に書き換えてしまう (browserhive で実測、replayweb-server で 403 になった)。
       # URL の一部として書けばその書き換えは起きない。
       - DATABASE_URL=postgres://windmill:windmill@windmill-db.capture-scheduler:5432/windmill?sslmode=disable
       - BASE_URL=http://127.0.0.1:8000
