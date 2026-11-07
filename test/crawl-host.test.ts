@@ -463,6 +463,23 @@ describe("一過性の失敗の再試行", () => {
     expect(result!.status).toBe("failed");
   });
 
+  it("failed のときは、理由の頭に status でなく型を書く —— 行の状態と重ねて failed: failed: にしない", async () => {
+    const endpoint = fakeEndpoint("bh-1", {
+      responses: [{ status: "failed", errorType: "renderer_crashed" }],
+    });
+    const [result] = await run([endpoint], ["a"]);
+
+    expect(result!.status).toBe("failed");
+    expect(result!.skipReason).toBe("renderer_crashed: boom");
+  });
+
+  it("failed で型が無ければ、理由は failed のまま", async () => {
+    const endpoint = fakeEndpoint("bh-1", { responses: [{ status: "failed" }] });
+    const [result] = await run([endpoint], ["a"]);
+
+    expect(result!.skipReason).toBe("failed");
+  });
+
   it("主の頁の renderer の crash (renderer_crashed) は再試行しない —— 同じ頁は同じ所で落ちる", async () => {
     // BrowserHive v28.0.0 から。v27 までは同じ事故が timeout を名乗り、ここで撮り直していた。
     const calls: Call[] = [];

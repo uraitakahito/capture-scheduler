@@ -22,7 +22,7 @@
     "pagesDiscovered": 0,
     "pagesCaptured": 0,
     "pagesFailed": 1,
-    "error": "1 枚も撮れませんでした（取れず 1・見送り 0）。最初の理由: failed: net::ERR_NAME_NOT_RESOLVED at http://nonexistent.invalid/",
+    "error": "1 枚も撮れませんでした（取れず 1・見送り 0）。最初の理由: internal: net::ERR_NAME_NOT_RESOLVED at http://nonexistent.invalid/",
     "lastJob": {
       "id": "01a0ba0c-d609-5280-0008-08a22dc56fd6",
       "depth": 0
@@ -32,7 +32,7 @@
         "page": "220",
         "url": "http://nonexistent.invalid/",
         "depth": 0,
-        "reason": "failed: net::ERR_NAME_NOT_RESOLVED at http://nonexistent.invalid/"
+        "reason": "internal: net::ERR_NAME_NOT_RESOLVED at http://nonexistent.invalid/"
       }
     ]
   },

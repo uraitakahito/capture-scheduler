@@ -596,6 +596,10 @@ const captureOne = async (
     }
 
     const message = report?.errorDetails?.message;
+    // 理由の頭は BrowserHive の status。ただし failed は台帳の行の状態と同じ字で何も足さないので
+    // (dashboard は「行の状態: 理由」と出す)、型のほうを書く。timeout と http_error は status のまま。
+    const kind =
+      report?.status === "failed" ? (errorType ?? "failed") : (report?.status ?? "no report");
     return {
       url,
       status: ok ? "captured" : "failed",
@@ -608,9 +612,7 @@ const captureOne = async (
       ...(ok
         ? {}
         : {
-            skipReason:
-              (report?.status ?? "no report") +
-              (message !== undefined && message !== "" ? `: ${message}` : ""),
+            skipReason: kind + (message !== undefined && message !== "" ? `: ${message}` : ""),
           }),
       ...(ok && links !== undefined && links !== "" ? { linksLocation: links } : {}),
     };
