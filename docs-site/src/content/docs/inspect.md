@@ -27,7 +27,7 @@ Shows the crawl — seeds, depth and page caps, how it ended — and then:
 - **what was dropped**, by host name: links a rule dropped, links no rule matched (dropped too),
   and pages robots.txt kept the crawl from taking.
 
-The first 8 characters are what the dashboard and Windmill's run pages show. The script looks
+The first 8 characters are what [capture-workbench](https://github.com/uraitakahito/capture-workbench) and Windmill's run pages show. The script looks
 them up in the newest pages of capture-ledger's crawl list; when two crawls start with the same
 characters it names both and stops rather than pick one.
 
