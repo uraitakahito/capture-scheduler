@@ -56,7 +56,8 @@ type ErrorType =
   | "internal"
   | "artifact_sink"
   | "cancelled"
-  | "policy";
+  | "policy"
+  | "renderer_crashed";
 
 /**
  * 何をどう取り込むか。**capture-ledger が決めて、dispatch の payload で渡す。**
@@ -195,6 +196,10 @@ const BUSY_RETRY: BusyRetry = { minMs: 500, maxMs: 1500 };
  *
  * `policy` (方針を守れなかった。BrowserHive v18.0.0 から) も**入れない**。`deny` に当たる WebSocket を
  * 開く頁は、撮り直しても同じ WebSocket を開き、止められない handshake が相手にもう 1 回届く。
+ *
+ * `renderer_crashed` (主の頁の renderer が落ちた。BrowserHive v28.0.0 から) も**入れない**。メモリ切れが多く、
+ * 同じ頁は同じ所で落ちる (2026-11-07 の実測で 3 回とも)。撮り直すと、落ちる頁に相手へのアクセスが 1 回増える。
+ * v27 までは同じ事故が `timeout` を名乗っていたので、ここで再試行されていた。
  */
 const MAX_ATTEMPTS = 2;
 const RETRYABLE: ReadonlySet<string> = new Set<ErrorType>(["connection", "timeout", "internal"]);

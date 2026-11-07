@@ -120,6 +120,9 @@ BrowserHive は queue も pool も持たない。`POST /captures` は 1 往復�
   保管庫で、ページを撮り直しても同じ保管庫に書くだけ。
   方針を守れなかった失敗（`policy`。BrowserHive v18.0.0 から）も試し直さない ——
   `deny` に当たる WebSocket を開いた頁は、撮り直しても同じ WebSocket を開き、handshake は止められない。
+  主の頁の renderer の crash（`renderer_crashed`。BrowserHive v28.0.0 から）も試し直さない ——
+  多くはメモリ切れで、同じ頁は同じ所で落ちる。別サイトの iframe だけが落ちたときは失敗ではなく、
+  取り込みは `success` で答え、アーカイブが `completeness.crashedTargets` で言う。
 
 ## 設定は変数から読む
 
