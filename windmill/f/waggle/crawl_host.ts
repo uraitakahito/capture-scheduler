@@ -107,10 +107,17 @@ export interface CaptureSettings {
   /**
    * クロールごとのシークレット (名前 → **解いた後の値**)。解くのは `main` —— 台帳が渡すのは
    * Windmill の変数の path で、`resolveSecrets` が `f/waggle_secrets/` の下だけを `getVariable` で読む。
-   * BrowserHive は値をどこにも書かず、`settings.secrets` に名前だけ残す。ここでも log にも
-   * `PageResult` にも出さない —— 値が在るのは BrowserHive への要求の本文だけ。
+   * BrowserHive は `settings.secrets` に名前だけを残し、v29.0.0 からは、スクリプトが通信に載せた値もサイトが返した値も
+   * WARC の中で `***` に置き換える (`secretArchive` に名前の在る物だけ、通信の記録に値のまま残す)。
+   * ここでも log にも `PageResult` にも出さない —— 値が在るのは BrowserHive への要求の本文だけ。
    */
   secrets?: Record<string, string>;
+  /**
+   * 値を WARC に残すシークレット (名前 → `"keep"`)。capture-ledger がスクリプトの宣言 (`archive: "keep"`) から組む。
+   * 要求に載せるのは **`secrets` に在る名前だけ** (`keptSecrets`) —— BrowserHive は `secrets` に無い名前を 400 で断り、
+   * それは 1 ページではなくクロールの全部の取り込みに当たる。
+   */
+  secretArchive?: Record<string, "keep">;
 }
 
 /**
@@ -455,6 +462,21 @@ const bagOf = (key: string, bag: Record<string, string> | undefined): Record<str
   bag === undefined || Object.keys(bag).length === 0 ? {} : { [key]: bag };
 
 /**
+ * 値を WARC に残すシークレットのうち、**実際に送る `secrets` に在る名前だけ**。BrowserHive は `secrets` に無い名前の
+ * `secretArchive` を 400 で断る —— 台帳は行に在る名前だけを送るが (任意で Windmill に無いシークレットは行に無い)、
+ * ここでも突き合わせる。空なら鍵ごと送らない (`bagOf`)。**export は試験のため。**
+ */
+export const keptSecrets = (
+  secrets: Readonly<Record<string, string>> | undefined,
+  archive: Readonly<Record<string, "keep">> | undefined,
+): Record<string, "keep"> =>
+  Object.fromEntries(
+    Object.entries(archive ?? {}).filter(
+      ([name]) => secrets !== undefined && Object.hasOwn(secrets, name),
+    ),
+  );
+
+/**
  * flow が省いた入力は **`null` で届く** (Windmill CE の実測。`undefined` ではない)。どちらも「無い」と
  * 読む。`artifact_sink` もこれを通す —— 以前は `=== undefined` しか見ておらず、省いた配備では
  * `artifactSink: null` を BrowserHive に送っていた。**export は試験のため。**
@@ -538,10 +560,11 @@ const captureOne = async (
     // 在れば BrowserHive はここへ押し出し、自前の保管庫へは書かない。
     ...(capture.artifactSink === undefined ? {} : { artifactSink: capture.artifactSink }),
     // クロールごとの値。変数は受け皿の `__bh.vars` (スクリプトは `defineParams` で読む)、シークレットは
-    // `__bh.secrets` で頁に届く。
+    // `__bh.secrets` で頁に届く。値を WARC に残すシークレットは `secretArchive` (送る secrets に在る名前だけ)。
     // 空なら鍵ごと送らない。
     ...bagOf("variables", capture.variables),
     ...bagOf("secrets", capture.secrets),
+    ...bagOf("secretArchive", keptSecrets(capture.secrets, capture.secretArchive)),
     // 頼まれた字。解かずに渡す。空なら鍵ごと送らない。
     ...(capture.userAgent === undefined || capture.userAgent === ""
       ? {}
@@ -715,6 +738,12 @@ export async function main(
    * (`askedUserAgent`)。この層は中身を見ない。
    */
   user_agent?: string | null,
+  /**
+   * 値を WARC に残すシークレット (名前 → `"keep"`)。capture-ledger が宣言の `archive` から組み、**必ず送る**
+   * (無ければ `{}`)。古い台帳からは届かず `null` になるので、それも「無い」と読む (`given`) —— 全部を隠す側に倒れる。
+   * 要求には、解いたシークレットに在る名前だけを載せる (`keptSecrets`)。
+   */
+  secret_archive?: Record<string, "keep"> | null,
 ): Promise<PageResult[]> {
   const userAgent = askedUserAgent(user_agent);
   // **設定は変数から読む。引数では受けない。**
@@ -729,8 +758,13 @@ export async function main(
   // シークレットは段の最初に 1 度だけ解く。log に出すのは名前だけ (値はどこにも出さない)。
   const refs = given(secrets) ?? {};
   const resolved = await resolveSecrets(refs);
+  const kept = keptSecrets(resolved, given(secret_archive));
   if (Object.keys(refs).length > 0) {
-    console.log(`[${host}] シークレットを解いた: ${Object.keys(refs).sort().join(", ")}`);
+    const keptNames = Object.keys(kept).sort();
+    console.log(
+      `[${host}] シークレットを解いた: ${Object.keys(refs).sort().join(", ")}` +
+        (keptNames.length === 0 ? "" : ` (WARC に残す: ${keptNames.join(", ")})`),
+    );
   }
   const sink = given(artifact_sink);
   return captureHost(
@@ -745,6 +779,7 @@ export async function main(
       ...(sink === undefined ? {} : { artifactSink: sink }),
       variables: given(variables) ?? {},
       secrets: resolved,
+      secretArchive: kept,
       userAgent,
     },
     per_host_delay_ms,

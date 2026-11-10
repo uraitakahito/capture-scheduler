@@ -89,6 +89,11 @@ schema:
             description: ""
             originalType: string
       originalType: record[]
+    secret_archive:
+      type: object
+      description: ""
+      default: null
+      format: resource-record
     secrets:
       type: object
       description: ""

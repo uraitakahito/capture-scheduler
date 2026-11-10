@@ -48,6 +48,12 @@ stay open.
 `robots-parser`, so the scripts import into vitest directly. IO is stubbed:
 `vi.stubGlobal("fetch", …)` and `vi.mock("windmill-client", …)`.
 
+One unit test reads `flow.yaml` itself (`crawl-level-flow.test.ts`): every argument of `crawl_host` (its
+`.script.yaml` schema) must be carried by an `input_transforms` entry, and `secret_archive` must come from the
+flow's input. It sees the shape only — whether Windmill delivers the value is still the e2e's question.
+`crawl-host-main.test.ts` calls `crawl_host`'s `main` itself, with `windmill-client` and `fetch` stubbed, to see
+that what the flow hands it (`secret_archive`) reaches the BrowserHive request.
+
 `captureHost` is exported from `crawl_host.ts` so the pacing loop can be driven
 with a fake client — `call()` only does `client[method](req, cb)`, so the fake is
 a plain object. Its `retry` argument — how long to wait when every BrowserHive
@@ -60,7 +66,7 @@ cost a round trip.
 Each test starts a crawl through capture-ledger's API — **not** Windmill's run endpoint —
 because the point is to carry the arguments capture-ledger actually sends:
 `crawl_id`, `depth`, `frontier`, `per_host_delay_ms`, `host_parallelism`,
-`capture_formats`, `signing`, `scripts`, `variables`, `secrets`, `user_agent`, and `artifact_sink` where
+`capture_formats`, `signing`, `scripts`, `variables`, `secrets`, `secret_archive`, `user_agent`, and `artifact_sink` where
 capture-ledger serves the sink. **`respect_robots` is not among them.**
 
 The first one asserts five things:
@@ -125,6 +131,18 @@ log, which counts every request by its full URL, query string included.
   answers, or the arguments of the Windmill runs; `settings.secrets` carries the name only. The
   control is a capture that sends the same value as a variable — the same search finds it in that
   WACZ.
+- **A hidden secret sent over the network leaves no trace in the WACZ** (BrowserHive v29.0.0). The inline
+  script sends the value as `/echo/text?v=<value>`, and capture-fixtures sends it back in HTML. The value is
+  random, has characters that change under `%`, HTML and JSON encoding, and carries a random 12-character
+  hex nonce. The witness is the request log: the nonce shows the value reached the site. Neither the value's
+  spellings nor the nonce is in any WACZ member (hex survives every encoding, so a form the list of
+  spellings missed is still caught); the ledger's `archive` is `null`, `settings.secretArchive` is `{}`, and
+  the WARC has `BrowserHive-Redacted` and `/echo/text?v=***`.
+- **A secret declared `keep` travels ledger → flow → crawl_host → BrowserHive and stays in the WARC as it
+  was** — the control for the one above. Same sending, with `archive: "keep"` in the declaration: the ledger's
+  `archive` is `"keep"`, the crawl_host step's run arguments carry `secret_archive`, `settings.secretArchive`
+  names it, and the nonce is found in the WARC. A flow that forgets to carry `secret_archive` turns only this
+  test red.
 - **A required secret missing from Windmill is refused by the ledger with a 400 that names it, and
   no crawl row is created.**
 - **Zod in a script works on a page with a strict CSP** (`zod.e2e.test.ts`). The seed is
