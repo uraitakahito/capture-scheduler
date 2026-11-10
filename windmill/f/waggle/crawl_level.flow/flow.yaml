@@ -103,14 +103,19 @@ value:
                   expr: flow_input.artifact_sink
                 # クロールごとの値。**flow は運ぶだけで中身を見ない。** variables は名前 → 値で、
                 # BrowserHive が記録に残す。secrets は名前 → Windmill の変数の path で、値に解くのは
-                # crawl_host (f/waggle_secrets/ の下だけ)。古い台帳はどちらも送らないので null で届き、
-                # crawl_host が「無い」と読む。
+                # crawl_host (f/waggle_secrets/ の下だけ)。secret_archive は値を WARC に残すシークレットの
+                # 名前 → "keep" で、crawl_host が解いた名前だけを BrowserHive の secretArchive にする。ここを
+                # 書き忘れると null で届き、keep の値も隠れる (残すつもりの値が黙って消える側に倒れる)。
+                # 古い台帳はどれも送らないので null で届き、crawl_host が「無い」と読む。
                 variables:
                   type: javascript
                   expr: flow_input.variables
                 secrets:
                   type: javascript
                   expr: flow_input.secrets
+                secret_archive:
+                  type: javascript
+                  expr: flow_input.secret_archive
                 # 頼まれた User-Agent。**flow は運ぶだけで解かない** ({chrome} を解くのは BrowserHive)。
                 # 台帳は必ず文字列を送る (指定なしは "")。ここを書き忘れると null で届き、crawl_host が投げる。
                 user_agent:
@@ -302,19 +307,30 @@ schema:
     secrets:
       # クロールごとのシークレット。値ではなく **Windmill の変数の path** (f/waggle_secrets/<名前>) で
       # 届き、crawl_host が getVariable で解いて BrowserHive にだけ渡す。flow の入力にも run の履歴にも
-      # 値は現れない。
+      # 値は現れない。BrowserHive (v29.0.0 から) は値を WARC でも既定で隠す (secret_archive に在る物だけ残す)。
       type: object
-      description: クロールごとのシークレット (名前 → Windmill の変数の path)。crawl_host が解き、スクリプトが __bh.secrets で読む。値は記録に残らない
+      description: クロールごとのシークレット (名前 → Windmill の変数の path)。crawl_host が解き、スクリプトが __bh.secrets で読む。値は台帳にも run の引数にも無く、WARC では既定で *** に置き換わる
       additionalProperties:
         type: string
+    secret_archive:
+      # 値を WARC に残すシークレット。capture-ledger がスクリプトの宣言 (archive: "keep") から組み、**必ず送る**
+      # (無ければ {})。crawl_host は、解いたシークレットに在る名前だけを BrowserHive の secretArchive に載せる。
+      type: object
+      description: 値を WARC に残すシークレット (名前 → "keep")。無い名前の値は BrowserHive が *** に置き換える
+      additionalProperties:
+        type: string
+        enum:
+          - keep
     user_agent:
       # 頼まれた User-Agent。capture-ledger がクロールの頼みから固定し、**必ず送る** (指定なしは "")。
       type: string
       description: 頼まれた User-Agent。打った字のままで、{chrome} は BrowserHive が解く。空なら browser の字のまま撮る
       default: ""
   # capture-ledger が送るのは crawl_id / depth / frontier / 間隔 / 並列度 /
-  # capture_formats / signing / scripts / variables / secrets / user_agent と、受け口を出している配備では
-  # artifact_sink。並列度は plan_level が BrowserHive の口の数で頭打ちにしてから for-loop に渡る。
+  # capture_formats / signing / scripts / variables / secrets / secret_archive / user_agent と、受け口を
+  # 出している配備では artifact_sink。並列度は plan_level が BrowserHive の口の数で頭打ちにしてから for-loop に渡る。
+  # schema に無い入力を台帳が送っても、Windmill は既定で引数を schema に照らさないので断らない (frontier の
+  # 要素の lastFinishedAt も、ここに書いていないのに plan_level まで届いている)。
   # capture-ledger は自分がコンテナからどう見えるかを知らないし、issuer の鍵も持っていない。
   #
   # **下の default は webhook からの実行では埋まらない。** 実測: 必須の引数だけ渡して

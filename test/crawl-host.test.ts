@@ -4,6 +4,7 @@ import {
   captureHost,
   describeRefusal,
   given,
+  keptSecrets,
   parseEndpoints,
   resolveSecrets,
   SECRETS_FOLDER,
@@ -726,6 +727,7 @@ describe("クロールごとの値", () => {
   const sendWith = async (extra: {
     variables?: Record<string, string>;
     secrets?: Record<string, string>;
+    secretArchive?: Record<string, "keep">;
   }) => {
     const seen: unknown[] = [];
     await captureHost(
@@ -760,6 +762,77 @@ describe("クロールごとの値", () => {
     const req = await sendWith({});
     expect(req).not.toHaveProperty("variables");
     expect(req).not.toHaveProperty("secrets");
+  });
+
+  it("WARC に残すシークレットは、送る secrets に在る名前だけを secretArchive に載せる（無い名前は BrowserHive がクロールの取り込みを全部 400 で断る）", async () => {
+    const seen: unknown[] = [];
+    await captureHost(
+      [fakeEndpoint("bh-1", { seen })],
+      "m",
+      ["a"],
+      "c1",
+      {
+        formats,
+        signing: false,
+        scripts: [],
+        secrets: { note: "kept-value-1234", password: "hidden-value-5678" },
+        secretArchive: { note: "keep", absent: "keep" },
+      },
+      0,
+      0,
+      FAST,
+    );
+    const req = seen[0] as { secrets?: unknown; secretArchive?: unknown };
+    expect(req.secrets).toEqual({ note: "kept-value-1234", password: "hidden-value-5678" });
+    expect(req.secretArchive).toEqual({ note: "keep" });
+  });
+
+  it("送るシークレットが無ければ、secretArchive は鍵ごと送らない（台帳が keep を送っていても）", async () => {
+    const without = await sendWith({});
+    expect(without).not.toHaveProperty("secretArchive");
+    const seen: unknown[] = [];
+    await captureHost(
+      [fakeEndpoint("bh-1", { seen })],
+      "m",
+      ["a"],
+      "c1",
+      { formats, signing: false, scripts: [], secrets: {}, secretArchive: { note: "keep" } },
+      0,
+      0,
+      FAST,
+    );
+    expect(seen[0]).not.toHaveProperty("secretArchive");
+    expect(seen[0]).not.toHaveProperty("secrets");
+  });
+
+  it("残すシークレットが無ければ secretArchive は鍵ごと送らず、隠すシークレットだけを載せる", async () => {
+    const seen: unknown[] = [];
+    await captureHost(
+      [fakeEndpoint("bh-1", { seen })],
+      "m",
+      ["a"],
+      "c1",
+      {
+        formats,
+        signing: false,
+        scripts: [],
+        secrets: { password: "hidden-value-5678" },
+        secretArchive: {},
+      },
+      0,
+      0,
+      FAST,
+    );
+    expect(seen[0]).toMatchObject({ secrets: { password: "hidden-value-5678" } });
+    expect(seen[0]).not.toHaveProperty("secretArchive");
+  });
+
+  it("keptSecrets は secrets に在る名前だけを残し、どちらかが無ければ空", () => {
+    expect(keptSecrets({ a: "v", b: "w" }, { a: "keep", c: "keep" })).toEqual({ a: "keep" });
+    expect(keptSecrets(undefined, { a: "keep" })).toEqual({});
+    expect(keptSecrets({ a: "v" }, undefined)).toEqual({});
+    // 名前は own property で照らす（prototype の名前を在ると読まない）
+    expect(keptSecrets({}, Object.fromEntries([["toString", "keep" as const]]))).toEqual({});
   });
 
   it("シークレットの値は結果に出ない", async () => {

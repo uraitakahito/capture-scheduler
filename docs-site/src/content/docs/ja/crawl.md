@@ -133,7 +133,7 @@ Windmill は schema の既定値を **UI からの実行にしか埋めない**�
 
 引数で届くのは、そのクロールについて capture-ledger が決めて**必ず送る**もの —— URL と
 間隔、`capture_formats` / `signing`、**`scripts`**（ページの中で走らせる TypeScript）、そして
-**`variables` / `secrets`**（クロールごとの値。[下の節](#クロールごとの値--変数とシークレット)）。
+**`variables` / `secrets` / `secret_archive`**（クロールごとの値。[下の節](#クロールごとの値--変数とシークレット)）。
 台帳が持つのは書いたままの TS で、`sha256` はそのバイト列に打たれている。`compile_scripts` が
 JS にして hash を打ち直し、BrowserHive は JS の hash を照合する。2 つの hash はその 1 段で継がれる。
 `report_level` はその JS の hash を、サービスが名乗った compiler の版と受け皿の型の tag と一緒に
@@ -191,14 +191,24 @@ robots.txt の規則を照らすのに使う: 字に `BrowserHive` があれば�
 どちらも受け皿で、`defineParams` は JS で `__bh.vars` に置き換わる。
 **flow はどちらも運ぶだけで中身を見ない。**
 
-| 口          | 台帳が送る物                                                                                                 | `crawl_host` がすること                                                                    | 記録に残る物                                                             |
-| ----------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| `variables` | 名前 → 値。`POST /api/crawls` の `variables` で頼んだ物を台帳が固定する                                      | そのまま BrowserHive の要求に載せる                                                        | 値（WACZ の `settings.variables`・台帳の行）                             |
-| `secrets`   | 名前 → Windmill の変数の path（`f/waggle_secrets/<名前>`）。スクリプトの宣言から台帳が集め、在るかを確かめる | `getVariable` で値に解き、BrowserHive の要求に**だけ**載せる。フォルダの外の path は投げる | 名前だけ（WACZ の `settings.secrets`。台帳の行には path と、置いた時刻） |
+| 口               | 台帳が送る物                                                                                                 | `crawl_host` がすること                                                                    | 記録に残る物                                                                                   |
+| ---------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `variables`      | 名前 → 値。`POST /api/crawls` の `variables` で頼んだ物を台帳が固定する                                      | そのまま BrowserHive の要求に載せる                                                        | 値（WACZ の `settings.variables`・台帳の行）                                                   |
+| `secrets`        | 名前 → Windmill の変数の path（`f/waggle_secrets/<名前>`）。スクリプトの宣言から台帳が集め、在るかを確かめる | `getVariable` で値に解き、BrowserHive の要求に**だけ**載せる。フォルダの外の path は投げる | 名前だけ（WACZ の `settings.secrets`。台帳の行には path と、置いた時刻）                       |
+| `secret_archive` | 値を WARC に残すシークレットの名前 → `"keep"`（宣言の `archive: "keep"`）。無ければ `{}`                     | 要求の `secretArchive` に載せる。**`secrets` で解いた名前だけを残す**                      | どのシークレットを残したか（`settings.secretArchive`）。ほかのシークレットの値は WARC で `***` |
 
-どちらも空なら鍵ごと送らない（v21 までの BrowserHive は知らない欄を 400 で断る）。古い台帳は
-どちらも送らないので flow からは `null` で届き、`crawl_host` は「無い」と読む —— `artifact_sink` も
-同じ扱いにした（以前は `undefined` しか見ておらず、省いた配備では `null` を送っていた）。
+どれも空なら鍵ごと送らない（v21 までの BrowserHive は知らない欄を 400 で断る）。古い台帳は
+どれも送らないので flow からは `null` で届き、`crawl_host` は「無い」と読む —— `artifact_sink` も
+同じ扱いにした（以前は `undefined` しか見ておらず、省いた配備では `null` を送っていた）。`secret_archive` が
+届かなければ全部のシークレットを隠すので、安全な側に倒れる。逆向きに、`secret_archive` の入力を持たない古い flow も、
+この引数を断らない。Windmill は既定で引数を flow の schema に照らさず（台帳が `frontier` の要素に足す `lastFinishedAt` は、
+schema に無いまま `plan_level` まで届いてきた）、運ぶ段が無いので、そこでも値は隠れる。
+
+**BrowserHive は WARC の中でもシークレットの値を隠す**（v29.0.0 から）。スクリプトが送った値もサイトが返した値も、
+`secretArchive` に名前の無い物は `***` になる。`crawl_host` が `secretArchive` に残すのは、自分が組んだ `secrets` に在る
+名前だけ —— BrowserHive は `secrets` に無い名前を 400 で断り、それは 1 ページではなくクロールの全部の取り込みに当たる。
+台帳も行に固定した名前だけを送るが、ここでも見直す。BrowserHive は 8 字未満の隠す値と、隠す値を書いた取り込みの URL も
+断るので、そうしたクロールはページごとに BrowserHive の 400 で失敗する（台帳は値を見ないので先に断れない）。
 
 ### シークレットは Windmill の変数
 
@@ -219,8 +229,8 @@ pnpm run windmill:cli variable add '<値>' f/waggle_secrets/<名前> --secret --
   `crawl_host` が解くときに無い（クロールの途中で消された）なら段ごと落ち、`fail_crawl` が締める。
 - 値が通るのは、Windmill の worker から BrowserHive への要求の本文だけ。run の履歴に載る引数は path。
   Windmill の job のログは、secret の値の全体一致を `zzp*****c3b` の形に伏せる（1.806.0 で実測。部分文字列は
-  伏せない）が、`crawl_host` は元から値を log に出さない（出すのは名前だけ）。BrowserHive の側の扱い
-  （記録に残さない・ログで伏せる・頁の JS からは読める）は BrowserHive の docs を見ること。
+  伏せない）が、`crawl_host` は元から値を log に出さない（出すのは名前と、そのうち WARC に残す物だけ）。BrowserHive の
+  側の扱い（残すと言わなければ WARC でも隠す・ログで伏せる・頁の JS からは読める）は BrowserHive の docs を見ること。
 
 予定の `request` は `POST /api/crawls` と同じ形なので、`variables` も書ける。シークレットは書かない —— スクリプトが
 宣言した名前を、台帳が回ごとに Windmill の変数に結ぶので、定期の回でも手で始めたクロールでも同じ値が届く。

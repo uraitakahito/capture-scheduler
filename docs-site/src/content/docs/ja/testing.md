@@ -47,6 +47,11 @@ vitest は必ず「No test files found, exiting with code 1」を先に出し、
 `robots-parser` だけ。だから script はそのまま vitest に読み込める。IO は差し替える:
 `vi.stubGlobal("fetch", …)` と `vi.mock("windmill-client", …)`。
 
+`flow.yaml` そのものを読む単体が 1 本ある（`crawl-level-flow.test.ts`）。`crawl_host` の引数（`.script.yaml` の schema）は
+全部 `input_transforms` が運び、`secret_archive` は flow の入力から来ること。見るのは形だけで、Windmill が値を届けるかは
+いまも e2e の問い。`crawl-host-main.test.ts` は `windmill-client` と `fetch` を差し替えて `crawl_host` の `main` そのものを
+呼び、flow から渡された物（`secret_archive`）が BrowserHive の要求まで届くかを見る。
+
 `captureHost` を `crawl_host.ts` から export してあるのは、間隔のループを偽の client で
 回すため —— `call()` は `client[method](req, cb)` を呼ぶだけなので、偽物はただの
 オブジェクトで足りる。`retry`（全 BrowserHive が busy のときの待ち幅）を引数にして
@@ -58,7 +63,7 @@ vitest は必ず「No test files found, exiting with code 1」を先に出し、
 どの試験も、Windmill の実行の口ではなく **capture-ledger の API** でクロールを始める —— 目的が
 「capture-ledger が実際に送る引数」を運ぶことだから: `crawl_id` / `depth` / `frontier` /
 `per_host_delay_ms` / `host_parallelism` / `capture_formats` / `signing` / `scripts` / `variables` /
-`secrets` / `user_agent` と、受け口を出している配備では `artifact_sink` で、**`respect_robots` は入っていない**。
+`secrets` / `secret_archive` / `user_agent` と、受け口を出している配備では `artifact_sink` で、**`respect_robots` は入っていない**。
 
 最初の試験が見ているのは 5 つ:
 
@@ -112,6 +117,15 @@ e2e のほうは capture-fixtures が禁じられたページを受け取った�
   TS が `__bh.secrets.e2e_probe` の長さだけを `/plain-html?len=<長さ>` で送る。値そのものは WACZ の全 member・
   台帳の答え・Windmill の run の引数のどこにも無く、`settings.secrets` に名前だけ在る。対照は、同じ値を変数で
   渡した取り込み —— そちらでは同じ探し方で WACZ に見つかる。
+- **隠すシークレットは、通信に載せても WACZ に残らない**（BrowserHive v29.0.0）。その場の TS が値を
+  `/echo/text?v=<値>` で送り、capture-fixtures は値を HTML で返す。値は無作為で、`%`・HTML・JSON で綴りが変わる字と、
+  乱数の 12 字（16 進）を持つ。証人は要求ログで、値がサイトに届いたことを乱数の字で確かめる。WACZ の全 member に、値の
+  綴りも乱数の字も無く（16 進の字はどの符号化でも残るので、綴りの一覧が見落とした形も見つかる）、台帳の `archive` は
+  `null`、`settings.secretArchive` は `{}`、WARC には `BrowserHive-Redacted` と `/echo/text?v=***` が在る。
+- **keep と宣言したシークレットは、台帳 → flow → crawl_host → BrowserHive と運ばれ、WARC に値のまま残る**（上の対照）。
+  同じ送り方で、宣言に `archive: "keep"` と書く。台帳の `archive` は `"keep"`、crawl_host の段の run の引数に
+  `secret_archive` が在り、`settings.secretArchive` に名前が在り、乱数の字が WARC に見つかる。flow が `secret_archive` を
+  運び忘れると、この試験だけが赤くなる。
 - **宣言した required のシークレットが Windmill に無ければ、台帳が 400 で名指し、クロールの行は立たない。**
 - **スクリプトの Zod が、厳しい CSP のページで動く**（`zod.e2e.test.ts`）。起点は capture-fixtures の `/csp/strict`
   （`script-src 'self'` で eval を禁じ、違反を `/csp/report` へ報告させる）。その場の TS が `z.object` を同期で定義し、

@@ -152,7 +152,7 @@ runs**, so a webhook run gets nothing — the BrowserHive target arrived
 
 What does arrive as arguments is what capture-ledger decides for that crawl and always
 sends: the URLs, the delay, `capture_formats` / `signing`, **`scripts`** — the
-TypeScript to run inside each page — and **`variables` / `secrets`**, the per-crawl values
+TypeScript to run inside each page — and **`variables` / `secrets` / `secret_archive`**, the per-crawl values
 ([the section below](#per-crawl-values--variables-and-secrets)). The ledger keeps it as written (its `sha256` is over the
 TypeScript bytes); `compile_scripts` turns it into JavaScript and re-hashes it, and BrowserHive
 checks the JavaScript's hash. The two hashes meet at that one step. `report_level` then carries
@@ -219,15 +219,28 @@ object as `__bh.secrets`. Both reach the page through the host object: in the Ja
 becomes `__bh.vars`.
 **The flow carries both and looks at neither.**
 
-| Slot        | What the ledger sends                                                                                                                    | What `crawl_host` does                                                                                                     | What the records keep                                                                             |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `variables` | name → value; what was asked for as `variables` on `POST /api/crawls`, pinned on the crawl                                               | puts them on the BrowserHive request as they are                                                                           | the values (`settings.variables` in the WACZ, the crawl row)                                      |
-| `secrets`   | name → the path of a Windmill variable (`f/waggle_secrets/<name>`); the ledger collects them from the declarations and checks they exist | resolves each with `getVariable` and puts the values on the BrowserHive request **only**; a path outside the folder throws | the names only (`settings.secrets` in the WACZ; the crawl row keeps the path and when it was set) |
+| Slot             | What the ledger sends                                                                                                                    | What `crawl_host` does                                                                                                     | What the records keep                                                                             |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `variables`      | name → value; what was asked for as `variables` on `POST /api/crawls`, pinned on the crawl                                               | puts them on the BrowserHive request as they are                                                                           | the values (`settings.variables` in the WACZ, the crawl row)                                      |
+| `secrets`        | name → the path of a Windmill variable (`f/waggle_secrets/<name>`); the ledger collects them from the declarations and checks they exist | resolves each with `getVariable` and puts the values on the BrowserHive request **only**; a path outside the folder throws | the names only (`settings.secrets` in the WACZ; the crawl row keeps the path and when it was set) |
+| `secret_archive` | name → `"keep"` for each secret whose value stays in the WARC (the declaration's `archive: "keep"`); `{}` when none                      | puts it on the request as `secretArchive`, **keeping only names it resolved in `secrets`**                                 | which secrets stayed (`settings.secretArchive`); every other secret's value is `***` in the WARC  |
 
 An empty slot is not sent at all (BrowserHive up to v21 refuses unknown fields with a 400). An older
-ledger sends neither, so they arrive from the flow as `null`, which `crawl_host` reads as absent —
+ledger sends none of them, so they arrive from the flow as `null`, which `crawl_host` reads as absent —
 `artifact_sink` now gets the same treatment (it used to check `undefined` only and sent `null` when
-the sink was left out).
+the sink was left out). A missing `secret_archive` therefore hides every secret, the safe side. In the
+other direction, an older flow without the `secret_archive` input does not reject the argument: Windmill
+does not check arguments against the flow's schema by default (the ledger's `lastFinishedAt` on each
+`frontier` item has always reached `plan_level` without being in it), and nothing passes it on, so the values
+are hidden there too.
+
+**BrowserHive hides a secret's value in the WARC** (from v29.0.0): what a script sends and what the site
+sends back become `***`, unless `secretArchive` names the secret. `crawl_host` keeps a name in `secretArchive`
+only when it is in the `secrets` it built, because BrowserHive refuses a name that `secrets` lacks with a 400,
+and that would fail every capture of the crawl, not one page. The ledger already sends only the names it
+pinned on the crawl; the check is repeated here. BrowserHive also refuses a hidden value shorter than 8
+characters and a URL to capture that contains one, so such a crawl fails page by page with BrowserHive's
+400 (the ledger cannot see the values).
 
 ### Secrets are Windmill variables
 
@@ -251,8 +264,9 @@ push` deletes remote folders that are absent locally). The variables inside are 
 - The value travels only in the request body from the Windmill worker to BrowserHive. The run history
   shows the path. Windmill masks whole occurrences of a secret's value in job logs as `zzp*****c3b`
   (measured on 1.806.0; substrings are not masked), but `crawl_host` never logs values in the first
-  place (it logs the names). What BrowserHive does on its side — keep it out of the archive, mask it in
-  its logs, and the fact that page JavaScript can read it — is in BrowserHive's docs.
+  place (it logs the names, and which of them stay in the WARC). What BrowserHive does on its side — hide
+  it in the WARC unless kept, mask it in its logs, and the fact that page JavaScript can read it — is in
+  BrowserHive's docs.
 
 A schedule's `request` has the shape of `POST /api/crawls`, so it takes `variables` too. It does not
 take secrets — the ledger binds the names a script declared to the Windmill variables, on every run, so a

@@ -12,7 +12,13 @@ import {
   windmillToken,
   WORKSPACE,
 } from "./helpers/stack.js";
-import { membersContaining, readWacz, settingsOf } from "./helpers/wacz.js";
+import {
+  membersContaining,
+  readWacz,
+  settingsOf,
+  textOf,
+  type WaczMembers,
+} from "./helpers/wacz.js";
 
 /**
  * **クロールごとの値 —— 変数とシークレット —— が、台帳 → flow → crawl_host → BrowserHive → 頁 と運ばれ、
@@ -23,9 +29,15 @@ import { membersContaining, readWacz, settingsOf } from "./helpers/wacz.js";
  * に届くかは、本物を通さないと言えない。判定は 3 か所で採る:
  *
  *   - **頁の中に届いたか** —— その場の TS が印を capture-fixtures に送る。相手のリクエストログで見る
- *   - **台帳の行** —— `GET /api/crawls/:id` の `variables` (値) と `secrets` (名前と path)
+ *   - **台帳の行** —— `GET /api/crawls/:id` の `variables` (値) と `secrets` (名前と path と `archive`)
  *   - **WACZ** —— `datapackage.json` の `settings.variables` (値) と `settings.secrets` (名前だけ)。シークレットの値は
  *     **全 member のどこにも無い**。同じ探し方で、変数として渡した値は見つかる (対照)
+ *
+ * シークレットを通信に載せた場面も見る (BrowserHive v29.0.0 は WARC の中でも値を隠す)。宣言に `archive: "keep"` と
+ * 書いた物だけが、台帳 → flow の `secret_archive` → crawl_host → BrowserHive の `secretArchive` と運ばれて WARC に
+ * 値のまま残る。隠す場面と keep の場面を同じ探し方で並べ、keep が対照になる (探し方が壊れていれば両方が同じ答えになる)。
+ * 探すのは値の綴りだけではない: 値の中に乱数の 12 字 (16 進) を入れ、その字でも探す —— 16 進の字はどの符号化でも
+ * 同じ字のまま残るので、綴りの一覧 (BrowserHive の実装と同じ見方) が見落とした形でも見つかる。
  *
  * シークレットは Windmill の変数 `f/waggle_secrets/<名前>` に試験自身が置く。値は毎回無作為なので、
  * 前の回の WACZ や run の履歴に残っていても、この回の判定には混ざらない。
@@ -35,12 +47,72 @@ import { membersContaining, readWacz, settingsOf } from "./helpers/wacz.js";
 const sendsVariable = (name: string): string =>
   `import { z } from "zod";\n\n(async () => {\n  const { ${name} } = defineParams(z.object({ ${name}: z.string().min(1) }));\n  void fetch("/plain-html?var=" + encodeURIComponent(${name}));\n})();\n`;
 
-/** シークレットは**長さだけ**を送る。値を通信に載せれば WARC に残り、「残らない」の判定が自分で崩れる。 */
+/**
+ * シークレットの**長さだけ**を送る。頁に届いたかだけを見る試験で使う (値そのものを通信に載せる場面は、下の
+ * `sendsSecret` の試験)。
+ */
 const sendsSecretLength = (name: string): string =>
   `(() => {\n  void fetch("/plain-html?len=" + String(globalThis.__bh.secrets.${name} ?? "").length);\n})();\n`;
 
+/**
+ * シークレットの値を**通信に載せる**。capture-fixtures の `/echo/text?v=` は値を HTML で返すので、値は要求の URL と
+ * 応答の本文の両方に載る。応答を読み切るまで待つ (BrowserHive は Promise の終わりを待つ)。
+ */
+const sendsSecret = (name: string): string =>
+  `(async () => {\n  const value = globalThis.__bh.secrets.${name} ?? "";\n  await fetch("/echo/text?v=" + encodeURIComponent(value)).then((response) => response.text());\n})();\n`;
+
+/**
+ * 通信に載せる値。毎回無作為で、乱数の 12 字 (16 進) を持つ。8 字以上 (BrowserHive は 8 字未満の隠す値を断る) で、
+ * `%`・HTML・JSON で綴りが変わる字を持つ。`#` と `'` は入れない (`#` は URL で割れ、`'` は query でブラウザが `%27` に
+ * 直すので、証人の要求ログの綴りが読めなくなる。探す側は乱数の字で足りる)。
+ */
+const valueWithNonce = (): { value: string; nonce: string } => {
+  const nonce = randomBytes(6).toString("hex");
+  return { value: `MARK p@ss+${nonce}&é"<`, nonce };
+};
+
 const SECRET_NAME = "e2e_probe";
 const SECRET_PATH = `f/waggle_secrets/${SECRET_NAME}`;
+const CRAWL_HOST = "f/waggle/crawl_host";
+
+/**
+ * WACZ の中で探す字: 値の綴り 2 つ (UTF-8 のバイト列のまま・`%` の符号化) と、乱数の 12 字。member は latin1 で
+ * 字にする (`textOf`) ので、綴りも UTF-8 のバイト列を latin1 で読んだ字にして渡す。
+ */
+const needlesOf = (value: string, nonce: string): string[] => [
+  Buffer.from(value, "utf-8").toString("latin1"),
+  encodeURIComponent(value),
+  nonce,
+];
+
+/** WACZ の中の WARC (`archive/`) を、全部字にして繋ぐ。 */
+const warcTextOf = (members: WaczMembers): string =>
+  [...members.entries()]
+    .filter(([name]) => name.startsWith("archive/"))
+    .map(([name, bytes]) => textOf(name, bytes))
+    .join("\n");
+
+/**
+ * 値がサイトに届いたか (証人)。要求ログの綴りは `%` の符号化で変わるので、`/echo/text` の要求を乱数の字で探す。
+ */
+const echoedWith = (counts: Record<string, number>, nonce: string): boolean =>
+  Object.entries(counts).some(
+    ([url, count]) => url.startsWith("/echo/text?") && url.includes(nonce) && count > 0,
+  );
+
+/** 値を通信に載せるその場の TS を、シークレットの宣言を添えて 1 本始め、終わりまで待つ。 */
+const startSending = async (params: Record<string, unknown>[]) =>
+  api.finished(
+    await api.start({
+      seeds: [`${FIXTURES}/plain-html`],
+      maxDepth: 0,
+      scripts: [
+        {
+          inline: { name: "probe", phase: "behavior", source: sendsSecret(SECRET_NAME), params },
+        },
+      ],
+    }),
+  );
 
 /** Windmill の変数を置く。在れば値を入れ替える (create → 在れば update)。 */
 const upsertSecret = async (value: string): Promise<void> => {
@@ -195,6 +267,94 @@ describe("クロールごとの値 —— 変数とシークレット", () => {
       jobs.some((job) => JSON.stringify(job.args).includes(SECRET_PATH)),
       "run の引数に path が無い —— 引数を読めていない",
     ).toBe(true);
+  });
+
+  /**
+   * **隠すシークレットを通信に載せる (CAPTURE-166)。** 宣言が `archive` を省けば、台帳は `secret_archive` に名前を
+   * 載せず、BrowserHive は WARC の中でも値を `***` に置き換える。値はサイトには届いている (証人) のに、WACZ のどこにも
+   * 無い。対照は次の keep の試験。
+   */
+  it("隠すシークレットは、通信に載せても WACZ のどこにも値が無く、WARC は *** に置き換えて名乗る。サイトには届いている", async () => {
+    await resetFixtures();
+    const { value, nonce } = valueWithNonce();
+    await upsertSecret(value);
+
+    const got = await startSending([
+      { name: SECRET_NAME, kind: "secret", required: true, summary: "e2e の鍵" },
+    ]);
+    expect(got["state"], String(got["error"])).toBe("succeeded");
+
+    // ① 証人: 値はサイトに届いた。届いていなければ、下の「無い」は何も言っていない
+    expect(
+      echoedWith(await requestCounts(), nonce),
+      "値がサイトに届いていない —— flow の secrets・crawl_host・BrowserHive の受け皿のどれかで切れている",
+    ).toBe(true);
+
+    // ② 台帳の行: 隠す (archive は null)。値は無い
+    expect(got["secrets"]).toMatchObject([{ name: SECRET_NAME, path: SECRET_PATH, archive: null }]);
+    expect(JSON.stringify(got), "台帳の答えにシークレットの値が在る").not.toContain(nonce);
+
+    // ③ WACZ: 残すと言った物は無く、値は綴りでも乱数の字でも、全 member のどこにも無い
+    const archive = await api.archiveOf(`${FIXTURES}/plain-html`, String(got["startedAt"]));
+    const members = await readWacz(await api.signedUrl(archive.id));
+    expect(settingsOf(members)["secretArchive"]).toEqual({});
+    for (const needle of needlesOf(value, nonce)) {
+      expect(
+        membersContaining(members, needle),
+        `${needle === nonce ? "乱数の字" : "値の綴り"}が WACZ に残っている`,
+      ).toEqual([]);
+    }
+    // 置き換えた印。WARC を読めている (探し方が空振りしていない) ことの証でもある
+    const warc = warcTextOf(members);
+    expect(warc).toContain("BrowserHive-Redacted:");
+    expect(warc).toContain("/echo/text?v=***");
+  });
+
+  /**
+   * **対照: keep。** 宣言に `archive: "keep"` と書けば、台帳 → flow の `secret_archive` → crawl_host → BrowserHive の
+   * `secretArchive` と運ばれ、同じ探し方で WARC に値のまま見つかる。flow が `secret_archive` を運び忘れると、ここだけが
+   * 赤くなる (値が隠れる)。
+   */
+  it("対照: keep と宣言したシークレットは、台帳 → flow → crawl_host → BrowserHive と運ばれ、同じ探し方で WARC に値のまま見つかる", async () => {
+    await resetFixtures();
+    const { value, nonce } = valueWithNonce();
+    await upsertSecret(value);
+
+    const got = await startSending([
+      { name: SECRET_NAME, kind: "secret", required: true, summary: "e2e の鍵", archive: "keep" },
+    ]);
+    expect(got["state"], String(got["error"])).toBe("succeeded");
+    expect(echoedWith(await requestCounts(), nonce), "値がサイトに届いていない").toBe(true);
+
+    // ① 台帳の行: keep
+    expect(got["secrets"]).toMatchObject([
+      { name: SECRET_NAME, path: SECRET_PATH, archive: "keep" },
+    ]);
+
+    // ② Windmill の run: crawl_host の段の引数に secret_archive が載っている (flow が運んだ)
+    const lastJob = got["lastJob"] as { id: string } | null;
+    expect(lastJob, "台帳が run の id を持っていない").not.toBeNull();
+    const jobs = await jobArgsTree(String(lastJob?.id), {
+      windmill: WINDMILL,
+      workspace: WORKSPACE,
+      token: windmillToken(),
+    });
+    const crawlHost = jobs.find((job) => job.path === CRAWL_HOST);
+    expect(crawlHost, "crawl_host の段まで辿れていない").toBeDefined();
+    expect(
+      (crawlHost?.args as Record<string, unknown> | undefined)?.["secret_archive"],
+      "flow が secret_archive を crawl_host に運んでいない (flow.yaml の input_transforms)",
+    ).toEqual({ [SECRET_NAME]: "keep" });
+
+    // ③ WACZ: settings に keep が残り、値は通信の記録 (WARC) に値のまま在る。置き換えた印は無い
+    const archive = await api.archiveOf(`${FIXTURES}/plain-html`, String(got["startedAt"]));
+    const members = await readWacz(await api.signedUrl(archive.id));
+    expect(settingsOf(members)["secretArchive"]).toEqual({ [SECRET_NAME]: "keep" });
+    expect(
+      membersContaining(members, nonce).some((name) => name.startsWith("archive/")),
+      "keep の値が WARC に無い —— 台帳の secret_archive・flow・crawl_host のどれかで keep が落ちている",
+    ).toBe(true);
+    expect(warcTextOf(members)).not.toContain("BrowserHive-Redacted:");
   });
 
   /**
