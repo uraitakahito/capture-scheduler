@@ -8,10 +8,10 @@ name: site
 #     publish の step が無いので、fork の PR が配信内容を選ぶことはできない。
 #
 # なぜ site:build ではなく site:check なのか:
-#   `.md` のページでは、`// #region` の抜き出しが失敗しても `astro build` は緑で
-#   終わる (Starlight の docs loader が例外を捕まえるため)。capture-scheduler のページは全部
-#   `.md` なので、**ビルドは守りにならない**。実測でも region を改名したまま
-#   ビルドが通った。非 0 で落ちるのは check-doc-refs.mjs だけ。
+#   `.md` のページで `// #region` の抜き出しが失敗したとき、`astro build` が落ちるかは
+#   Starlight の版次第 (docs loader が例外を捕まえて 0 で終わる版があった。いまの版は 1 で
+#   落ちる)。ビルドの挙動に守りを預けず、`.md` も `.mdx` も読んで非 0 で落ちる
+#   check-doc-refs.ts を通す。訳の欠けなど、ビルドが見ない物もここで見る。
 
 on:
   push:

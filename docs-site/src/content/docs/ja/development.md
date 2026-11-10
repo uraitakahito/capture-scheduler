@@ -20,8 +20,8 @@ pnpm run windmill:push   # git を正として UI に反映する
 `windmill/wmill.yaml` は、この repo に schedule が無くても `includeSchedules: true` のままにしてある。同期から
 外すと、UI で作った schedule や前に push した schedule を `windmill:push` が消さない。古い checkout の
 `windmill:push` が戻すこともあり、戻った schedule は capture-ledger の予定と別にクロールを始めるので、doctor の
-`schedule` が残っていないかを見る。秘密は同期しない
-（`skipSecrets`）。`u/admin/waggle_token` は `scripts/capture-ledger-token.ts` が API 経由で入れる。
+`schedule` が残っていないかを見る。変数は秘密かどうかによらず同期しない
+（`skipVariables: true`。`skipSecrets: true` も書いてある）。`u/admin/waggle_token` は `scripts/capture-ledger-token.ts` が API 経由で入れる。
 
 フォルダは同期する（`skipFolders` は書いておらず、既定で同期）。`windmill/f/<名前>/folder.meta.yaml` が正で、
 **手元に無いフォルダは push が消す** —— API や UI で作ったフォルダは次の push で消える（2026-11-01 に
@@ -37,6 +37,8 @@ script の `main` の引数を変えたら、`.script.yaml`（schema）・`.scri
 yaml の整形まで含むため、format の後は常に stale になる。触っていない script の生成物まで commit に入れなくてよい。
 push は stale を警告するだけで止まらない。`pnpm run windmill:cli <wmill の引数>` で、`.env` の接続先のまま
 他の `wmill` のコマンド（`variable add` など）を打てる。
+
+script や flow を消したら、`wmill-lock.yaml` のその行も手で消す（消す `wmill` の命令は無い）。消し忘れは `test/wmill-lock.test.ts` が鍵の名前を挙げて知らせる。
 
 ## スクリーンショットを撮り直す
 
@@ -74,9 +76,10 @@ pnpm run docs:shots
 
 ### 設定のファイルは 2 枚ある
 
-実行系の script は `.env` と `.env.local` を**この順で** node に渡す
+実行系の script は（`docs:shots` を除いて）`.env` と `.env.local` を**この順で** node に渡す
 （`--env-file-if-exists` を 2 つ）。**後に渡したほうが勝つ**ので、同じ名前が両方に
-在れば `.env.local` の値が効く。
+在れば `.env.local` の値が効く。`docs:shots` はどちらも渡さず、`WINDMILL_URL`・`WINDMILL_EMAIL`・
+`WINDMILL_PASSWORD` を shell の環境から読む（無ければ開発の既定値）。
 
 分けてあるのは持ち主が違うから。`.env` は人が書く値、`.env.local` は
 **走らせてみないと決まらない値**（Windmill の token）。道具が人の書いた行を

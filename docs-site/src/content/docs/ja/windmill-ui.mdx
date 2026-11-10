@@ -179,13 +179,12 @@ windmill-db の volume を消すと、workspace・token・変数が全部消え�
 復旧の順序（2026-09-11 に実測）:
 
 ```sh
-pnpm run windmill:bootstrap            # workspace を作り直し、新しい token を出す
-                                       # → 出た WINDMILL_TOKEN= を .env に貼り直す
-                                       # → 続く 4 行を capture-ledger の .env の末尾に
-                                       #   貼り直して、あちらの API を起こし直す
+pnpm run windmill:bootstrap            # workspace を作り直し、新しい token を .env.local に、
+                                       # capture-ledger に渡す行を .dev/capture-ledger.env に書く
 pnpm run windmill:push                 # script / flow
 pnpm run windmill:capture-ledger-token # 変数 5 つ
 cd ../capture-ledger
+pnpm run connect                       # 渡す行を取りに行く。そのあと API を起こし直す
 pnpm run fga:grant submitter windmill acme  # windmill に acme のクロールを許可する
 ```
 

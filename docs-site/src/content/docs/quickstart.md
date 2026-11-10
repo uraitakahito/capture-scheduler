@@ -30,18 +30,16 @@ are cloned side by side under the same parent directory, and you are at the root
 capture-scheduler command inside capture-ledger and pnpm only says `Missing script`.
 
 :::tip[All of it at once: one command in capture-ledger]
-`pnpm run dev:up` over in capture-ledger runs the bring-up steps in order — **including the ones on this
-page**: it brings Windmill up, bootstraps it, loads the flow, hands over the keys,
-and finishes with `doctor`. What it runs there are **this repo's own commands**, and **no file
-of this repo's is written from over there** (the lines for capture-ledger are fetched by
-its own `pnpm run connect`).
+`pnpm run dev:up` over in capture-ledger runs the bring-up steps in order, **including the ones on this
+page** (`pnpm run dev:up --dry-run` there prints the list). What it runs there are **this repo's own
+commands**, and **no file of this repo's is written from over there** (the lines for capture-ledger are
+fetched by its own `pnpm run connect`).
 
 ```sh
 cd ../capture-ledger && pnpm run dev:up
 ```
 
-This page is the capture-scheduler half of those steps, done one at a time. Both roads end
-in the same place.
+This page is the capture-scheduler half of those steps, done one at a time.
 :::
 
 ## Bring it up

@@ -77,7 +77,8 @@ export interface Deployed {
 
 /**
  * push が済んでいるか。script は中身まで比べ、flow は在るかだけを見る ——
- * flow.yaml は script を `!inline` で抱えるので、比べるなら wmill の解決をなぞることになる。
+ * flow.yaml は script を `path` で呼ぶだけで (`!inline` は `.script.yaml` が lock を指す所に在る)、
+ * Windmill が返す flow の形と repo の yaml を突き合わせる道具はここに無い。
  * flow の差は `windmill:diff` に任せる。
  */
 export const readPush = (items: readonly Deployed[]): Verdict => {

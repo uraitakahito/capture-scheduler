@@ -6,7 +6,7 @@ description: 何も要らない単体と、スタック一式が要る e2e。な
 ```sh
 pnpm run test        # 単体。スタック不要、数秒
 pnpm run test:e2e    # e2e。スタックが要る
-pnpm run check       # audit / format / env / typecheck / 単体 / CI との一致 / docs サイト
+pnpm run check       # push の前に走らせる検査の全部（中身は package.json の check）
 ```
 
 `pretest:e2e` が先に doctor を `--e2e` 付きで走らせ、足りないものを名指しする ——
