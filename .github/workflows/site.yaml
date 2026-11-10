@@ -9,8 +9,8 @@ name: site
 #
 # なぜ site:build ではなく site:check なのか:
 #   `.md` のページで `// #region` の抜き出しが失敗したとき、`astro build` が落ちるかは
-#   Starlight の版次第 (docs loader が例外を捕まえて 0 で終わる版があった。いまの版は 1 で
-#   落ちる)。ビルドの挙動に守りを預けず、`.md` も `.mdx` も読んで非 0 で落ちる
+#   Starlight の版と content cache 次第 (docs loader が例外を捕まえて 0 で終わる版や、cache が
+#   温かいときがあった。cold なら 1 で落ちる)。ビルドの挙動に守りを預けず、`.md` も `.mdx` も読んで非 0 で落ちる
 #   check-doc-refs.ts を通す。訳の欠けなど、ビルドが見ない物もここで見る。
 
 on:

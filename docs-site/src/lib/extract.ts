@@ -20,18 +20,18 @@ const ROOT = resolve(process.cwd(), "..");
  * The current text between `// #region <name>` and `// #endregion`.
  *
  * Throws when the region is gone. Whether that stops the build depends on the
- * page's extension and the installed Starlight/Astro, so it was measured
- * rather than assumed:
+ * page's extension, the Starlight/Astro version and the content cache, so it
+ * was measured rather than assumed:
  *
  *   .mdx — the throw surfaces through @astrojs/mdx's vite plugin and the
  *          build fails, exit 1.
  *   .md  — Starlight's docs loader catches it and logs
- *          `[ERROR] [starlight-docs-loader] Error rendering …`. An older
- *          Starlight then finished with exit 0 and "Complete!"; the installed
- *          one exits 1, same as .mdx.
+ *          `[ERROR] [starlight-docs-loader] Error rendering …`. With a cold
+ *          cache (as in CI) the build exits 1 here; an older Starlight, and a
+ *          warm cache, finished with exit 0 and "Complete!".
  *
- * The .md behaviour belongs to Starlight, not to this repo, and has already
- * changed once. So do not rely on `site:build` for it:
+ * The .md behaviour belongs to Starlight and the cache, not to this repo, and
+ * has varied. So do not rely on `site:build` for it:
  * scripts/check-doc-refs.ts reads .md and .mdx alike and exits non-zero on a
  * missing region. `pnpm run site:check` runs both, and the workflows run it,
  * never `site:build` alone.
