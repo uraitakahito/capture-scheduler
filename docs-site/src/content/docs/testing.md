@@ -6,7 +6,7 @@ description: Unit tests that need nothing, end-to-end tests that need the whole 
 ```sh
 pnpm run test        # unit tests, no stack, a few seconds
 pnpm run test:e2e    # end-to-end tests, need the stack
-pnpm run check       # audit, format, env, typecheck, unit tests, CI parity, docs site
+pnpm run check       # every check to run before pushing (the list is package.json's check)
 ```
 
 `pretest:e2e` runs doctor with `--e2e` first and names what is missing — the checks of

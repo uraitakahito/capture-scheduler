@@ -20,8 +20,8 @@ push before pulling — see [Windmill CE](/windmill-ce/).
 `windmill/wmill.yaml` keeps `includeSchedules: true` although this repository holds no schedule: with
 schedules out of the sync, `windmill:push` would not remove one made in the UI or pushed earlier. An old
 checkout's `windmill:push` can bring one back, and it would start crawls apart from capture-ledger's
-schedules, so doctor's `schedule` line checks that none is left. Secrets are not synced
-(`skipSecrets`); `u/admin/waggle_token` is injected through the API by
+schedules, so doctor's `schedule` line checks that none is left. Variables are not synced, secret or not
+(`skipVariables: true`; `skipSecrets: true` is set too); `u/admin/waggle_token` is injected through the API by
 `scripts/capture-ledger-token.ts`.
 
 Folders are synced (`skipFolders` is not set, so the default applies). `windmill/f/<name>/folder.meta.yaml`
@@ -41,6 +41,8 @@ you did not touch as "stale" and rewrite them too — its staleness hash covers 
 after `format` everything is stale. You need not commit the regenerated files of scripts you did not
 touch; push only warns about stale metadata, it does not stop. `pnpm run windmill:cli <wmill arguments>`
 runs any other `wmill` command (`variable add`, for one) against the connection in `.env`.
+
+When you delete a script or flow, delete its lines in `wmill-lock.yaml` by hand — no `wmill` command removes them. If you forget, `test/wmill-lock.test.ts` names the key.
 
 ## Re-taking the screenshots
 
@@ -80,9 +82,10 @@ directions by `scripts/check-env.ts`: `.env.example`, the name lists in
 
 ### There are two settings files
 
-Every runnable script hands node `.env` and then `.env.local` (two
+Every runnable script except `docs:shots` hands node `.env` and then `.env.local` (two
 `--env-file-if-exists` flags). **The later one wins**, so a name present in both
-takes its value from `.env.local`.
+takes its value from `.env.local`. `docs:shots` passes neither: it reads `WINDMILL_URL`,
+`WINDMILL_EMAIL` and `WINDMILL_PASSWORD` from the shell, with the development defaults.
 
 They are split because they have different owners. `.env` holds what a person
 decided; `.env.local` holds **what only running things can decide** (the Windmill

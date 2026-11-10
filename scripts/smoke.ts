@@ -178,8 +178,9 @@ const ledger = async (
 
 /**
  * Windmill の run を取り消す。**締める前に。** 走っている flow を残して台帳だけ締めると、後から
- * 届いた段の報告が、締めたクロールを succeeded に書き戻した (2026-09-19 に実測。capture-ledger は
- * 締めた後の報告を断らない)。取り消した run では締める段が走らないので、締めるのはこちら。
+ * 届いた段の報告が、締めたクロールを succeeded に書き戻していた (2026-09-19 に実測)。いまの
+ * capture-ledger は、締めるのを走行中の行だけにして書き戻さない (CAPTURE-61)。それでも、残した run は
+ * 台帳に報告を足し続けるので、先に取り消す。取り消した run では締める段が走らないので、締めるのはこちら。
  * 終わった run の取り消しは、何もせずに 200 を返す。
  */
 const cancelRun = async (jobId: string, reason: string): Promise<void> => {

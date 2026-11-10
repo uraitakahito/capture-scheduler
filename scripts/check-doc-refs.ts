@@ -1,10 +1,9 @@
 /**
  * docs-site/ の Starlight のドキュメントが嘘をつかないことを確かめる。
  *
- * **`astro build` はこれを守らない。** region が欠けていると
- * "Failed to parse Markdown file" と log には出るのに、Starlight の docs loader が
- * 例外を捕まえるので、全ページをビルドしたと報告して 0 で終わる (capture-ledger と capture-fixtures が
- * 実測して docstring に残している)。ビルドに任せると、ドキュメントは空のコード
+ * **`astro build` に守りを預けない。** `.md` で region が欠けたとき、Starlight の docs loader は
+ * 例外を捕まえて log に残すだけにする。build が 0 で終わる版があった (いまの版は 1 で落ちる —— 版で
+ * 変わった)。0 で終わると、ドキュメントは空のコード
  * フェンスのまま出てしまう。
  *
  * 見るのは 7 つ:

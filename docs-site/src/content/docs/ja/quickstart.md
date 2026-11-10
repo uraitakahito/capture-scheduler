@@ -32,17 +32,15 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'authorization: Bearer dev-key' http
 
 :::tip[まとめてなら、capture-ledger の 1 本で済みます]
 capture-ledger で `pnpm run dev:up` を打つと、**このページの手順も含めて** 立ち上げの段を順に
-起こします —— Windmill を立て、bootstrap し、flow を入れ、鍵を渡し、最後に
-`doctor` まで。向こうが打つのは**この repo のコマンド**で、**ファイルはこの repo の中に
-しか書かれません**（capture-ledger に渡す行は、向こうの `pnpm run connect` が
-取りに来ます）。
+起こします（向こうの `pnpm run dev:up --dry-run` が段の一覧を出します）。向こうが打つのは
+**この repo のコマンド**で、**ファイルはこの repo の中にしか書かれません**（capture-ledger に渡す行は、
+向こうの `pnpm run connect` が取りに来ます）。
 
 ```sh
 cd ../capture-ledger && pnpm run dev:up
 ```
 
 このページは、そのうち capture-scheduler 側を 1 つずつ手でやる道です。
-どちらでも同じところに着きます。
 :::
 
 ## 立ち上げる

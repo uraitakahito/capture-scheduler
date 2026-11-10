@@ -37,7 +37,7 @@ const token = required(
 
 const args = process.argv.slice(2);
 if (args.length === 0) {
-  process.stderr.write("usage: wmill.mjs <wmill の引数...>\n");
+  process.stderr.write("usage: pnpm run windmill:cli <wmill の引数...>\n");
   process.exit(1);
 }
 
