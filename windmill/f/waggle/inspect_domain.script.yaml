@@ -1,6 +1,6 @@
 summary: あるドメインを落としたクロールを引く
 description: |
-  台帳 (capture-ledger) の GET /api/decisions を引き、そのドメインとその下を
+  capture-ledger の GET /api/decisions を引き、そのドメインとその下を
   どのクロールのどの規則が落としたか (撮るだけにしたか・辿ったか) を表に描く。
 
   クロールの通り道には居ない。走らせても何も変わらない。

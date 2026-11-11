@@ -79,11 +79,11 @@ CAPTURE_LEDGER_API_HOST=0.0.0.0
 CAPTURE_LEDGER_TS_COMPILE_URL=http://127.0.0.1:28080
 ```
 
-| 行                                             | なぜ要るか                                                                                                                                                                                         |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `…_CRAWL_WEBHOOK_URL`・`…_CRAWL_WEBHOOK_TOKEN` | クロールを Windmill に投げる先。無いと `/api/crawls` そのものが無い（`404`）                                                                                                                       |
-| `CAPTURE_LEDGER_API_HOST=0.0.0.0`              | 段の報告はコンテナから来る。`127.0.0.1` で待つ API には届かない                                                                                                                                    |
-| `CAPTURE_LEDGER_TS_COMPILE_URL`                | host で動く台帳が、落ちたクロールの型の誤りを取り直し、直し方を検査するときに呼ぶ ts-compile-service の宛先（host の `127.0.0.1:28080`）。Claude の鍵があってこれが無いと、台帳の API は起動しない |
+| 行                                             | なぜ要るか                                                                                                                                                                                                                |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `…_CRAWL_WEBHOOK_URL`・`…_CRAWL_WEBHOOK_TOKEN` | クロールを Windmill に投げる先。無いと `/api/crawls` そのものが無い（`404`）                                                                                                                                              |
+| `CAPTURE_LEDGER_API_HOST=0.0.0.0`              | 段の報告はコンテナから来る。`127.0.0.1` で待つ API には届かない                                                                                                                                                           |
+| `CAPTURE_LEDGER_TS_COMPILE_URL`                | host で動く capture-ledger が、落ちたクロールの型の誤りを取り直し、直し方を検査するときに呼ぶ ts-compile-service の宛先（host の `127.0.0.1:28080`）。Claude の鍵があってこれが無いと、capture-ledger の API は起動しない |
 
 bootstrap は打つたびに新しい token を作ります（前に作ったものも、使えるまま残ります）。
 **打ち直したら `connect` も打ち直すこと** —— 引き渡しファイルは新しい token で書き換わるので、
@@ -155,7 +155,7 @@ API の宛先（`u/admin/waggle_api_url`）は、`CAPTURE_LEDGER_API_URL` を書
 スクリプトが `catalog.json` の `params` で `kind: secret` と宣言した名前は、人が Windmill の変数
 `f/waggle_secrets/<名前>` に置く（置き方は[リンクを辿る](/crawl/)の「シークレットは Windmill の変数」）。
 フォルダ `f/waggle_secrets` は `windmill:push` が作る。宣言したスクリプトを使うクロールは、変数が無ければ
-台帳が 400 で名指して始めない。
+capture-ledger が 400 で名指して始めない。
 
 ### windmill にクロールを許可する
 
@@ -203,7 +203,7 @@ pnpm run smoke    # capture-fixtures の頁を 1 本撮り、WACZ を取り出�
 smoke が既定で撮るのは、capture-ledger のスタックにいる
 [capture-fixtures](https://github.com/uraitakahito/capture-fixtures) の印付きの頁
 （`http://capture-fixtures.capture-ledger:8080/marked/page/smoke?tag=<印>`）。印は撮るたびに変わり、頁は
-それを題と本文に書くので、台帳の検索をその印で引けば、この回の archive にだけ当たる（前の回の取り込みは
+それを題と本文に書くので、capture-ledger の検索をその印で引けば、この回の archive にだけ当たる（前の回の取り込みは
 混ざらない）。`example.com` のような例示の名前は、
 ネットワークによって答えが変わる（ルータが `127.0.0.1` を返すことがある）ので使わない。capture-fixtures は
 `dev:up` では立ち上がらないので、smoke の前に立ち上げておく:
@@ -242,13 +242,13 @@ capture-ledger の中に在り、古い checkout の `windmill:push` が戻す�
 
 **smoke** は、doctor が全部 ✓ のときだけ 1 本撮る。本番と同じ道 —— capture-ledger の
 `POST /api/crawls` に flow と同じ app client で取ったトークンで頼み、Windmill の flow に撮らせ、段の報告を待つ ——
-を通し、台帳に載った archive を署名付き URL で取り出して、先頭が `PK`（WACZ は zip）であることまで
-見る。台帳は段の報告の時点でクロールを succeeded にし、flow の合本の段と索引の段はその後に
+を通し、capture-ledger に載った archive を署名付き URL で取り出して、先頭が `PK`（WACZ は zip）であることまで
+見る。capture-ledger は段の報告の時点でクロールを succeeded にし、flow の合本の段と索引の段はその後に
 走るので、smoke は段の run の終わりを待つ。合本の段の答え（書けた・検められなかった WACZ が 0 本）を
-照らし —— 合本の段はそれらの失敗では投げないので、run が緑でも書けたとは限らない —— 台帳が指す
+照らし —— 合本の段はそれらの失敗では投げないので、run が緑でも書けたとは限らない —— capture-ledger が指す
 合本の `replay.json` を replayweb-server の `/wacz/`（`127.0.0.1:8899`。capture-ledger のスタックの replayweb-server）から
 読んで、この回の archive が `resources` に在るかを見る。続けて索引の段の答え（載らなかった 0 本・
-載せた 1 本以上）を照らす。最後に、印で台帳の検索を引き、この回の archive の当たりの時点が、
+載せた 1 本以上）を照らす。最後に、印で capture-ledger の検索を引き、この回の archive の当たりの時点が、
 WACZ のページ一覧から予想した時点（写しの行があれば写しの時点、無ければ文書の行の 1 件 `page`）と
 同じかを照らす:
 
@@ -279,7 +279,7 @@ pnpm run smoke --close-running        # 409 のとき、走っている 1 本を
 ```
 
 smoke は capture-ledger v0.43.0 以上を前提にする（最後の段の run と、取れなかったページの理由を
-台帳が返すのは、その版から）。
+capture-ledger が返すのは、その版から）。
 
 ### 症状から引く
 
@@ -287,7 +287,7 @@ smoke は capture-ledger v0.43.0 以上を前提にする（最後の段の run 
 
 | 見えたもの                                                                                                                                      | 意味                                                                                                     | 直す                                                                                                                 |
 | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| doctor のスクリプトが ✗ ／ smoke が 400 `no scripts are registered`                                                                             | 台帳にスクリプトが無いか、全部が既定に入らない（無効）。何も名指さないクロールは断られる                 | capture-ledger で `pnpm run scripts import .upstream/capture-scripts`。全部が無効なら `pnpm run scripts enable <id>` |
+| doctor のスクリプトが ✗ ／ smoke が 400 `no scripts are registered`                                                                             | 登録済みのスクリプトが無いか、全部が既定に入らない（無効）。何も名指さないクロールは断られる             | capture-ledger で `pnpm run scripts import .upstream/capture-scripts`。全部が無効なら `pnpm run scripts enable <id>` |
 | doctor の windmill が ✗ で、下の点検が「先に windmill を」                                                                                      | Windmill が落ちている                                                                                    | `container-compose up -d`（この repo で）                                                                            |
 | doctor の push が ✗「repo と中身が違う」                                                                                                        | script を直したが push していない（または Windmill の UI で直した）                                      | `pnpm run windmill:push`（違いを見るだけなら `windmill:diff`）                                                       |
 | doctor の worker→browserhive が ✗「名前が引けない」（止めた直後の数秒は「3 秒で答えない」）／smoke の原因が `[cap] BrowserHive に届きません: …` | BrowserHive のコンテナが止まっている（止めたコンテナは名前ごと消える）                                   | capture-ledger で `pnpm run stack:up`                                                                                |

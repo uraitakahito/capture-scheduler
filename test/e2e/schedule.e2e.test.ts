@@ -6,8 +6,8 @@ import { FIXTURES, json, ledger, mintToken, WAGGLE } from "./helpers/stack.js";
 /**
  * **定期実行の予定から、本物の flow を通して 1 本撮る。**
  *
- * 時計は capture-ledger の中に在る。この repo に schedule は無く、flow は台帳が webhook で投げた段を撮るだけ。周回の判定は
- * 台帳の単体と `schedules-smoke` が見るので、ここで見るのは端から端 —— 周回が始めた回が flow まで届き、撮れて、回の行に
+ * 時計は capture-ledger の中に在る。この repo に schedule は無く、flow は capture-ledger が webhook で投げた段を撮るだけ。周回の判定は
+ * capture-ledger の単体と `schedules-smoke` が見るので、ここで見るのは端から端 —— 周回が始めた回が flow まで届き、撮れて、回の行に
  * 予定の名前が残ること。
  *
  * 期限の回は静かな時間を待つので試験にならない。「いま撮る」は静けさを見ない。

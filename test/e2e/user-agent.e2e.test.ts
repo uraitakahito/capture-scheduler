@@ -15,13 +15,13 @@ import {
 import { readWacz, settingsOf } from "./helpers/wacz.js";
 
 /**
- * **クロールごとの User-Agent が、台帳 → flow → crawl_host → BrowserHive → 相手 と運ばれる。**
+ * **クロールごとの User-Agent が、capture-ledger → flow → crawl_host → BrowserHive → 相手 と運ばれる。**
  *
  * 単体で見えるのは「crawl_host が要求に載せる形」までで、flow が `user_agent` を運ぶか (`flow.yaml` の input_transforms)、
  * 次の段にも配られるか、BrowserHive が `{chrome}` を解くかは、本物を通さないと言えない。判定は 3 か所で採る:
  *
  *   - **相手が見た字** —— capture-fixtures のリクエストログ (`/__requests`)。robots.txt は別の道具が取るので除く
- *   - **台帳の行** —— `GET /api/crawls/:id` の `userAgent` (打った字)
+ *   - **capture-ledger の行** —— `GET /api/crawls/:id` の `userAgent` (打った字)
  *   - **WACZ** —— `datapackage.json` の `settings.userAgent` (解いた字)
  *
  * `sec-ch-ua` はここでは見られない。capture-fixtures は http で、Chromium は secure context にしか送らない。
@@ -46,7 +46,7 @@ const jobsOf = async (
   got: Record<string, unknown>,
 ): Promise<{ path: string | null; args: unknown }[]> => {
   const lastJob = got["lastJob"] as { id: string } | null;
-  expect(lastJob, "台帳が run の id を持っていない").not.toBeNull();
+  expect(lastJob, "capture-ledger が run の id を持っていない").not.toBeNull();
   return jobArgsTree(String(lastJob?.id), {
     windmill: WINDMILL,
     workspace: WORKSPACE,
@@ -73,7 +73,7 @@ afterAll(async () => {
 });
 
 describe("クロールごとの User-Agent", () => {
-  it("頼んだ字が 2 段とも相手に届き、台帳は打った字を、WACZ は解いた字を持つ", async () => {
+  it("頼んだ字が 2 段とも相手に届き、capture-ledger は打った字を、WACZ は解いた字を持つ", async () => {
     await resetFixtures();
     const seed = `${FIXTURES}/links/hub`;
     const asked = "{chrome} BrowserHive";
@@ -111,7 +111,7 @@ describe("クロールごとの User-Agent", () => {
     );
   });
 
-  it("頼まなければ browser の字のまま撮り、台帳は null を、flow は空の字を持つ", async () => {
+  it("頼まなければ browser の字のまま撮り、capture-ledger は null を、flow は空の字を持つ", async () => {
     await resetFixtures();
     const seed = `${FIXTURES}/plain-html`;
 

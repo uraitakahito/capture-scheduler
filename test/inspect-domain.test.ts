@@ -5,8 +5,8 @@ import { main, renderDomain, type DomainAnswer } from "../windmill/f/waggle/insp
 /**
  * あるドメインを落としたクロールを引く調べ物の script。
  *
- * 照らし方 (ラベルの境目・日数・動き) は台帳の物で、ここは引いて描くだけ。押さえるのは、頼みが
- * 崩れずに台帳へ届くことと、読み違えない描き方 (クロールの数え方・どれにも当たらない物・切った印)。
+ * 照らし方 (ラベルの境目・日数・動き) は capture-ledger の物で、ここは引いて描くだけ。押さえるのは、頼みが
+ * 崩れずに capture-ledger へ届くことと、読み違えない描き方 (クロールの数え方・どれにも当たらない物・切った印)。
  */
 
 const VARS: Record<string, string> = {
@@ -81,13 +81,13 @@ describe("ドメインの判断を描く", () => {
     });
   });
 
-  it("動きで見出しの言い方を変え、台帳が切ったら見出しでそう言う", () => {
+  it("動きで見出しの言い方を変え、capture-ledger が切ったら見出しでそう言う", () => {
     const rendered = renderDomain("outside.invalid", 90, "capture", {
       decisions: [row(A, 4, "outside.invalid", "any")],
       truncated: true,
     });
     expect(rendered.render_all[0]?.["markdown"]).toBe(
-      "**outside.invalid** とその下を撮るだけにしたクロール: 1 本（90 日のうち） —— 台帳が行の上限で切りました。days を短くして走らせ直してください",
+      "**outside.invalid** とその下を撮るだけにしたクロール: 1 本（90 日のうち） —— capture-ledger が行の上限で切りました。days を短くして走らせ直してください",
     );
   });
 
@@ -100,7 +100,7 @@ describe("ドメインの判断を描く", () => {
   });
 });
 
-describe("台帳を引く", () => {
+describe("capture-ledger を引く", () => {
   it("ドメイン・日数・動きを崩さずに、変数の宛先とトークンで引く", async () => {
     const seen: { url: string; auth: string | null }[] = [];
     vi.stubGlobal(
@@ -123,7 +123,7 @@ describe("台帳を引く", () => {
     ]);
   });
 
-  it("台帳が断れば（読めないドメイン）、状態と本文を言って落ちる", async () => {
+  it("capture-ledger が断れば（読めないドメイン）、状態と本文を言って落ちる", async () => {
     vi.stubGlobal(
       "fetch",
       answeringToken(() =>

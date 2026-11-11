@@ -105,7 +105,7 @@ export interface CaptureSettings {
    */
   userAgent?: string;
   /**
-   * クロールごとのシークレット (名前 → **解いた後の値**)。解くのは `main` —— 台帳が渡すのは
+   * クロールごとのシークレット (名前 → **解いた後の値**)。解くのは `main` —— capture-ledger が渡すのは
    * Windmill の変数の path で、`resolveSecrets` が `f/waggle_secrets/` の下だけを `getVariable` で読む。
    * BrowserHive は `settings.secrets` に名前だけを残し、v29.0.0 からは、スクリプトが通信に載せた値もサイトが返した値も
    * WARC の中で `***` に置き換える (`secretArchive` に名前の在る物だけ、通信の記録に値のまま残す)。
@@ -121,7 +121,7 @@ export interface CaptureSettings {
 }
 
 /**
- * 走らせるもの 1 本。台帳が解決済みで、ここを素通りして BrowserHive へ行く。
+ * 走らせるもの 1 本。capture-ledger が解決済みで、ここを素通りして BrowserHive へ行く。
  *
  * `phase` が差し込む時を決める。`behavior` は読み込みの後・主フレーム・1 回、
  * `preload` は遷移の**前**・iframe を含む全フレーム・遷移のたび。BrowserHive では
@@ -162,7 +162,7 @@ export interface PageResult {
   /**
    * `.result.json` を書けた場所 (`s3://…`)。**綴りはこちらで組まない** —— BrowserHive
    * (または受け取り先) が応答で答えた場所をそのまま運ぶ。capture-ledger はこれを鍵にして
-   * manifest を読み、台帳に書き留める。
+   * manifest を読み、自分の DB に書き留める。
    */
   manifestLocation?: string;
   /**
@@ -215,7 +215,7 @@ const RETRYABLE: ReadonlySet<string> = new Set<ErrorType>(["connection", "timeou
  * BrowserHive に届かない。**1 ページの失敗として扱ってはいけない。**
  *
  * 潰すと、server が落ちているクロールが「全ページ失敗のクロール」として
- * **成功で完了する**。取れなかったのはページのせいではないのに、台帳には
+ * **成功で完了する**。取れなかったのはページのせいではないのに、capture-ledger には
  * 「このページは取れない」と残り、しかもリンクが辿れないので木がそこで切れる。
  *
  * flow は `skip_failures: false` なので、ここで throw すれば段ごと失敗し、
@@ -429,7 +429,7 @@ const captureOnAny = async (
  * スクリプト 1 本を、BrowserHive の `Script` の形にする。
  *
  * **`version` は送らない。** あちらは `id` / `source` / `sha256` / `options` しか
- * 持たない —— 版は台帳の言葉で、走る側には関係が無い。どの版が走ったかは
+ * 持たない —— 版は capture-ledger の言葉で、走る側には関係が無い。どの版が走ったかは
  * `crawls.scripts` とサーバのログが答える。
  *
  * `options` は空のときに送らない。model では任意の document で、`{}` を送ることと省くことは、
@@ -463,7 +463,7 @@ const bagOf = (key: string, bag: Record<string, string> | undefined): Record<str
 
 /**
  * 値を WARC に残すシークレットのうち、**実際に送る `secrets` に在る名前だけ**。BrowserHive は `secrets` に無い名前の
- * `secretArchive` を 400 で断る —— 台帳は行に在る名前だけを送るが (任意で Windmill に無いシークレットは行に無い)、
+ * `secretArchive` を 400 で断る —— capture-ledger は行に在る名前だけを送るが (任意で Windmill に無いシークレットは行に無い)、
  * ここでも突き合わせる。空なら鍵ごと送らない (`bagOf`)。**export は試験のため。**
  */
 export const keptSecrets = (
@@ -485,7 +485,7 @@ export const given = <T>(value: T | null | undefined): T | undefined =>
   value === null ? undefined : value;
 
 /**
- * 頼まれた User-Agent を読む。台帳は**必ず文字列を送る** (指定なしは `""`)。`null` は flow か台帳の取り違えで、
+ * 頼まれた User-Agent を読む。capture-ledger は**必ず文字列を送る** (指定なしは `""`)。`null` は flow か capture-ledger の取り違えで、
  * 黙って撮らせると、指定した字が届かなくても `HeadlessChrome` のまま成功する。**export は試験のため。**
  */
 export const askedUserAgent = (value: string | null | undefined): string => {
@@ -498,9 +498,9 @@ export const askedUserAgent = (value: string | null | undefined): string => {
 };
 
 /**
- * スクリプトのシークレットを置くフォルダ。**この外の path は解かない。** path を組むのは台帳で、
- * 台帳も同じ線で断る (二重の検査) —— ここまで外の path が届いたなら、運ぶ途中で入れ替わったか
- * 台帳が壊れたかのどちらかで、黙って読んでよい物ではない。doctor の `SECRETS_FOLDER_NAME`
+ * スクリプトのシークレットを置くフォルダ。**この外の path は解かない。** path を組むのは capture-ledger で、
+ * capture-ledger も同じ線で断る (二重の検査) —— ここまで外の path が届いたなら、運ぶ途中で入れ替わったか
+ * capture-ledger が壊れたかのどちらかで、黙って読んでよい物ではない。doctor の `SECRETS_FOLDER_NAME`
  * (`scripts/doctor/windmill-contents.ts`) と同じ名前。食い違いは試験が止める。
  */
 export const SECRETS_FOLDER = "f/waggle_secrets/";
@@ -509,7 +509,7 @@ export const SECRETS_FOLDER = "f/waggle_secrets/";
  * 名前 → Windmill の変数の path を、名前 → 値に解く。**値はここで初めて現れ、BrowserHive への
  * 要求の本文にだけ載る** —— log にも `PageResult` にも出さない。
  *
- * 無い変数は `getVariable` が投げる (段ごと落ち、`fail_crawl` が締める)。台帳は始める前に在るかを
+ * 無い変数は `getVariable` が投げる (段ごと落ち、`fail_crawl` が締める)。capture-ledger は始める前に在るかを
  * 訊いているので、ここで落ちるのは「クロールの途中で消された」とき。`read` は試験のため。
  */
 export const resolveSecrets = async (
@@ -533,7 +533,7 @@ export const resolveSecrets = async (
  * **report が `success` でなければ失敗**。一過性の型 (`RETRYABLE`) なら間隔を空けて
  * もう一度だけ試し、それでも駄目ならそのまま返す。`taskId` は必ず載せる ——
  * capture-ledger はこれを鍵に `.result.json` を引き直すので、落とすと成果物が S3 に
- * 在っても台帳へ入らない。
+ * 在っても capture-ledger へ入らない。
  */
 const captureOne = async (
   endpoints: Endpoint[],
@@ -619,7 +619,7 @@ const captureOne = async (
     }
 
     const message = report?.errorDetails?.message;
-    // 理由の頭は BrowserHive の status。ただし failed は台帳の行の状態と同じ字で何も足さないので
+    // 理由の頭は BrowserHive の status。ただし failed は capture-ledger の行の状態と同じ字で何も足さないので
     // (capture-workbench は「行の状態: 理由」と出す)、型のほうを書く。timeout と http_error は status のまま。
     const kind =
       report?.status === "failed" ? (errorType ?? "failed") : (report?.status ?? "no report");
@@ -722,7 +722,7 @@ export async function main(
   artifact_sink?: { url: string; token: string },
   /**
    * クロールごとの変数 (名前 → 値)。capture-ledger がクロールの頼みから固定し、**必ず送る**
-   * (無ければ `{}`)。値は BrowserHive が記録に残す。古い台帳からは届かず `null` になるので、
+   * (無ければ `{}`)。値は BrowserHive が記録に残す。古い capture-ledger からは届かず `null` になるので、
    * それも「無い」と読む (`given`)。
    */
   variables?: Record<string, string>,
@@ -740,7 +740,7 @@ export async function main(
   user_agent?: string | null,
   /**
    * 値を WARC に残すシークレット (名前 → `"keep"`)。capture-ledger が宣言の `archive` から組み、**必ず送る**
-   * (無ければ `{}`)。古い台帳からは届かず `null` になるので、それも「無い」と読む (`given`) —— 全部を隠す側に倒れる。
+   * (無ければ `{}`)。古い capture-ledger からは届かず `null` になるので、それも「無い」と読む (`given`) —— 全部を隠す側に倒れる。
    * 要求には、解いたシークレットに在る名前だけを載せる (`keptSecrets`)。
    */
   secret_archive?: Record<string, "keep"> | null,

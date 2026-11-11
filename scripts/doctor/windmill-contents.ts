@@ -102,7 +102,7 @@ export const readPush = (items: readonly Deployed[]): Verdict => {
  * Windmill に残っている schedule。**時計は capture-ledger の中に在るので、1 本も無いのが正しい。**
  *
  * `push` の点検は repo に在る物しか見ないので、消した物が Windmill に残っていても ✓ のままになる。`daily` を消した後に
- * 古い checkout から `windmill:push` を打つと、消した schedule が戻る —— 戻ると、台帳の予定と別に毎朝クロールを始める。
+ * 古い checkout から `windmill:push` を打つと、消した schedule が戻る —— 戻ると、capture-ledger の予定と別に毎朝クロールを始める。
  */
 export const readSchedules = (paths: readonly string[]): Verdict =>
   paths.length === 0
@@ -153,18 +153,18 @@ export const VARIABLES = [
 ] as const;
 
 /**
- * `GET /api/scripts` の答え。**既定で走るスクリプトが台帳に無ければ ✗。**
+ * `GET /api/scripts` の答え。**既定で走るスクリプトが登録されていなければ ✗。**
  *
  * 空でもクロールは始められてしまう時期が在った —— ページの中で何も走らず、スクロールも
  * 遅延読み込みも起きないまま `complete: true` のアーカイブが出る。capture-ledger は
  * いまそれを 400 で止めるが、**止まるのは頼んだ後**。doctor は「全部 ✓ なら、クロールを
  * 始めれば最後まで走る」と名乗っているので、頼む前にここで言う。
  *
- * 台帳 v0.64.0 から、一覧は既定に入らないスクリプト（capture-scripts のカタログの `default: false`）も
+ * capture-ledger v0.64.0 から、一覧は既定に入らないスクリプト（capture-scripts のカタログの `default: false`）も
  * `enabled: false` で載せる。名指せば走るが、何も名指さないクロールは
  * 走らせない —— 載っている物が全部 `enabled: false` なら、そのクロールは 400 で断られる。`enabled` の
- * 無い行（v0.64.0 より前の台帳は、有効な物だけを載せていた）は既定に数える。頼む前に言えるのは
- * ここまで —— 対象サイトのある物しか無い台帳は、起点しだいで既定が空になる。
+ * 無い行（v0.64.0 より前の capture-ledger は、有効な物だけを載せていた）は既定に数える。頼む前に言えるのは
+ * ここまで —— 対象サイトのある物しか登録されていなければ、起点しだいで既定が空になる。
  *
  * 404 は「許可が無い」—— エンドポイントそのものは webhook の設定に依らず出るので、
  * 在るかどうかではなく can_submit を疑う先になる。
@@ -183,7 +183,7 @@ export const readCatalog = (answer: Answer): Verdict => {
     return {
       ok: false,
       need:
-        "台帳にスクリプトが無い —— 撮れてもページの中では何も走らない (クロールは 400 で断られる) → " +
+        "登録済みのスクリプトが無い —— 撮れてもページの中では何も走らない (クロールは 400 で断られる) → " +
         "cd ../capture-ledger && pnpm run scripts import .upstream/capture-scripts",
     };
   }
@@ -196,7 +196,7 @@ export const readCatalog = (answer: Answer): Verdict => {
   return {
     ok: false,
     need:
-      "台帳のスクリプトが全部、既定に入らない (enabled: false) —— 何も名指さないクロールは 400 で断られる → " +
+      "登録済みのスクリプトが全部、既定に入らない (enabled: false) —— 何も名指さないクロールは 400 で断られる → " +
       "cd ../capture-ledger && pnpm run scripts list で見て、pnpm run scripts enable <id>",
   };
 };

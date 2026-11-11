@@ -1,5 +1,5 @@
 /**
- * この段で台帳に載ったぶんを、全文検索の索引に載せるよう capture-ledger に頼む。
+ * この段で記録に載ったぶんを、全文検索の索引に載せるよう capture-ledger に頼む。
  *
  * ## ここに判断は無い
  *
@@ -11,7 +11,7 @@
  * 本文の取り出し (WACZ を開いて `pages.jsonl` を読む) も capture-ledger 側。ここに置くと
  * S3 の資格情報が Windmill にも要る。
  *
- * ## 検索は台帳の必須の部品 —— 載らなければ段を落とす
+ * ## 検索は capture-ledger の必須の部品 —— 載らなければ段を落とす
  *
  * capture-ledger は `CAPTURE_LEDGER_OPENSEARCH_URL` が無ければ起動しない (CAPTURE-53)。だから
  * このエンドポイントは必ず在り、**どの失敗も黙らせない**:
@@ -23,16 +23,16 @@
  * - 202 で `failed` が 1 以上 —— 載せられなかったアーカイブがある (`indexed_at` は立たないので、
  *   同じクロールの次の段の索引か、`pnpm run search:reindex` が拾い直す)
  *
- * 投げると flow の failure_module (`fail_crawl.ts`) が走る。最後の段では、台帳はクロールを段の報告の
+ * 投げると flow の failure_module (`fail_crawl.ts`) が走る。最後の段では、capture-ledger はクロールを段の報告の
  * 時点で succeeded にしているので、クロールの状態は変わらず、Windmill の run だけが赤くなる。
  */
 import * as wmill from "windmill-client";
 
-// ── 台帳に名乗るトークン（6 本が同じ物を持つ。test/ledger-token.test.ts が同じかを見る）──
+// ── capture-ledger に名乗るトークン（6 本が同じ物を持つ。test/ledger-token.test.ts が同じかを見る）──
 /**
- * 台帳 (capture-ledger) に名乗る access token を、client credentials で取る。
+ * capture-ledger に名乗る access token を、client credentials で取る。
  *
- * 台帳の IdP は Amazon Cognito (手元は代役の Floci)。Windmill の flow は機械なので、人のサインインは
+ * capture-ledger の IdP は Amazon Cognito (手元は代役の Floci)。Windmill の flow は機械なので、人のサインインは
  * 使えず、app client の ID と secret で M2M のトークンを取る。トークンは最長 1 日しかもたないので、
  * 変数に入れて使い回さず、段ごとに取る。設定は変数 `u/admin/ledger_client` (secret・JSON) から読む
  * —— 入れるのは capture-scheduler の `pnpm run windmill:capture-ledger-token`。

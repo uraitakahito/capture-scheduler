@@ -6,9 +6,9 @@ import { main } from "../windmill/f/waggle/replay_bundle_level.js";
  * 合本の段 (CAPTURE-57)。**判断はゼロで、渡すのは crawl_id と段の深さだけ** —— 押さえるのはその形と、
  * 答えの読み分け。
  *
- * どの WACZ を入れるかは capture-ledger が知っている (`archives.crawl_id`)。版も台帳が払い出す。
+ * どの WACZ を入れるかは capture-ledger が知っている (`archives.crawl_id`)。版も capture-ledger が払い出す。
  *
- * 索引の段と違い、**台帳が 200 で返す失敗では投げない** —— 合本は作り直せる派生物で、投げると後ろの索引の段が
+ * 索引の段と違い、**capture-ledger が 200 で返す失敗では投げない** —— 合本は作り直せる派生物で、投げると後ろの索引の段が
  * 飛び、failure_module がクロールを failed で締める。投げるのは 200 で答えなかったときと、答えの形が違うときだけ。
  */
 
@@ -63,7 +63,7 @@ describe("capture-ledger への頼み方", () => {
   });
 
   it("起点の段（深さ 0）でも depth を本文に入れる", async () => {
-    // 0 は偽値。`depth && …` の形で組むと鍵ごと落ち、台帳は depth が無いと言って 400 を返す。
+    // 0 は偽値。`depth && …` の形で組むと鍵ごと落ち、capture-ledger は depth が無いと言って 400 を返す。
     const seen = responding(200, WROTE);
     quietLog();
     await main("c-1", 0);
@@ -73,7 +73,7 @@ describe("capture-ledger への頼み方", () => {
 
   it("本文があるので content-type に application/json を名乗り、Bearer で名乗る", async () => {
     // `index_level` と逆。あちらは本文の無い POST なので名乗ってはいけない。こちらは名乗らないと、
-    // Fastify が本文を JSON として読まず、台帳は depth が無いと言って 400 を返す。
+    // Fastify が本文を JSON として読まず、capture-ledger は depth が無いと言って 400 を返す。
     const seen = responding(200, WROTE);
     quietLog();
     await main("c-1", 1);
@@ -95,7 +95,7 @@ describe("capture-ledger への頼み方", () => {
   });
 });
 
-describe("台帳が 200 で返す失敗では投げない（クロールを止めない）", () => {
+describe("capture-ledger が 200 で返す失敗では投げない（クロールを止めない）", () => {
   it("保管庫に書けなかった（error）は投げずに返し、理由をログに書く", async () => {
     const answer = {
       rev: 3,
@@ -142,7 +142,7 @@ describe("200 で答えなかったら段を落とす", () => {
   });
 
   it("エンドポイントごと無い 404（capture-ledger が古い）は、そう言って投げる", async () => {
-    // Fastify が route を知らないときの本文。台帳の 404 とは本文で分かれる
+    // Fastify が route を知らないときの本文。capture-ledger の 404 とは本文で分かれる
     responding(404, {
       message: "Route POST:/api/crawls/c-1/replay-bundle not found",
       error: "Not Found",

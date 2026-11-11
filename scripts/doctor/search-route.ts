@@ -3,7 +3,7 @@
  *
  * **名乗って引く。** flow の資格で取ったばかりのトークンで `GET /api/search?q=x` を引く (jwt の行と同じ
  * 取り方)。名乗らずに引くと、エンドポイントが在れば名乗りを見る所で 401 になるので、OpenSearch が止まっていても
- * ✓ に見える —— 台帳の検索のエンドポイントは、名乗りを見た後で OpenSearch に訊く。名乗って引けば、200 が
+ * ✓ に見える —— capture-ledger の検索のエンドポイントは、名乗りを見た後で OpenSearch に訊く。名乗って引けば、200 が
  * 「エンドポイントが在り、OpenSearch が答えた」、503 が「OpenSearch が答えないか、索引が無い」、404 が「エンドポイントが無い」と
  * 分かれる。
  *
@@ -40,7 +40,7 @@ export const readSearchRoute = (answer: Answer): Verdict => {
     return {
       ok: false,
       need:
-        "GET /api/search → 404 —— 台帳に検索のエンドポイントが無い (CAPTURE_LEDGER_OPENSEARCH_URL)。" +
+        "GET /api/search → 404 —— capture-ledger に検索のエンドポイントが無い (CAPTURE_LEDGER_OPENSEARCH_URL)。" +
         "capture-ledger が古い → cd ../capture-ledger && git pull && pnpm run dev:up --from search",
     };
   }

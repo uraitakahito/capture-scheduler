@@ -21,7 +21,7 @@ import {
 } from "./helpers/wacz.js";
 
 /**
- * **クロールごとの値 —— 変数とシークレット —— が、台帳 → flow → crawl_host → BrowserHive → 頁 と運ばれ、
+ * **クロールごとの値 —— 変数とシークレット —— が、capture-ledger → flow → crawl_host → BrowserHive → 頁 と運ばれ、
  * 残るべき所にだけ残る。**
  *
  * 単体で見えるのは「crawl_host が要求に載せる形」までで、flow が `variables` / `secrets` を運ぶか
@@ -29,12 +29,12 @@ import {
  * に届くかは、本物を通さないと言えない。判定は 3 か所で採る:
  *
  *   - **頁の中に届いたか** —— その場の TS が印を capture-fixtures に送る。相手のリクエストログで見る
- *   - **台帳の行** —— `GET /api/crawls/:id` の `variables` (値) と `secrets` (名前と path と `archive`)
+ *   - **capture-ledger の行** —— `GET /api/crawls/:id` の `variables` (値) と `secrets` (名前と path と `archive`)
  *   - **WACZ** —— `datapackage.json` の `settings.variables` (値) と `settings.secrets` (名前だけ)。シークレットの値は
  *     **全 member のどこにも無い**。同じ探し方で、変数として渡した値は見つかる (対照)
  *
  * シークレットを通信に載せた場面も見る (BrowserHive v29.0.0 は WARC の中でも値を隠す)。宣言に `archive: "keep"` と
- * 書いた物だけが、台帳 → flow の `secret_archive` → crawl_host → BrowserHive の `secretArchive` と運ばれて WARC に
+ * 書いた物だけが、capture-ledger → flow の `secret_archive` → crawl_host → BrowserHive の `secretArchive` と運ばれて WARC に
  * 値のまま残る。隠す場面と keep の場面を同じ探し方で並べ、keep が対照になる (探し方が壊れていれば両方が同じ答えになる)。
  * 探すのは値の綴りだけではない: 値の中に乱数の 12 字 (16 進) を入れ、その字でも探す —— 16 進の字はどの符号化でも
  * 同じ字のまま残るので、綴りの一覧 (BrowserHive の実装と同じ見方) が見落とした形でも見つかる。
@@ -149,7 +149,7 @@ beforeAll(async () => {
   api = ledger(await mintToken());
 });
 
-/** 置いた変数は消す。残しても害は無い (値は毎回無作為) が、台帳の broken の試験と同じく後を残さない。 */
+/** 置いた変数は消す。残しても害は無い (値は毎回無作為) が、登録したスクリプトの broken の試験と同じく後を残さない。 */
 afterAll(async () => {
   if ((process.env["WINDMILL_TOKEN"] ?? "") === "") return;
   await fetch(`${WINDMILL}/api/w/${WORKSPACE}/variables/delete/${SECRET_PATH}`, {
@@ -159,7 +159,7 @@ afterAll(async () => {
 });
 
 describe("クロールごとの値 —— 変数とシークレット", () => {
-  it("変数が頁に届き、台帳の行と WACZ の settings に同じ値が残る", async () => {
+  it("変数が頁に届き、capture-ledger の行と WACZ の settings に同じ値が残る", async () => {
     await resetFixtures();
     const value = `v-${randomUUID().slice(0, 8)}`;
     const seed = `${FIXTURES}/plain-html`;
@@ -190,7 +190,7 @@ describe("クロールごとの値 —— 変数とシークレット", () => {
       "変数が頁に届いていない —— flow の variables・crawl_host・BrowserHive の受け皿のどれかで切れている",
     ).toBeGreaterThan(0);
 
-    // ② 台帳の行に固定された値
+    // ② capture-ledger の行に固定された値
     expect(got["variables"]).toEqual({ probe: value });
     expect(got["secrets"]).toEqual([]);
 
@@ -205,7 +205,7 @@ describe("クロールごとの値 —— 変数とシークレット", () => {
     );
   });
 
-  it("シークレットが頁に届き、WACZ にも台帳にも Windmill の run にも値は残らない", async () => {
+  it("シークレットが頁に届き、WACZ にも capture-ledger にも Windmill の run にも値は残らない", async () => {
     await resetFixtures();
     // 16 進 24 字。8 字以上なので BrowserHive のログの伏せ字にも掛かる長さ
     const value = randomBytes(12).toString("hex");
@@ -238,10 +238,12 @@ describe("クロールごとの値 —— 変数とシークレット", () => {
       "シークレットが頁に届いていない —— flow の secrets・crawl_host の getVariable・BrowserHive の受け皿のどれかで切れている",
     ).toBeGreaterThan(0);
 
-    // ② 台帳の行: 名前と path だけ。値はどこにも無い
+    // ② capture-ledger の行: 名前と path だけ。値はどこにも無い
     expect(got["variables"]).toEqual({});
     expect(got["secrets"]).toMatchObject([{ name: SECRET_NAME, path: SECRET_PATH }]);
-    expect(JSON.stringify(got), "台帳の答えにシークレットの値が在る").not.toContain(value);
+    expect(JSON.stringify(got), "capture-ledger の答えにシークレットの値が在る").not.toContain(
+      value,
+    );
 
     // ③ WACZ: settings.secrets に名前だけ。値は全 member のどこにも無い
     const archive = await api.archiveOf(seed, String(got["startedAt"]));
@@ -253,7 +255,7 @@ describe("クロールごとの値 —— 変数とシークレット", () => {
 
     // ④ Windmill の run: flow と各段の引数に値は無く、path は在る (読む場所を間違えていない対照)
     const lastJob = got["lastJob"] as { id: string } | null;
-    expect(lastJob, "台帳が run の id を持っていない").not.toBeNull();
+    expect(lastJob, "capture-ledger が run の id を持っていない").not.toBeNull();
     const jobs = await jobArgsTree(String(lastJob?.id), {
       windmill: WINDMILL,
       workspace: WORKSPACE,
@@ -270,7 +272,7 @@ describe("クロールごとの値 —— 変数とシークレット", () => {
   });
 
   /**
-   * **隠すシークレットを通信に載せる (CAPTURE-166)。** 宣言が `archive` を省けば、台帳は `secret_archive` に名前を
+   * **隠すシークレットを通信に載せる (CAPTURE-166)。** 宣言が `archive` を省けば、capture-ledger は `secret_archive` に名前を
    * 載せず、BrowserHive は WARC の中でも値を `***` に置き換える。値はサイトには届いている (証人) のに、WACZ のどこにも
    * 無い。対照は次の keep の試験。
    */
@@ -290,9 +292,11 @@ describe("クロールごとの値 —— 変数とシークレット", () => {
       "値がサイトに届いていない —— flow の secrets・crawl_host・BrowserHive の受け皿のどれかで切れている",
     ).toBe(true);
 
-    // ② 台帳の行: 隠す (archive は null)。値は無い
+    // ② capture-ledger の行: 隠す (archive は null)。値は無い
     expect(got["secrets"]).toMatchObject([{ name: SECRET_NAME, path: SECRET_PATH, archive: null }]);
-    expect(JSON.stringify(got), "台帳の答えにシークレットの値が在る").not.toContain(nonce);
+    expect(JSON.stringify(got), "capture-ledger の答えにシークレットの値が在る").not.toContain(
+      nonce,
+    );
 
     // ③ WACZ: 残すと言った物は無く、値は綴りでも乱数の字でも、全 member のどこにも無い
     const archive = await api.archiveOf(`${FIXTURES}/plain-html`, String(got["startedAt"]));
@@ -311,11 +315,11 @@ describe("クロールごとの値 —— 変数とシークレット", () => {
   });
 
   /**
-   * **対照: keep。** 宣言に `archive: "keep"` と書けば、台帳 → flow の `secret_archive` → crawl_host → BrowserHive の
+   * **対照: keep。** 宣言に `archive: "keep"` と書けば、capture-ledger → flow の `secret_archive` → crawl_host → BrowserHive の
    * `secretArchive` と運ばれ、同じ探し方で WARC に値のまま見つかる。flow が `secret_archive` を運び忘れると、ここだけが
    * 赤くなる (値が隠れる)。
    */
-  it("対照: keep と宣言したシークレットは、台帳 → flow → crawl_host → BrowserHive と運ばれ、同じ探し方で WARC に値のまま見つかる", async () => {
+  it("対照: keep と宣言したシークレットは、capture-ledger → flow → crawl_host → BrowserHive と運ばれ、同じ探し方で WARC に値のまま見つかる", async () => {
     await resetFixtures();
     const { value, nonce } = valueWithNonce();
     await upsertSecret(value);
@@ -326,14 +330,14 @@ describe("クロールごとの値 —— 変数とシークレット", () => {
     expect(got["state"], String(got["error"])).toBe("succeeded");
     expect(echoedWith(await requestCounts(), nonce), "値がサイトに届いていない").toBe(true);
 
-    // ① 台帳の行: keep
+    // ① capture-ledger の行: keep
     expect(got["secrets"]).toMatchObject([
       { name: SECRET_NAME, path: SECRET_PATH, archive: "keep" },
     ]);
 
     // ② Windmill の run: crawl_host の段の引数に secret_archive が載っている (flow が運んだ)
     const lastJob = got["lastJob"] as { id: string } | null;
-    expect(lastJob, "台帳が run の id を持っていない").not.toBeNull();
+    expect(lastJob, "capture-ledger が run の id を持っていない").not.toBeNull();
     const jobs = await jobArgsTree(String(lastJob?.id), {
       windmill: WINDMILL,
       workspace: WORKSPACE,
@@ -352,7 +356,7 @@ describe("クロールごとの値 —— 変数とシークレット", () => {
     expect(settingsOf(members)["secretArchive"]).toEqual({ [SECRET_NAME]: "keep" });
     expect(
       membersContaining(members, nonce).some((name) => name.startsWith("archive/")),
-      "keep の値が WARC に無い —— 台帳の secret_archive・flow・crawl_host のどれかで keep が落ちている",
+      "keep の値が WARC に無い —— capture-ledger の secret_archive・flow・crawl_host のどれかで keep が落ちている",
     ).toBe(true);
     expect(warcTextOf(members)).not.toContain("BrowserHive-Redacted:");
   });
@@ -395,7 +399,7 @@ describe("クロールごとの値 —— 変数とシークレット", () => {
   });
 
   /**
-   * **必須の変数を渡さなければ、始める前に断る (CAPTURE-20)。** 判定は ts-compile-service の `BH0001` で、台帳が行を
+   * **必須の変数を渡さなければ、始める前に断る (CAPTURE-20)。** 判定は ts-compile-service の `BH0001` で、capture-ledger が行を
    * 立てる前に訊く。行は立たず、相手のサイトへの要求も 1 本も出ない。
    */
   it("必須の変数を渡さなければ、400 と BH0001 で断り、行も相手への要求も残らない", async () => {
@@ -436,10 +440,10 @@ describe("クロールごとの値 —— 変数とシークレット", () => {
   });
 
   /**
-   * **宣言した required のシークレットが Windmill に無ければ、台帳はクロールを始めない。** 400 が名前と path を言い、
-   * 行は立たない (立てば以後のクロールが 409 で塞がる)。台帳の単体の反証を、端から端で。
+   * **宣言した required のシークレットが Windmill に無ければ、capture-ledger はクロールを始めない。** 400 が名前と path を言い、
+   * 行は立たない (立てば以後のクロールが 409 で塞がる)。capture-ledger の単体の反証を、端から端で。
    */
-  it("宣言した required のシークレットが Windmill に無ければ、台帳が 400 で名指し、行は立たない", async () => {
+  it("宣言した required のシークレットが Windmill に無ければ、capture-ledger が 400 で名指し、行は立たない", async () => {
     const name = `nope_${randomUUID().slice(0, 8).replace(/-/g, "")}`;
     const { status, text } = await api.post({
       seeds: [`${FIXTURES}/plain-html`],

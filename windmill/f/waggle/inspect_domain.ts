@@ -3,17 +3,17 @@
  *
  * **クロールの通り道には居ない。** Windmill の画面で引数を書いて走らせる調べ物の道具で、何も書かない。
  *
- * 判断は台帳が決め、台帳に残している (`report_level.ts` の冒頭、capture-ledger の `crawl_decisions`)。
- * ここは台帳の `GET /api/decisions` を引き、クロールを跨いで表に描くだけ。run の中身は最長 30 日で
- * 消えるが、台帳の行はクロールがある限り残るので、`days` を伸ばして走らせ直せる。
+ * 判断は capture-ledger が決め、自分の DB に残している (`report_level.ts` の冒頭、capture-ledger の `crawl_decisions`)。
+ * ここは capture-ledger の `GET /api/decisions` を引き、クロールを跨いで表に描くだけ。run の中身は最長 30 日で
+ * 消えるが、capture-ledger の行はクロールがある限り残るので、`days` を伸ばして走らせ直せる。
  */
 import * as wmill from "windmill-client";
 
-// ── 台帳に名乗るトークン（6 本が同じ物を持つ。test/ledger-token.test.ts が同じかを見る）──
+// ── capture-ledger に名乗るトークン（6 本が同じ物を持つ。test/ledger-token.test.ts が同じかを見る）──
 /**
- * 台帳 (capture-ledger) に名乗る access token を、client credentials で取る。
+ * capture-ledger に名乗る access token を、client credentials で取る。
  *
- * 台帳の IdP は Amazon Cognito (手元は代役の Floci)。Windmill の flow は機械なので、人のサインインは
+ * capture-ledger の IdP は Amazon Cognito (手元は代役の Floci)。Windmill の flow は機械なので、人のサインインは
  * 使えず、app client の ID と secret で M2M のトークンを取る。トークンは最長 1 日しかもたないので、
  * 変数に入れて使い回さず、段ごとに取る。設定は変数 `u/admin/ledger_client` (secret・JSON) から読む
  * —— 入れるのは capture-scheduler の `pnpm run windmill:capture-ledger-token`。
@@ -52,7 +52,7 @@ const ledgerToken = async (): Promise<string> => {
 
 type Action = "follow" | "capture" | "skip";
 
-/** 台帳の `GET /api/decisions` の答え。 */
+/** capture-ledger の `GET /api/decisions` の答え。 */
 export interface DomainAnswer {
   decisions: {
     crawlId: string;
@@ -65,7 +65,7 @@ export interface DomainAnswer {
     hostname: string;
     links: number;
   }[];
-  /** 台帳が行の上限で切ったか。 */
+  /** capture-ledger が行の上限で切ったか。 */
   truncated: boolean;
 }
 
@@ -95,7 +95,7 @@ export const renderDomain = (
 ): Rendered => {
   const crawls = new Set(got.decisions.map((row) => row.crawlId)).size;
   const cut = got.truncated
-    ? " —— 台帳が行の上限で切りました。days を短くして走らせ直してください"
+    ? " —— capture-ledger が行の上限で切りました。days を短くして走らせ直してください"
     : "";
   const rows = got.decisions.map((row) => ({
     始めた: row.startedAt.slice(0, 16).replace("T", " "),

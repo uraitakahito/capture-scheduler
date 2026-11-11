@@ -1,5 +1,5 @@
 /**
- * クロールの語を、旧い言い方で書いていないかを見張る。規則は下の RULES の 10 個。
+ * クロールの語を、旧い言い方で書いていないかを見張る。規則は下の RULES の 11 個。
  *
  * ## なぜ要るのか
  *
@@ -10,7 +10,7 @@
  *   Windmill の summary・docs で 51 か所。capture-ledger と capture-workbench も同じ）。目的語の無い「起こす」は
  *   「目を覚まさせる」に読める。プロセス・job・flow の「起こす」（API を起こし直す・webhook で起こす・
  *   次の段を起こす）は別の意味で、見ない
- * - **ページで走らせる物は「スクリプト」、置き場は「台帳」と書く。** 2026-10 に「目録」からそろえた
+ * - **ページで走らせる物は「スクリプト」と書く。** 2026-10 に「目録」からそろえた
  *   （doctor の点検の名前「スクリプト」・Windmill の説明・docs・試験の文で 62 か所。capture-ledger と capture-workbench も同じ）。
  *   「目録」は browserhive と wacz-validator では WACZ の中の storage の目録を指す。この repo はそれを
  *   持たないので、全部見る
@@ -54,6 +54,10 @@
  * - 「dashboard」: 全部（大文字小文字を問わない）
  * - 「replay」: 旧い名前の形の並びだけ（OLD_REPLAY_NAMES）。語の replay は合本の形式（replay.json）と ReplayWeb.page の振る舞いの文に
  *   残るので見ない
+ * - 「台帳」: 全部。2026-11 に（Jira CAPTURE-186）意味ごとに書き分けた。capture-ledger というシステムは capture-ledger、
+ *   スクリプトの置き場は「登録済みのスクリプト」、DB に入ったことは「capture-ledger に載る」。2 字がシステム・DB の行・
+ *   置き場を兼ね、帳簿の語なのに「台帳が 400 で断る」と動く主語になっていた（capture-ledger・capture-workbench・
+ *   browserhive も見張っている）
  *
  * ## 見ないもの
  *
@@ -110,7 +114,7 @@ const RULES: { find: (line: string) => boolean; say: string }[] = [
   },
   {
     find: (line) => line.includes("目録"),
-    say: "「目録」が残っています。ページで走らせる物は「スクリプト」、置き場は「台帳」（台帳にスクリプトが無い）と書きます。",
+    say: "「目録」が残っています。ページで走らせる物は「スクリプト」、置き場は「登録済みのスクリプト」（登録済みのスクリプトが無い）と書きます。",
   },
   {
     find: (line) => line.replace(NOT_NET, "").includes("網"),
@@ -141,6 +145,12 @@ const RULES: { find: (line: string) => boolean; say: string }[] = [
     say:
       "「口」が残っています。HTTP の method と path の組と BrowserHive の宛先 URL は「エンドポイント」、待ち受けの番号は" +
       "「ポート」、スクリプトを差し込む時は「phase」、成果物を PUT する先は「受け取り先」と書きます（切り口・入口・出口はそのまま）。",
+  },
+  {
+    find: (line) => line.includes("台帳"),
+    say:
+      "「台帳」が残っています。システムは capture-ledger、置き場は「登録済みのスクリプト」（登録する・登録されていない）、" +
+      "DB に入ったことは「capture-ledger に載る」と書きます（CAPTURE-186）。",
   },
 ];
 

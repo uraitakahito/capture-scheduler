@@ -2,9 +2,9 @@
  * smoke が、撮った 1 本が **合本に入り、replayweb-server から読める** ところまでを読む (CAPTURE-57)。
  *
  * flow は段の報告の後に合本の段 (`replay_bundle_level.ts`) を走らせ、capture-ledger がクロールの合本 (`replay.json` と
- * `pages.json` の組) を保管庫の `org/<組織>/crawls/<クロール>/r<版>/` に書く。合本の段は、台帳が 200 で返す失敗
+ * `pages.json` の組) を保管庫の `org/<組織>/crawls/<クロール>/r<版>/` に書く。合本の段は、capture-ledger が 200 で返す失敗
  * (保管庫に書けない・検められない WACZ・入れる WACZ が無い) では投げない (クロールを止めないため) ので、**run が
- * 緑でも、合本が書けたとは限らない** —— smoke は合本の段の答えを読み、台帳が指す合本の `replay.json` を replayweb-server の
+ * 緑でも、合本が書けたとは限らない** —— smoke は合本の段の答えを読み、capture-ledger が指す合本の `replay.json` を replayweb-server の
  * `/wacz/<鍵>` から読んで、この回の archive が `resources` に入っているかまで照らす。
  *
  * 入出力を持たない。訊くのは `smoke.ts`。
@@ -85,7 +85,7 @@ export const readReplayBundleStep = (
   if (outcome.rev === null) {
     return {
       evidence: `合本の段: 入れる WACZ が無く、書かなかった (記録が 0 で外した ${String(outcome.skipped)} 本)`,
-      fix: "この回の archive が台帳に載る前に合本の段が走ったか、WACZ の記録が 0 —— run を開いて report と replay_bundle の段の log を見る",
+      fix: "この回の archive が capture-ledger に載る前に合本の段が走ったか、WACZ の記録が 0 —— run を開いて report と replay_bundle の段の log を見る",
     };
   }
   return undefined;
@@ -111,7 +111,7 @@ export const readReplayBundleFailure = (message: string): string | undefined => 
   return undefined;
 };
 
-/** 台帳が指す合本 (`GET /api/crawls/:id` の `replayBundle`)。smoke が使う所だけ。 */
+/** capture-ledger が指す合本 (`GET /api/crawls/:id` の `replayBundle`)。smoke が使う所だけ。 */
 export interface LedgerReplayBundle {
   /** 保管庫の `replay.json` の鍵 (`org/<組織>/crawls/<クロール>/r<版>/replay.json`)。 */
   key: string;
@@ -119,8 +119,8 @@ export interface LedgerReplayBundle {
 }
 
 /**
- * `GET /api/crawls/:id` の本文から、台帳が指す合本を読む。合本の段が r`wrote` を書いたと言った後に呼ぶ。
- * 台帳が指す版は前へだけ進むので、`wrote` より小さければ食い違い。
+ * `GET /api/crawls/:id` の本文から、capture-ledger が指す合本を読む。合本の段が r`wrote` を書いたと言った後に呼ぶ。
+ * capture-ledger が指す版は前へだけ進むので、`wrote` より小さければ食い違い。
  */
 export const readLedgerReplayBundle = (
   body: unknown,
@@ -138,7 +138,7 @@ export const readLedgerReplayBundle = (
   if (field === null) {
     return {
       problem: {
-        evidence: `合本の段は r${String(wrote)} を書いたと言ったが、台帳はこのクロールの合本を指していない (replayBundle が null)`,
+        evidence: `合本の段は r${String(wrote)} を書いたと言ったが、capture-ledger はこのクロールの合本を指していない (replayBundle が null)`,
         fix: "capture-ledger の API のログの「replay bundle written」と「could not write the replay bundle」を見る",
       },
     };
@@ -148,7 +148,7 @@ export const readLedgerReplayBundle = (
   if (typeof key !== "string" || !isCount(rev)) {
     return {
       problem: {
-        evidence: `台帳の replayBundle の形が違う (key と rev が要る): ${JSON.stringify(field).slice(0, 200)}`,
+        evidence: `capture-ledger の replayBundle の形が違う (key と rev が要る): ${JSON.stringify(field).slice(0, 200)}`,
         fix: "capture-ledger が合本を 1 度も書けていないか (key が null)、capture-ledger と capture-scheduler の版の組が合っていない",
       },
     };
@@ -156,8 +156,8 @@ export const readLedgerReplayBundle = (
   if (rev < wrote) {
     return {
       problem: {
-        evidence: `台帳が指す合本は r${String(rev)} で、合本の段が書いた r${String(wrote)} より古い`,
-        fix: "台帳が指す版は前へだけ進むはず —— capture-ledger の src/replay-bundle/write.ts の「前へだけ」を見る",
+        evidence: `capture-ledger が指す合本は r${String(rev)} で、合本の段が書いた r${String(wrote)} より古い`,
+        fix: "capture-ledger が指す版は前へだけ進むはず —— capture-ledger の src/replay-bundle/write.ts の「前へだけ」を見る",
       },
     };
   }
@@ -201,7 +201,7 @@ export const readReplayJson = (
       evidence: `GET ${url} → ${String(status)} ${body.slice(0, 200)}`,
       fix:
         status === 404
-          ? "台帳が指す合本が、replayweb-server の読む保管庫に無い —— capture-ledger の保管庫の bucket と、replayweb-server の S3_BUCKET_URL が同じか"
+          ? "capture-ledger が指す合本が、replayweb-server の読む保管庫に無い —— capture-ledger の保管庫の bucket と、replayweb-server の S3_BUCKET_URL が同じか"
           : status === 502 || status === 504
             ? "replayweb-server が保管庫に届かない —— 保管庫が動いているか、replayweb-server の S3_BUCKET_URL を見る"
             : "replayweb-server の /wacz/ が保管庫の物をそのまま返していない —— replayweb-server の版 (capture-ledger の .upstream/replayweb-server)",

@@ -14,7 +14,7 @@ import { expect } from "vitest";
 export const WAGGLE = process.env["E2E_WAGGLE_URL"] ?? "http://127.0.0.1:7070";
 /**
  * capture-ledger の置き場。トークンは向こうの `idp:token` で取る。`crawl-level.e2e.test.ts` の
- * スクリプトの台帳の試験と同じ環境変数で差し替える。
+ * 登録済みのスクリプトの試験と同じ環境変数で差し替える。
  */
 export const LEDGER_DIR =
   process.env["E2E_LEDGER_DIR"] ?? resolve(process.cwd(), "../capture-ledger");
@@ -73,7 +73,7 @@ export const resetFixtures = async (): Promise<void> => {
   await fetch(`${FIXTURES_HOST}/__reset`, { method: "POST" });
 };
 
-/** 台帳の API を、採ったトークンで。 */
+/** capture-ledger の API を、採ったトークンで。 */
 export const ledger = (token: string) => {
   const auth = { authorization: `Bearer ${token}` };
 
@@ -87,7 +87,7 @@ export const ledger = (token: string) => {
     return { status: res.status, text: await res.text() };
   };
 
-  /** 1 本始めて crawlId を返す。202 でなければ、台帳の本文を理由に落とす。 */
+  /** 1 本始めて crawlId を返す。202 でなければ、capture-ledger の本文を理由に落とす。 */
   const start = async (body: Record<string, unknown>): Promise<string> => {
     const { status, text } = await post(body);
     expect(
@@ -136,10 +136,10 @@ export const ledger = (token: string) => {
       if (found !== undefined) return found;
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
-    throw new Error(`台帳の一覧に ${sourceUrl} のこの回の archive が出ない`);
+    throw new Error(`capture-ledger の一覧に ${sourceUrl} のこの回の archive が出ない`);
   };
 
-  /** archive の署名付き URL。台帳が `POST /api/archives/:id/url` で出す。 */
+  /** archive の署名付き URL。capture-ledger が `POST /api/archives/:id/url` で出す。 */
   const signedUrl = async (archiveId: string): Promise<string> => {
     const res = await fetch(`${WAGGLE}/api/archives/${archiveId}/url`, {
       method: "POST",

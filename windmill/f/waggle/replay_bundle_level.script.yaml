@@ -6,7 +6,7 @@ description: |
   合本は、そのクロールの WACZ を全部並べた replay.json と、その頁の行の pages.json の組。
   capture-ledger が段ごとに新しい版として保管庫に書き、replay はそれを 1 つのアーカイブとして開く。
 
-  台帳が 200 で返す失敗 (保管庫に書けない・検められない WACZ・入れる WACZ がまだ無い) では投げない ——
+  capture-ledger が 200 で返す失敗 (保管庫に書けない・検められない WACZ・入れる WACZ がまだ無い) では投げない ——
   投げると索引の段が飛び、クロールが failed で締められる。投げるのは 200 で答えなかったときと、
   答えの形が違うときだけ。
 lock: "!inline f/waggle/replay_bundle_level.script.lock"

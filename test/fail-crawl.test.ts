@@ -39,9 +39,9 @@ describe("誤りを 1 行に潰す", () => {
   });
 });
 
-describe("台帳の reason の上限に収める", () => {
+describe("capture-ledger の reason の上限に収める", () => {
   it("2,000 字を超える文は切り、省いた字数を末尾に言う", () => {
-    // **超えたまま送ると、台帳が 400 で断り、行が running のまま次を全部 409 で塞ぐ。**
+    // **超えたまま送ると、capture-ledger が 400 で断り、行が running のまま次を全部 409 で塞ぐ。**
     // 92,314 字は、async.js をそのまま貼ったときの元の reason の長さ
     const long = `[compile] ${"x".repeat(92_304)}`;
     const out = clip(long);

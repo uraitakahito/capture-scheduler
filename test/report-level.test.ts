@@ -44,7 +44,7 @@ const CAPTURED = [
   },
 ];
 
-/** compile の段の出力そのもの。source も運ばれてくるが、台帳へは身元と hash だけを送る。 */
+/** compile の段の出力そのもの。source も運ばれてくるが、capture-ledger へは身元と hash だけを送る。 */
 const COMPILED = {
   typescript: "6.0.3",
   hostTypes: "v0.2.0",

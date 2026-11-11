@@ -19,11 +19,11 @@
  */
 import * as wmill from "windmill-client";
 
-// ── 台帳に名乗るトークン（6 本が同じ物を持つ。test/ledger-token.test.ts が同じかを見る）──
+// ── capture-ledger に名乗るトークン（6 本が同じ物を持つ。test/ledger-token.test.ts が同じかを見る）──
 /**
- * 台帳 (capture-ledger) に名乗る access token を、client credentials で取る。
+ * capture-ledger に名乗る access token を、client credentials で取る。
  *
- * 台帳の IdP は Amazon Cognito (手元は代役の Floci)。Windmill の flow は機械なので、人のサインインは
+ * capture-ledger の IdP は Amazon Cognito (手元は代役の Floci)。Windmill の flow は機械なので、人のサインインは
  * 使えず、app client の ID と secret で M2M のトークンを取る。トークンは最長 1 日しかもたないので、
  * 変数に入れて使い回さず、段ごとに取る。設定は変数 `u/admin/ledger_client` (secret・JSON) から読む
  * —— 入れるのは capture-scheduler の `pnpm run windmill:capture-ledger-token`。
@@ -87,8 +87,8 @@ export interface LevelOutcome {
 }
 
 /**
- * compile の段の出力 (`compile_scripts.ts` の Compiled)。台帳に運ぶのは JS の sha256 と、
- * 何で・何に向けて変換したかだけ —— source は運ばない。台帳が持つのは身元と hash で、
+ * compile の段の出力 (`compile_scripts.ts` の Compiled)。capture-ledger に運ぶのは JS の sha256 と、
+ * 何で・何に向けて変換したかだけ —— source は運ばない。capture-ledger が持つのは身元と hash で、
  * 中身は archive に在る。
  */
 export interface CompiledLevel {
@@ -115,8 +115,8 @@ export async function main(
     body: JSON.stringify({
       depth,
       results,
-      // 走った JS の hash と変換の記録。台帳は固定したスクリプトの各要素に写し、段ごとに同じ値かを見る
-      // (違えば 409)。台帳側では必須 —— 載せ忘れは 400 で、この段が落ちる
+      // 走った JS の hash と変換の記録。capture-ledger は固定したスクリプトの各要素に写し、段ごとに同じ値かを見る
+      // (違えば 409)。capture-ledger 側では必須 —— 載せ忘れは 400 で、この段が落ちる
       compiled: {
         typescript: compiled.typescript,
         hostTypes: compiled.hostTypes,

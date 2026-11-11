@@ -2,7 +2,7 @@
  * smoke が、撮った 1 本が索引に載り、検索に当たるところまでを読む読み分け (CAPTURE-53)。
  *
  * 当たるはずの時点は WACZ のページ一覧から決める。写しの行がある WACZ で文書の行 (`page`) が当たったら、
- * 台帳の索引の決まり (CAPTURE-48: 写しの行があれば文書の行を入れない) が外れている —— それを見逃さない。
+ * capture-ledger の索引の決まり (CAPTURE-48: 写しの行があれば文書の行を入れない) が外れている —— それを見逃さない。
  */
 import { describe, expect, it } from "vitest";
 
@@ -92,7 +92,7 @@ describe("索引の段の答え", () => {
     expect(reading?.fix).toContain("search:reindex");
   });
 
-  it("1 本も載せていなければ止める（台帳に載る前に索引の段が走った）", () => {
+  it("1 本も載せていなければ止める（capture-ledger に載る前に索引の段が走った）", () => {
     expect(readIndexStep({ pending: 0, indexed: 0, failed: 0, pages: 0 })?.evidence).toContain(
       "0 本",
     );

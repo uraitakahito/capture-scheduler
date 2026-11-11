@@ -21,11 +21,11 @@
  */
 import * as wmill from "windmill-client";
 
-// ── 台帳に名乗るトークン（6 本が同じ物を持つ。test/ledger-token.test.ts が同じかを見る）──
+// ── capture-ledger に名乗るトークン（6 本が同じ物を持つ。test/ledger-token.test.ts が同じかを見る）──
 /**
- * 台帳 (capture-ledger) に名乗る access token を、client credentials で取る。
+ * capture-ledger に名乗る access token を、client credentials で取る。
  *
- * 台帳の IdP は Amazon Cognito (手元は代役の Floci)。Windmill の flow は機械なので、人のサインインは
+ * capture-ledger の IdP は Amazon Cognito (手元は代役の Floci)。Windmill の flow は機械なので、人のサインインは
  * 使えず、app client の ID と secret で M2M のトークンを取る。トークンは最長 1 日しかもたないので、
  * 変数に入れて使い回さず、段ごとに取る。設定は変数 `u/admin/ledger_client` (secret・JSON) から読む
  * —— 入れるのは capture-scheduler の `pnpm run windmill:capture-ledger-token`。
@@ -79,7 +79,7 @@ export const describe = (error: unknown): string => {
 };
 
 /**
- * 台帳の reason の上限 (capture-ledger の `POST /api/crawls/:id/failed` の schema)。
+ * capture-ledger の reason の上限 (capture-ledger の `POST /api/crawls/:id/failed` の schema)。
  * **超えると 400 で断られ、行が running のまま次を全部 409 で塞ぐ** —— running の行を
  * 締めるのはこの段だけ。
  */

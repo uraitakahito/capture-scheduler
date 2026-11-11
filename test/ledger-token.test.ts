@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { LEDGER_CLIENT, LEDGER_CLIENT_VAR, TOKEN } from "./helpers/ledger-token.js";
 
 /**
- * flow の段が台帳に名乗るトークンの取り方 (`ledgerToken`)。
+ * flow の段が capture-ledger に名乗るトークンの取り方 (`ledgerToken`)。
  *
  * Windmill の relative import で 1 本にまとめず、6 本の段に同じ関数を写してある (この版の
  * Windmill で効くかを確かめていないため)。写しが 1 本だけ古くなると、その段だけが別の取り方で
@@ -17,7 +17,7 @@ const SCRIPTS = [
   "replay_bundle_level",
   "report_level",
 ];
-const BEGIN = "// ── 台帳に名乗るトークン";
+const BEGIN = "// ── capture-ledger に名乗るトークン";
 const END = "// ── ここまで ──";
 
 const block = (name: string) => {
@@ -55,7 +55,7 @@ afterEach(() => {
 });
 
 describe("取り方 (index_level で見る)", () => {
-  it("client credentials で取り、取ったトークンで台帳に名乗る", async () => {
+  it("client credentials で取り、取ったトークンで capture-ledger に名乗る", async () => {
     const seen: { url: string; init: RequestInit }[] = [];
     vi.stubGlobal(
       "fetch",
@@ -89,8 +89,8 @@ describe("取り方 (index_level で見る)", () => {
     expect(new Headers(seen[1]!.init.headers).get("authorization")).toBe(`Bearer ${TOKEN}`);
   });
 
-  // 違う secret・プールを作り直した後。台帳を叩く前に、取れなかったと言って止まる。
-  it("token endpoint が断れば、台帳を叩かずに理由と直し方を言う", async () => {
+  // 違う secret・プールを作り直した後。capture-ledger を叩く前に、取れなかったと言って止まる。
+  it("token endpoint が断れば、capture-ledger を叩かずに理由と直し方を言う", async () => {
     const seen: string[] = [];
     vi.stubGlobal(
       "fetch",

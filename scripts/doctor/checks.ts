@@ -318,7 +318,7 @@ const acceptsJwt = async (): Promise<Verdict> => {
 
 /**
  * flow の資格でトークンを取り、名乗って検索を引く。**名乗らずに引くと、OpenSearch が止まっていても 401 で
- * 終わる** (台帳は名乗りを見てから OpenSearch に訊く)。読み分けは `search-route.ts`。
+ * 終わる** (capture-ledger は名乗りを見てから OpenSearch に訊く)。読み分けは `search-route.ts`。
  */
 const searchAnswers = async (): Promise<Verdict> => {
   const token = await flowToken();
@@ -337,7 +337,7 @@ const searchAnswers = async (): Promise<Verdict> => {
  * 名前が docs とずれていることも、flow が 404 や 401 を踏む前にここで分かる。
  */
 /**
- * 台帳にスクリプトが 1 本でも入っているか。**flow のトークンで訊く** —— 見えるかどうかは許可の
+ * スクリプトが 1 本でも登録されているか。**flow のトークンで訊く** —— 見えるかどうかは許可の
  * 問題でもあるので、can_submit と同じ資格で確かめる。
  */
 const catalogFilled = async (): Promise<Verdict> => {
@@ -610,8 +610,8 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
     section: SECTIONS.bringUp,
     where: `POST ${API}/api/crawls/<uuid>/replay-bundle ${REPLAY_BUNDLE_PROBE_BODY} (名乗らずに 401 なら在る)`,
     // flow の合本の段が叩くエンドポイント。無い (古い capture-ledger) と、どのクロールも合本の段で落ちる。
-    // 名乗らずに叩くので、台帳は版を払い出さず、何も書かない (読み分けは `replay-bundle-route.ts`)。
-    // 親は crawl route —— 台帳はクロールのエンドポイント (webhook の 2 行) を出すときだけ合本のエンドポイントも出すので、webhook が
+    // 名乗らずに叩くので、capture-ledger は版を払い出さず、何も書かない (読み分けは `replay-bundle-route.ts`)。
+    // 親は crawl route —— capture-ledger はクロールのエンドポイント (webhook の 2 行) を出すときだけ合本のエンドポイントも出すので、webhook が
     // 無いと両方 404 になる。親にしておけば、直すもの 1 つに ✗ も 1 本。
     needs: ["crawl route"],
     probe: async () =>
@@ -634,7 +634,7 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
     name: "search route",
     section: SECTIONS.bringUp,
     where: `flow の資格で取ったトークンで GET ${API}${SEARCH_PROBE} (200 なら OpenSearch まで届く)`,
-    // 台帳の全文検索。エンドポイントが無いか OpenSearch が答えないと、flow の索引の段が毎回落ちる (CAPTURE-53 から
+    // capture-ledger の全文検索。エンドポイントが無いか OpenSearch が答えないと、flow の索引の段が毎回落ちる (CAPTURE-53 から
     // 404 を飛ばさない)。トークンは jwt の行と同じ取り方なので、jwt の後に訊く。
     needs: ["jwt"],
     probe: searchAnswers,

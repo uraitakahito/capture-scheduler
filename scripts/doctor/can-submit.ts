@@ -3,7 +3,7 @@
  *
  * 訊くのは **flow が使うのと同じ資格で取ったトークン** (Windmill の変数 `u/admin/ledger_client`)。
  * capture-ledger は、そのトークンから解いた主体 (機械なら app client の ID) と組織をそのまま返すので、
- * 足りない許可を打つべきコマンドの形で名指しできる。機械の組織はトークンに載らず、台帳が保存した許可から引く。
+ * 足りない許可を打つべきコマンドの形で名指しできる。機械の組織はトークンに載らず、capture-ledger が保存した許可から引く。
  *
  * 読み分けるのは status と本文。直すものがそれぞれ違う:
  *
@@ -74,7 +74,7 @@ export const readCanSubmit = (status: number | undefined, body: string): Verdict
     return {
       ok: false,
       need:
-        `${me.subject} の組織が無い —— 機械 (Windmill の app client) の組織は、台帳が保存した許可から引く。` +
+        `${me.subject} の組織が無い —— 機械 (Windmill の app client) の組織は、capture-ledger が保存した許可から引く。` +
         "許可が 1 つも無い → cd ../capture-ledger && pnpm run idp:grant",
     };
   }

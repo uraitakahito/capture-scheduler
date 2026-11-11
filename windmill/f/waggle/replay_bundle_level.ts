@@ -1,39 +1,39 @@
 /**
- * クロールの合本を、この段で台帳に載ったぶんまで含めて書き直すよう capture-ledger に頼む (CAPTURE-57)。
+ * クロールの合本を、この段で記録に載ったぶんまで含めて書き直すよう capture-ledger に頼む (CAPTURE-57)。
  *
  * 合本は、そのクロールの WACZ を全部並べた `replay.json` と、その頁の行の `pages.json` の組。capture-ledger が
  * 保管庫の `org/<組織>/crawls/<クロール>/r<版>/` に書き、replay はそれを 1 つのアーカイブとして開く —— どの WACZ の
- * 頁へもリンクで行ける。版は書くたびに台帳が払い出し、書いた版は書き換えない。
+ * 頁へもリンクで行ける。版は書くたびに capture-ledger が払い出し、書いた版は書き換えない。
  *
  * ## ここに判断は無い
  *
  * 渡すのは `crawl_id` と段の深さ (`depth`) だけ。**どの WACZ を入れるかは capture-ledger が知っている**
  * (`archives.crawl_id`)。深さは `replay.json` に記録されるだけで、版ではない。
  *
- * ## 台帳が 200 で返す失敗では投げない
+ * ## capture-ledger が 200 で返す失敗では投げない
  *
  * 合本は撮った物から作る派生物で、後から作り直せる (capture-ledger の `pnpm run replay-bundle:rebuild`)。
  * ここで投げると、後ろの索引の段 (`index_level`) が飛び、flow の failure_module (`fail_crawl.ts`) がクロールを
- * failed で締める —— 次の段が既に出ていれば、台帳の状態が食い違う。だから 200 の答えは、どれも 1 行の
+ * failed で締める —— 次の段が既に出ていれば、capture-ledger の行の状態が食い違う。だから 200 の答えは、どれも 1 行の
  * ログに書いて返す:
  *
- * - `error` が在る —— 保管庫に書けなかった (台帳は `crawls.replay_bundle_error` にも残す)
+ * - `error` が在る —— 保管庫に書けなかった (capture-ledger は `crawls.replay_bundle_error` にも残す)
  * - `failed` が 1 以上 —— 検められなかった WACZ がある (次の合本が拾い直す)
  * - `rev` が null —— 入れる WACZ がまだ無いので書かなかった
  *
  * ## 投げるのは、200 で答えなかったときと答えの形が違うときだけ
  *
  * 400 (本文の形)・401 (トークン)・404 (クロールが無い・トークンの名前に `can_submit` が無い・capture-ledger が
- * 古くエンドポイントが無い)・5xx (台帳が DB に届かない)。どれも段を進めても直らない設定か台帳の誤りで、黙ると合本が 1 本も
+ * 古くエンドポイントが無い)・5xx (capture-ledger が DB に届かない)。どれも段を進めても直らない設定か capture-ledger の誤りで、黙ると合本が 1 本も
  * 書かれないまま flow が緑で終わる。
  */
 import * as wmill from "windmill-client";
 
-// ── 台帳に名乗るトークン（6 本が同じ物を持つ。test/ledger-token.test.ts が同じかを見る）──
+// ── capture-ledger に名乗るトークン（6 本が同じ物を持つ。test/ledger-token.test.ts が同じかを見る）──
 /**
- * 台帳 (capture-ledger) に名乗る access token を、client credentials で取る。
+ * capture-ledger に名乗る access token を、client credentials で取る。
  *
- * 台帳の IdP は Amazon Cognito (手元は代役の Floci)。Windmill の flow は機械なので、人のサインインは
+ * capture-ledger の IdP は Amazon Cognito (手元は代役の Floci)。Windmill の flow は機械なので、人のサインインは
  * 使えず、app client の ID と secret で M2M のトークンを取る。トークンは最長 1 日しかもたないので、
  * 変数に入れて使い回さず、段ごとに取る。設定は変数 `u/admin/ledger_client` (secret・JSON) から読む
  * —— 入れるのは capture-scheduler の `pnpm run windmill:capture-ledger-token`。
@@ -101,7 +101,7 @@ const describe = ({ rev, pages, members, skipped, failed, error }: ReplayBundleO
   }
   if (error !== null) {
     return (
-      `合本: r${String(rev)} を保管庫に書けなかった (クロールは止めない。台帳の replay_bundle_error に残る` +
+      `合本: r${String(rev)} を保管庫に書けなかった (クロールは止めない。capture-ledger の replay_bundle_error に残る` +
       `${uninspected}): ${error}`
     );
   }
@@ -118,7 +118,7 @@ export async function main(crawl_id: string, depth: number): Promise<ReplayBundl
   const token = await ledgerToken();
 
   // **本文があるので `content-type` を送る。** `index_level.ts` と逆 —— あちらは本文の無い POST で、
-  // `application/json` を名乗ると Fastify が 400 を返す。こちらは名乗らないと本文が読まれず、台帳は
+  // `application/json` を名乗ると Fastify が 400 を返す。こちらは名乗らないと本文が読まれず、capture-ledger は
   // depth が無いと言って 400 を返す。
   const res = await fetch(`${waggle_url}/api/crawls/${crawl_id}/replay-bundle`, {
     method: "POST",
@@ -130,7 +130,7 @@ export async function main(crawl_id: string, depth: number): Promise<ReplayBundl
     const body = (await res.text()).slice(0, 300);
     const head = `POST /api/crawls/${crawl_id}/replay-bundle → ${String(res.status)} ${body}`;
     if (res.status === 404 && body.includes("Route POST:")) {
-      // Fastify がエンドポイントごと知らないときの 404。台帳の 404 (`{"error":"not found"}`) とは本文で分かれる
+      // Fastify がエンドポイントごと知らないときの 404。capture-ledger の 404 (`{"error":"not found"}`) とは本文で分かれる
       throw new Error(
         `${head} —— capture-ledger に合本のエンドポイントが無い (capture-ledger が古い)`,
       );
@@ -142,7 +142,7 @@ export async function main(crawl_id: string, depth: number): Promise<ReplayBundl
     }
     if (res.status === 400) {
       throw new Error(
-        `${head} —— 台帳が本文の形を断った (flow の replay_bundle の段が depth を渡しているか)`,
+        `${head} —— capture-ledger が本文の形を断った (flow の replay_bundle の段が depth を渡しているか)`,
       );
     }
     throw new Error(head);

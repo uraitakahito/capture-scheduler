@@ -4,7 +4,7 @@
  * docs-site/src/assets/windmill-ui/ の PNG は全部この script の生成物で、
  * 手で撮った絵は 1 枚も無い。スクリーンショットは UI の書き写しで、
  * **書き写しは腐る** —— だから撮影条件 (版・viewport・ルート・前提) を
- * shots-manifest.json に台帳化し、check-doc-refs が「compose の Windmill の
+ * shots-manifest.json に記録し、check-doc-refs が「compose の Windmill の
  * pin と manifest の版が一致すること」を CI で検める。compose を上げたら
  * この script を回し直すこと。
  *
