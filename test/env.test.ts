@@ -1,5 +1,5 @@
 /**
- * `scripts/env.ts` の読み口の試験。
+ * `scripts/env.ts` の、環境変数を読む関数の試験。
  *
  * **TypeScript 化で初めて書けるようになったもの。** `.mjs` だった頃は
  * 型が無く、vitest から import しても補完も検査も効かなかったので、
@@ -123,7 +123,7 @@ describe("ledgerEnv", () => {
     ]);
   });
 
-  it("ts-compile の宛先は、doctor が host から叩く口と同じ値", () => {
+  it("ts-compile の宛先は、doctor が host から叩く宛先と同じ値", () => {
     const lines = ledgerEnv({
       windmillUrl: "http://127.0.0.1:8000",
       workspace: "crawler",

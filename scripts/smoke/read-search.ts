@@ -114,7 +114,7 @@ export const readIndexFailure = (message: string): string | undefined => {
   }
   if (/\/index → 404\b/.test(message)) {
     return (
-      "索引の口が 404 —— flow のトークンの名前に、その組織のクロールの許可が無いか、capture-ledger が古い " +
+      "索引のエンドポイントが 404 —— flow のトークンの名前に、その組織のクロールの許可が無いか、capture-ledger が古い " +
       "(pnpm run doctor の can_submit と search route)"
     );
   }

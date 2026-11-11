@@ -3,7 +3,7 @@
  *
  * 既存の試験 (`crawl-level.e2e.test.ts`) が自分の中に持っている既定と同じ物を、環境変数で差し替えられる形で
  * ここに置く。宛先が 2 つ要る理由もあちらと同じ: `FIXTURES` は**取り込む側** (BrowserHive のコンテナ) が引く
- * 名前で起点の URL に載り、`FIXTURES_HOST` は**この試験自身**が叩く loopback の口。macOS 26 では Apple 署名でない
+ * 名前で起点の URL に載り、`FIXTURES_HOST` は**この試験自身**が叩く loopback の宛先。macOS 26 では Apple 署名でない
  * バイナリ (node) がコンテナの subnet へ TCP を張れず、DNS 名は引けるのに `EHOSTUNREACH` になる (実測 2026-09-20)。
  */
 import { fileURLToPath } from "node:url";
@@ -18,7 +18,7 @@ export const FIXTURES_HOST = process.env["E2E_FIXTURES_HOST_URL"] ?? "http://127
 export const SUBJECT = process.env["E2E_SUBJECT"] ?? "e2e";
 
 /**
- * Windmill の口。doctor・smoke と同じく、この repo の `.env`・`.env.local` の `WINDMILL_*` で叩く。試験の process
+ * Windmill のエンドポイント。doctor・smoke と同じく、この repo の `.env`・`.env.local` の `WINDMILL_*` で叩く。試験の process
  * にはどちらも読まれていないので、ここで読む。**`.env.local` が先**: `loadEnvFile` は既に在る値を上書きしないので、
  * 先に読んだ値が勝つ (`--env-file-if-exists=.env --env-file-if-exists=.env.local` と同じ勝ち方)。
  */

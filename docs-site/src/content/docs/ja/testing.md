@@ -20,7 +20,7 @@ OpenSearch が止まったり、索引ごと作り直されたりはするので
 vitest は必ず「No test files found, exiting with code 1」を先に出し、中に書いたどんなメッセージも
 その後ろに隠れるため。
 
-相手の口は環境変数で差し替えられる（`E2E_WAGGLE_URL`・`E2E_ISSUER_URL`・`E2E_FIXTURES_URL`・
+相手の宛先は環境変数で差し替えられる（`E2E_WAGGLE_URL`・`E2E_ISSUER_URL`・`E2E_FIXTURES_URL`・
 `E2E_FIXTURES_HOST_URL`・`E2E_SUBJECT`・`E2E_LEDGER_DIR`。既定は `test/e2e/helpers/stack.ts` と
 `crawl-level.e2e.test.ts` の先頭）。台帳の CLI を打つ試験は capture-ledger の checkout が `../capture-ledger` に
 在る前提なので、git worktree から流すときは `E2E_LEDGER_DIR=<capture-ledger の checkout>` を付ける
@@ -60,10 +60,10 @@ vitest は必ず「No test files found, exiting with code 1」を先に出し、
 
 ## e2e は本物のクロールを始める
 
-どの試験も、Windmill の実行の口ではなく **capture-ledger の API** でクロールを始める —— 目的が
+どの試験も、Windmill の実行のエンドポイント（HTTP の method と path の組）ではなく **capture-ledger の API** でクロールを始める —— 目的が
 「capture-ledger が実際に送る引数」を運ぶことだから: `crawl_id` / `depth` / `frontier` /
 `per_host_delay_ms` / `host_parallelism` / `capture_formats` / `signing` / `scripts` / `variables` /
-`secrets` / `secret_archive` / `user_agent` と、受け口を出している配備では `artifact_sink` で、**`respect_robots` は入っていない**。
+`secrets` / `secret_archive` / `user_agent` と、受け取り先を出している配備では `artifact_sink` で、**`respect_robots` は入っていない**。
 
 最初の試験が見ているのは 5 つ:
 
@@ -79,9 +79,9 @@ vitest は必ず「No test files found, exiting with code 1」を先に出し、
    1 以上で、鍵が `org/acme/crawls/<クロール>/r<版>/replay.json`、頁の行がこのクロールのアーカイブの数以上。
    run が緑でもこれは言えない —— 合本の段は、台帳が 200 で返す失敗では投げない（その失敗 1 つでクロールを
    止めないため）
-5. capture-ledger が受け口を出していれば（トークン無しの `PUT /api/sink/…` が 404 でなく
+5. capture-ledger が受け取り先（成果物を PUT する先）を出していれば（トークン無しの `PUT /api/sink/…` が 404 でなく
    401 を返す）、そのクロールのアーカイブの `objectKey` が全部 `org/acme/<YYYY-MM>/` の下に
-   あること。平らな鍵は、口が配られず BrowserHive が自前の bucket へ書いた印 ——
+   あること。平らな鍵は、受け取り先が配られず BrowserHive が自前の bucket へ書いた印 ——
    capture-ledger #226 から直るまで実際にそうなっていて、その形のクロールは上の 4 つを通る。
 
 `plan_level.ts` の `?? true` を消して配備すると、**単体と e2e が両方赤くなり**、

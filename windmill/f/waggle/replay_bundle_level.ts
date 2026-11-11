@@ -24,7 +24,7 @@
  * ## 投げるのは、200 で答えなかったときと答えの形が違うときだけ
  *
  * 400 (本文の形)・401 (トークン)・404 (クロールが無い・トークンの名前に `can_submit` が無い・capture-ledger が
- * 古く口が無い)・5xx (台帳が DB に届かない)。どれも段を進めても直らない設定か台帳の誤りで、黙ると合本が 1 本も
+ * 古くエンドポイントが無い)・5xx (台帳が DB に届かない)。どれも段を進めても直らない設定か台帳の誤りで、黙ると合本が 1 本も
  * 書かれないまま flow が緑で終わる。
  */
 import * as wmill from "windmill-client";
@@ -89,8 +89,10 @@ export async function main(crawl_id: string, depth: number): Promise<ReplayBundl
     const body = (await res.text()).slice(0, 300);
     const head = `POST /api/crawls/${crawl_id}/replay-bundle → ${String(res.status)} ${body}`;
     if (res.status === 404 && body.includes("Route POST:")) {
-      // Fastify が口ごと知らないときの 404。台帳の 404 (`{"error":"not found"}`) とは本文で分かれる
-      throw new Error(`${head} —— capture-ledger に合本の口が無い (capture-ledger が古い)`);
+      // Fastify がエンドポイントごと知らないときの 404。台帳の 404 (`{"error":"not found"}`) とは本文で分かれる
+      throw new Error(
+        `${head} —— capture-ledger に合本のエンドポイントが無い (capture-ledger が古い)`,
+      );
     }
     if (res.status === 404) {
       throw new Error(

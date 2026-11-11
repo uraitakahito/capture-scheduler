@@ -7,7 +7,7 @@ import { main } from "../windmill/f/waggle/crawl_host.js";
  *
  * 要求の組み立ては `captureHost` が見ている (`crawl-host.test.ts`)。ここは `main` が渡し忘れないかだけを見る ——
  * `main` が `secret_archive` を `captureHost` に渡し忘れても、取り込みは成功し、keep と宣言した値が黙って隠れる。
- * Windmill の変数と BrowserHive の口は差し替える (`windmill-client` と `fetch`)。
+ * Windmill の変数と BrowserHive のエンドポイントは差し替える (`windmill-client` と `fetch`)。
  */
 const VARS: Record<string, string> = {
   "u/admin/browserhive_endpoints": '["http://bh.test:50051"]',
@@ -25,7 +25,7 @@ vi.mock("windmill-client", () => ({
   },
 }));
 
-/** BrowserHive の口の偽物。届いた要求の本文を積み、成功の答えを返す。 */
+/** BrowserHive のエンドポイントの偽物。届いた要求の本文を積み、成功の答えを返す。 */
 const answering = (): unknown[] => {
   const bodies: unknown[] = [];
   vi.stubGlobal(

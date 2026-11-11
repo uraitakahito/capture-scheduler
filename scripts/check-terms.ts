@@ -1,5 +1,5 @@
 /**
- * クロールの語を、旧い言い方で書いていないかを見張る。規則は下の RULES の 9 つ。
+ * クロールの語を、旧い言い方で書いていないかを見張る。規則は下の RULES の 10 個。
  *
  * ## なぜ要るのか
  *
@@ -29,6 +29,11 @@
  * - **7080 番の Web アプリは「capture-workbench」、文で短く書くときは「workbench」と書く。** 2026-11 に「dashboard」から
  *   そろえた（repo の改名に合わせて）。この repo に Grafana の dashboard は無いので、語を全部見る（capture-ledger も同じ）
  * - **WACZ を開くビューアは「replayweb-server」と書く。** 2026-11 に「replay」から替えた（repo の改名に合わせて）
+ * - **HTTP の method と path の組と BrowserHive の宛先 URL 1 本は「エンドポイント」、待ち受けの番号は「ポート」、
+ *   スクリプトを差し込む時は「phase」、成果物を PUT する先は「受け取り先」と書く。** 2026-11 に（Jira CAPTURE-184）、
+ *   1 字の語から意味ごとに替えた。同じ字が 1 つの文の中でも別の物を指していた。切り口・入口・出口・窓口は別の語なので
+ *   外してから、残った字を全部見る。「注入口」は「入口」を含むので先に止める（capture-workbench・capture-ledger・
+ *   browserhive も見張っている）
  *
  * 書き手（人と Claude）は長くこの形で書いてきたので、見張らなければ戻ってくる。
  *
@@ -66,12 +71,14 @@ const SELF = "scripts/check-terms.ts";
 const ALLOWED = /種類|種別|\d\s?種/gu;
 /** 「網」を network の意味に取れない形（安全網・網羅）。 */
 const NOT_NET = /安全網|網羅/gu;
+/** 「口」を、エンドポイント・ポート・phase・受け取り先の意味に取れない語（2026-11・CAPTURE-184）。 */
+const NOT_KUCHI = /切り口|入口|出口|窓口/gu;
 /**
  * クロールを始める意味の「起こす」の形。capture-ledger・capture-workbench と同じ並び。
  * 足すときは、プロセス・job・flow の「起こす」（webhook で起こす・次の段を起こす）に当たらないことを確かめる。
  */
 const OKOSU =
-  /クロールを起こ|クロールは起こ|取り込みを起こ|取り込みの実行を起こ|起こしたクロール|起こせ(ます|ません|る|ない|れば|ば|て)|起こす(面|欄|口)|起こした(人|本人|行)|起こしました|起こしてよ|下敷きにして起こ|「起こす」|"起こす"/u;
+  /クロールを起こ|クロールは起こ|取り込みを起こ|取り込みの実行を起こ|起こしたクロール|起こせ(ます|ません|る|ない|れば|ば|て)|起こす(面|欄)|起こした(人|本人|行)|起こしました|起こしてよ|下敷きにして起こ|「起こす」|"起こす"/u;
 
 /**
  * その場で書く物の古い呼び名（2026-11 まで）。JS になるのは変換の後なので、走った JS・JS の hash は当てない。
@@ -128,6 +135,12 @@ const RULES: { find: (line: string) => boolean; say: string }[] = [
   {
     find: (line) => OLD_REPLAY_NAMES.test(line),
     say: "replay の旧い名前が残っています。WACZ を開くビューアは「replayweb-server」、capture-ledger の中の path は `.upstream/replayweb-server` と書きます。",
+  },
+  {
+    find: (line) => line.includes("注入口") || line.replace(NOT_KUCHI, "").includes("口"),
+    say:
+      "「口」が残っています。HTTP の method と path の組と BrowserHive の宛先 URL は「エンドポイント」、待ち受けの番号は" +
+      "「ポート」、スクリプトを差し込む時は「phase」、成果物を PUT する先は「受け取り先」と書きます（切り口・入口・出口はそのまま）。",
   },
 ];
 

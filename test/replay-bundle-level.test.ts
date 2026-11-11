@@ -140,14 +140,16 @@ describe("200 で答えなかったら段を落とす", () => {
     await expect(main("c-1", 0)).rejects.toThrow(/replay-bundle → 404.*can_submit/);
   });
 
-  it("口ごと無い 404（capture-ledger が古い）は、そう言って投げる", async () => {
+  it("エンドポイントごと無い 404（capture-ledger が古い）は、そう言って投げる", async () => {
     // Fastify が route を知らないときの本文。台帳の 404 とは本文で分かれる
     responding(404, {
       message: "Route POST:/api/crawls/c-1/replay-bundle not found",
       error: "Not Found",
       statusCode: 404,
     });
-    await expect(main("c-1", 0)).rejects.toThrow(/合本の口が無い \(capture-ledger が古い\)/);
+    await expect(main("c-1", 0)).rejects.toThrow(
+      /合本のエンドポイントが無い \(capture-ledger が古い\)/,
+    );
   });
 
   it("401 は投げる", async () => {

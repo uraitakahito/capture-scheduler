@@ -41,7 +41,7 @@ OpenSearch に頼らないから —— 索引の段が落ちても合本は書�
 WACZ がある（`failed` が 1 以上。次の合本が拾い直す）、入れる WACZ がまだ無い（`rev: null`）。1 行のログに書いて
 返す。投げると索引の段が飛び、`fail_crawl` がクロールを `failed` で締める（次の段が既に走っていても）。投げるのは、
 台帳が 200 で答えなかったとき（400 は本文の形、401 はトークン、404 はクロールが無いか、トークンの名前にクロールの
-許可が無いか、capture-ledger が古く口が無い、5xx）と、答えの形が違うときだけ。
+許可が無いか、capture-ledger が古くエンドポイントが無い、5xx）と、答えの形が違うときだけ。
 
 `index_level` は報告の後に走るので、そのとき capture-ledger はもうクロールを締めている（または
 次の段を始めている）。全文検索は capture-ledger の必須の部品なので、この段は何も飛ばさない —— 台帳が 404
@@ -100,18 +100,18 @@ subnet に届かないので、loopback に出す）。この宛先は、bootstr
 `test/plan-level.test.ts` に両側の試験があるのは、「robots があれば常に robots を採る」
 実装が片側の試験を通ってしまうから。
 
-## BrowserHive は browser 1 台に口 1 つ
+## BrowserHive は browser 1 台にエンドポイント 1 つ
 
 BrowserHive は queue も pool も持たない。`POST /captures` は 1 往復で、走行中の server は
 `429 Busy` で断る。だから空いている server を選ぶのは `crawl_host` の仕事 ——
-`u/admin/browserhive_endpoints` の一覧を順に試し、busy なら次へ、届かない口はその
+`u/admin/browserhive_endpoints` の一覧を順に試し、busy なら次へ、届かないエンドポイント（BrowserHive の宛先 URL）はその
 呼び出しの間は飛ばし、全部 busy なら 0.5〜1.5 秒待ってもう一周する。1 つも届かない
 ときだけ `ServerUnavailable` を投げ、段ごと失敗させる。
 
 帰結が 2 つ:
 
-- **`host_parallelism` は口の数で頭打ち。** `plan_level` が
-  `parallelism = max(1, min(host_parallelism, 口の数))` を返し、for-loop はそれを使う。
+- **`host_parallelism` はエンドポイントの数で頭打ち。** `plan_level` が
+  `parallelism = max(1, min(host_parallelism, エンドポイントの数))` を返し、for-loop はそれを使う。
   browser より多くのホストを並列にしても、busy を引いて待つホストが増えるだけ。
 - **再試行はこちらに移った。** BrowserHive は server 側で再試行しなくなった —— あちらで
   再試行すると、ここで測っている間隔を素通りする。一過性の失敗（`connection` /
@@ -146,7 +146,7 @@ capture-ledger へ運ぶ（段の報告の `compiled`）。台帳はそれをク
 `scripts` を必須にしてあるのは `capture_formats` と同じ理由。BrowserHive v11.0.0 は
 走らせるものの顔ぶれを持たないので、送らなければページの中では何も走らず、**それでも
 取り込みは成功してアーカイブも出る**。渡し忘れは「一度もスクロールしなかったクロール」に
-なり、した側と見分けが付かない。この flow は運ぶだけで、何を・どの順で・どちらの口
+なり、した側と見分けが付かない。この flow は運ぶだけで、何を・どの順で・どちらの phase
 （読み込み後の `behavior` か、遷移前の `preload` か）で走らせるかは capture-ledger が
 決める。
 
@@ -160,7 +160,7 @@ pnpm run windmill:capture-ledger-token   # waggle_token / waggle_api_url /
 `http://ts-compile.capture-scheduler:8080`、この repo の compose の `ts-compile`。
 `TS_COMPILE_URL` で変えられる）。`pnpm run doctor` が worker からその `/healthz` に届くかを見る。
 
-`u/admin/browserhive_tls_ca` は browserhive の口が `https://` のときの CA 証明書
+`u/admin/browserhive_tls_ca` は browserhive のエンドポイントが `https://` のときの CA 証明書
 （PEM）で、**空文字は「平文」**。空でも変数そのものは必ず作る —— 変数を作らない形に
 すると `getVariable` が落ち、script 側で「読めなかった」を「TLS は要らない」と扱った
 瞬間、読み取りの失敗が黙って平文に落ちる経路になる。「システムの root で TLS」は
@@ -171,7 +171,7 @@ pnpm run windmill:capture-ledger-token   # waggle_token / waggle_api_url /
 BrowserHive から写しているものは他に無い。`crawl_host` は BrowserHive の HTTP API
 （v12 からの `POST /captures`、本文は JSON）を `fetch` で話すので、同期し続ける契約の
 ファイルが無い —— v0.22 までは BrowserHive の gRPC の `.proto` の写しを Windmill の resource に
-置き、腐りを捕まえる番人を付けていた。だから口は `http(s)://` の URL で、`crawl_host` は
+置き、腐りを捕まえる番人を付けていた。だからエンドポイントは `http(s)://` の URL で、`crawl_host` は
 古い `host:port` の形を変数の名前を挙げて断る。
 
 ## クロールごとの User-Agent
@@ -185,13 +185,13 @@ robots.txt の規則を照らすのに使う: 字に `BrowserHive` があれば�
 
 ## クロールごとの値 —— 変数とシークレット
 
-スクリプトは、クロールごとに違う値を 2 つの口で受け取る。変数はスクリプトが
+スクリプトは、クロールごとに違う値を 2 つの経路で受け取る。変数はスクリプトが
 [capture-scripts](https://github.com/uraitakahito/capture-scripts) の `defineParams`（v0.11.0 から）で宣言して読み、
 シークレットは `catalog.json` の `params` で宣言して BrowserHive の受け皿 `__bh.secrets` で読む。頁に届くのは
 どちらも受け皿で、`defineParams` は JS で `__bh.vars` に置き換わる。
 **flow はどちらも運ぶだけで中身を見ない。**
 
-| 口               | 台帳が送る物                                                                                                 | `crawl_host` がすること                                                                    | 記録に残る物                                                                                   |
+| 経路             | 台帳が送る物                                                                                                 | `crawl_host` がすること                                                                    | 記録に残る物                                                                                   |
 | ---------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
 | `variables`      | 名前 → 値。`POST /api/crawls` の `variables` で頼んだ物を台帳が固定する                                      | そのまま BrowserHive の要求に載せる                                                        | 値（WACZ の `settings.variables`・台帳の行）                                                   |
 | `secrets`        | 名前 → Windmill の変数の path（`f/waggle_secrets/<名前>`）。スクリプトの宣言から台帳が集め、在るかを確かめる | `getVariable` で値に解き、BrowserHive の要求に**だけ**載せる。フォルダの外の path は投げる | 名前だけ（WACZ の `settings.secrets`。台帳の行には path と、置いた時刻）                       |

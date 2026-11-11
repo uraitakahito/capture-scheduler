@@ -16,9 +16,9 @@ import {
 import { SECRETS_FOLDER_NAME } from "../scripts/doctor/windmill-contents.js";
 
 /**
- * 1 ホストぶんの取り込み。**礼儀と、口の選び方と、結果の判定。**
+ * 1 ホストぶんの取り込み。**礼儀と、エンドポイントの選び方と、結果の判定。**
  *
- * `captureHost` は口 (`Endpoint`) を引数で受け、`Endpoint.capture` は答え (`Answer`) を返す
+ * `captureHost` はエンドポイント (`Endpoint`) を引数で受け、`Endpoint.capture` は答え (`Answer`) を返す
  * だけなので、偽物はただの関数で足りる —— HTTP も Windmill も要らない。
  *
  * **fake timer は使わない。** capture 系の sleep はここで race される形になりうるし、
@@ -67,9 +67,9 @@ interface Reply {
 }
 
 /**
- * 偽の BrowserHive の口。
+ * 偽の BrowserHive のエンドポイント。
  *
- * - `busyTimes`: 先頭から何回 429 (`Busy`) を返すか (走行中の口)
+ * - `busyTimes`: 先頭から何回 429 (`Busy`) を返すか (走行中のエンドポイント)
  * - `down`: 常に届かない (fetch が投げる形)
  * - `error`: この誤りをそのまま投げる (deadline など)
  * - `refuse`: この答えをそのまま返す (400 / 500 など、200 でない答え)
@@ -331,12 +331,12 @@ describe("断られた答えの読み方", () => {
   });
 });
 
-describe("口を選ぶ", () => {
+describe("エンドポイントを選ぶ", () => {
   /**
-   * **BrowserHive は browser 1 台に口 1 つ。** 走行中の口は 429 (`Busy`) で断るので、
-   * 空いている口を探すのはこちらの仕事。
+   * **BrowserHive は browser 1 台にエンドポイント 1 つ。** 走行中のエンドポイントは 429 (`Busy`) で断るので、
+   * 空いているエンドポイントを探すのはこちらの仕事。
    */
-  it("busy の口は飛ばして次の口に投げる", async () => {
+  it("busy のエンドポイントは飛ばして次のエンドポイントに投げる", async () => {
     const calls: Call[] = [];
     const busy = fakeEndpoint("bh-1", { busyTimes: 1, calls });
     const free = fakeEndpoint("bh-2", { calls });
@@ -359,7 +359,7 @@ describe("口を選ぶ", () => {
   });
 
   it("ページごとに試す順をずらす", async () => {
-    // 固定だと先頭の口ばかりに当たり、2 つ目は 1 つ目が busy のときにしか使われない。
+    // 固定だと先頭のエンドポイントばかりに当たり、2 つ目は 1 つ目が busy のときにしか使われない。
     const calls: Call[] = [];
     const a = fakeEndpoint("bh-1", { calls });
     const b = fakeEndpoint("bh-2", { calls });
@@ -368,7 +368,7 @@ describe("口を選ぶ", () => {
     expect(calls.map((c) => `${c.url}@${c.target}`)).toEqual(["a@bh-1", "b@bh-2", "c@bh-1"]);
   });
 
-  it("居ない口は飛ばし、残りの口で取り込む", async () => {
+  it("居ないエンドポイントは飛ばし、残りのエンドポイントで取り込む", async () => {
     const calls: Call[] = [];
     const down = fakeEndpoint("bh-1", { down: true, calls });
     const ok = fakeEndpoint("bh-2", { calls });
@@ -390,13 +390,13 @@ describe("口を選ぶ", () => {
     await expect(run([a, b], ["https://site.test/a"])).rejects.toThrow(ServerUnavailable);
   });
 
-  it("居ない口の名前を誤りに載せる", async () => {
+  it("居ないエンドポイントの名前を誤りに載せる", async () => {
     // 2 台のうちどちらを見に行けばよいか、名指しで分かること。
     await expect(run([fakeEndpoint("bh-1", { down: true })], ["a"])).rejects.toThrow("bh-1");
   });
 
-  it("deadline は口を飛ばす理由にしない —— 投入は通っているかもしれない", async () => {
-    // 固まった口の次の口で撮り直すと、相手に 2 回目が届く。1 ページの失敗として返す。
+  it("deadline はエンドポイントを飛ばす理由にしない —— 投入は通っているかもしれない", async () => {
+    // 固まったエンドポイントの次のエンドポイントで撮り直すと、相手に 2 回目が届く。1 ページの失敗として返す。
     const calls: Call[] = [];
     const stuck = fakeEndpoint("bh-1", { error: deadlineError(), calls });
     const ok = fakeEndpoint("bh-2", { calls });
@@ -508,7 +508,7 @@ describe("一過性の失敗の再試行", () => {
   });
 });
 
-describe("口の一覧の読み方", () => {
+describe("エンドポイントの一覧の読み方", () => {
   it("URL の JSON 配列を、末尾の / を落として返す", () => {
     expect(parseEndpoints('["http://bh-1:50051/", "https://bh-2:50051"]')).toEqual([
       "http://bh-1:50051",
@@ -522,12 +522,12 @@ describe("口の一覧の読み方", () => {
   });
 
   it("scheme の無い宛先は落ちる —— v11 までの host:port", () => {
-    // gRPC 時代の綴りのまま v12 の口に向けると `http` という名前の host を引きに行く前に止める。
+    // gRPC 時代の綴りのまま v12 のエンドポイントに向けると `http` という名前の host を引きに行く前に止める。
     expect(() => parseEndpoints('["browserhive-1.capture-ledger:50051"]')).toThrow("http(s)://");
   });
 
   it("空の配列は落ちる", () => {
-    // 黙って空にすると「口が 1 つも無い」が「全部 busy」と同じ待ちに化ける。
+    // 黙って空にすると「エンドポイントが 1 つも無い」が「全部 busy」と同じ待ちに化ける。
     expect(() => parseEndpoints("[]")).toThrow("空でない");
   });
 
@@ -574,7 +574,7 @@ describe("成果物の送り先", () => {
   });
 
   it("渡されなければ載せない —— 従来どおり自前の保管庫へ書かせる", async () => {
-    // **ここが空でないと、受け口を建てていない配備で取り込みが全部失敗する。**
+    // **ここが空でないと、受け取り先を建てていない配備で取り込みが全部失敗する。**
     const seen: unknown[] = [];
 
     await captureHost(
@@ -596,7 +596,7 @@ describe("成果物の送り先", () => {
  * **走らせるものを運ぶ。** BrowserHive v11.0.0 から、サーバは顔ぶれを持たない ——
  * 送らなければページの中では何も走らず、それでも取り込みは成功してアーカイブも出る。
  *
- * この層は中身を見ない。見ているのは「台帳が渡したものが、2 つの口に正しく分かれて、
+ * この層は中身を見ない。見ているのは「台帳が渡したものが、2 つの phase に正しく分かれて、
  * 並びを保ったまま本文に載るか」だけ。欄の綴りは BrowserHive の model (`Script` は
  * id / source / sha256 / options、`behaviors` と `preload` は素の配列) —— 届く形は
  * e2e が本物の server で確かめる。
@@ -627,8 +627,8 @@ describe("ページで走らせるスクリプト", () => {
     };
   };
 
-  it("phase で 2 つの口に分ける", async () => {
-    // 同じ形の 1 本でも、入る口で約束が違う —— behavior は読み込みの後・主フレーム、
+  it("phase で 2 つに分ける", async () => {
+    // 同じ形の 1 本でも、入る phase で約束が違う —— behavior は読み込みの後・主フレーム、
     // preload は遷移の前・全フレーム。混ぜると、どちらで走ったのかを誰も言えない。
     const req = await sendWith([script("autoscroll", "behavior"), script("hide", "preload")]);
 
@@ -674,7 +674,7 @@ describe("ページで走らせるスクリプト", () => {
     expect(req).not.toHaveProperty("preload");
   });
 
-  it("片方しか無ければ、その口だけを送る", async () => {
+  it("片方しか無ければ、その phase だけを送る", async () => {
     const req = await sendWith([script("hide", "preload")]);
     expect(req).not.toHaveProperty("behaviors");
     expect(req.preload).toHaveLength(1);

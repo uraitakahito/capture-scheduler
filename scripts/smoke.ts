@@ -87,9 +87,9 @@ function stop(label: string, text: string): never {
 /** 既定で撮る capture-fixtures (capture-ledger のスタックの物。BrowserHive のコンテナがこの名前を引く)。 */
 const FIXTURES = "http://capture-fixtures.capture-ledger:8080";
 /**
- * host から見た capture-ledger のスタックの replayweb-server (compose が loopback の 8899 に出す口)。合本の `replay.json` を
- * `/wacz/<鍵>` から読む —— ReplayWeb.page が合本を開くときと同じ口で読めるかを見る。`API` と同じく、台帳の
- * 開発のスタックの決まった口。
+ * host から見た capture-ledger のスタックの replayweb-server (compose が loopback の 8899 に出すポート)。合本の `replay.json` を
+ * `/wacz/<鍵>` から読む —— ReplayWeb.page が合本を開くときと同じエンドポイントで読めるかを見る。`API` と同じく、台帳の
+ * 開発のスタックの決まったポート。
  */
 const REPLAYWEB_SERVER = "http://127.0.0.1:8899";
 /** 既定の頁と、検索に使う語 (撮るたびに変わる印)。URL を渡したときは無い。 */
@@ -589,7 +589,7 @@ if (target === undefined) {
           got.status === 503
             ? "capture-ledger の OpenSearch が答えない → cd ../capture-ledger && pnpm run dev:up --from search"
             : got.status === 404
-              ? "台帳に検索の口が無い (pnpm run doctor の search route)"
+              ? "台帳に検索のエンドポイントが無い (pnpm run doctor の search route)"
               : "答えの形が違う (total が数でない) —— capture-ledger が古い",
       };
       break;

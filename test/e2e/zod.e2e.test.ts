@@ -24,7 +24,7 @@ import { readWacz, textOf } from "./helpers/wacz.js";
  * 分けられない。スクリプトの中で待ち、対照で届くことを示す。
  */
 
-/** `/csp/strict` の報告の口 (capture-fixtures の `CSP_REPORT.path`) */
+/** `/csp/strict` の報告のエンドポイント (capture-fixtures の `CSP_REPORT.path`) */
 const CSP_REPORT = "/csp/report";
 
 /** 報告がブラウザから届くまでの間 */

@@ -26,10 +26,10 @@
  * ブラウザはサブリソースまで取るので、1 回の取り込みは相手から見れば数十本のバースト。
  * 既定の 2 秒はそれを踏まえた値で、robots.txt に `Crawl-delay` があればそちらが勝つ。
  *
- * ## BrowserHive は browser 1 台に口 1 つ
+ * ## BrowserHive は browser 1 台にエンドポイント 1 つ
  *
  * BrowserHive (v9 以降) は queue も pool も持たない。取り込みは 1 回の `POST /captures` で
- * 終わり、走行中に呼ばれれば 429 (`Busy`) で断る。だから「空いている口を選ぶ」のはここの
+ * 終わり、走行中に呼ばれれば 429 (`Busy`) で断る。だから「空いているエンドポイントを選ぶ」のはここの
  * 仕事 —— endpoint を順に試し、busy なら次、全部 busy なら少し待ってもう一周。
  * server 側の再試行も無くなったので、一過性の失敗をもう一度だけ試すのもここ
  * (間隔を空けてから。再試行も相手から見れば 1 回のアクセス)。
@@ -37,7 +37,7 @@
  * ## 契約は HTTP の JSON (BrowserHive v12.0.0)
  *
  * v11 までは gRPC で、proto の写しを Windmill の resource に置き、実行時に読んでいた。
- * v12 から口は restJson1 の HTTP で、契約は browserhive の `model/main.smithy` (OpenAPI は
+ * v12 からエンドポイントは restJson1 の HTTP で、契約は browserhive の `model/main.smithy` (OpenAPI は
  * `generated/openapi.json`)。運ぶ物は無くなり、この script が使うのは `fetch` だけ。
  * 断られ方は `x-amzn-errortype` ヘッダ (error の名前) と status で読む ——
  * `ValidationException` (400) と `Busy` (429)。
@@ -123,7 +123,7 @@ export interface CaptureSettings {
 /**
  * 走らせるもの 1 本。台帳が解決済みで、ここを素通りして BrowserHive へ行く。
  *
- * `phase` が入る口を決める。`behavior` は読み込みの後・主フレーム・1 回、
+ * `phase` が差し込む時を決める。`behavior` は読み込みの後・主フレーム・1 回、
  * `preload` は遷移の**前**・iframe を含む全フレーム・遷移のたび。BrowserHive では
  * それぞれ `behaviors` と `preload` という別の欄になる。
  *
@@ -161,7 +161,7 @@ export interface PageResult {
   linksLocation?: string;
   /**
    * `.result.json` を書けた場所 (`s3://…`)。**綴りはこちらで組まない** —— BrowserHive
-   * (または受け口) が応答で答えた場所をそのまま運ぶ。capture-ledger はこれを鍵にして
+   * (または受け取り先) が応答で答えた場所をそのまま運ぶ。capture-ledger はこれを鍵にして
    * manifest を読み、台帳に書き留める。
    */
   manifestLocation?: string;
@@ -234,12 +234,12 @@ export interface Answer {
 }
 
 /**
- * BrowserHive の口。`capture` は `POST /captures` を 1 回投げて答えを持ち帰る。
+ * BrowserHive のエンドポイント。`capture` は `POST /captures` を 1 回投げて答えを持ち帰る。
  *
  * **届かなければ投げる** (DNS・拒否・切断・TLS —— `fetch` が投げるもの)。deadline を過ぎたときも
  * 投げる (`name` が `TimeoutError`)。答えが在れば、4xx でも 5xx でも `Answer` で返す。
  *
- * `target` は log のため —— 「どの口が居ないか」を名指しできないと、2 台のうち
+ * `target` は log のため —— 「どのエンドポイントが居ないか」を名指しできないと、2 台のうち
  * どちらを見に行けばよいか分からない。
  */
 export interface Endpoint {
@@ -253,11 +253,11 @@ const isDeadline = (err: unknown): boolean =>
 
 /**
  * `u/admin/browserhive_endpoints` の中身。**`http(s)://` で始まる URL の JSON 配列**で、
- * 1 要素が 1 つの口。TLS か平文かは URL の scheme が言う (`https://` なら
+ * 1 要素が 1 つのエンドポイント。TLS か平文かは URL の scheme が言う (`https://` なら
  * `u/admin/browserhive_tls_ca` の CA で検証する)。
  *
  * 書くのは `scripts/capture-ledger-token.ts`。形が違えばここで落とす —— 黙って空の
- * 一覧にすると、「口が 1 つも無い」が「全部 busy」と同じ待ちに化ける。v11 までの
+ * 一覧にすると、「エンドポイントが 1 つも無い」が「全部 busy」と同じ待ちに化ける。v11 までの
  * `host:port` (scheme 無し) もここで止まる。
  */
 export const parseEndpoints = (raw: string): string[] => {
@@ -288,13 +288,13 @@ export const parseEndpoints = (raw: string): string[] => {
 };
 
 /**
- * 口ごとに `fetch` を包む。
+ * エンドポイントごとに `fetch` を包む。
  *
  * **CA が名指しされているときだけ TLS の検証に使う。** 「システムの root で TLS」は用意しない ——
  * BrowserHive の TLS は私設 CA を想定したもので、公開の証明書が要るということは server が
  * 公開インターネット上に在るという意味になるが、そうではない。CA は Bun の `fetch` の
  * `tls.ca` に渡す (Windmill の TypeScript の script は Bun で走る。Node の `fetch` には
- * この口が無い)。平文の口 (`http://`) には効かない。
+ * この option が無い)。平文のエンドポイント (`http://`) には効かない。
  */
 export const httpEndpoint = (target: string, caPem: string): Endpoint => ({
   target,
@@ -377,15 +377,15 @@ const busyWait = (retry: BusyRetry): Promise<void> =>
   sleep(retry.minMs + Math.random() * (retry.maxMs - retry.minMs));
 
 /**
- * 空いている口に 1 件投げ、答えを持ち帰る。
+ * 空いているエンドポイントに 1 件投げ、答えを持ち帰る。
  *
  * **429 と「届かない」だけは種類が違う。** 他の答えは「この取り込みは駄目だった」だが、
- * 前者は「この口は走行中」なので次の口へ、後者は「この口は居ない」なので以後この呼び出しでは
+ * 前者は「このエンドポイントは走行中」なので次のエンドポイントへ、後者は「このエンドポイントは居ない」なので以後この呼び出しでは
  * 飛ばす。全部 busy なら少し待ってもう一周。全部居なければ `ServerUnavailable` ——
  * 次のページを試しても同じ答えしか返らない。deadline に当たったときは投げ直す —— 投入は
- * 通っているかもしれず、口を飛ばす理由にはならない。
+ * 通っているかもしれず、エンドポイントを飛ばす理由にはならない。
  *
- * 試す順はページごとにずらす (`start`)。固定だと先頭の口ばかりに当たり、
+ * 試す順はページごとにずらす (`start`)。固定だと先頭のエンドポイントばかりに当たり、
  * 2 つ目は 1 つ目が busy のときにしか使われない。
  */
 const captureOnAny = async (
@@ -411,7 +411,7 @@ const captureOnAny = async (
         down.add(endpoint);
         continue;
       }
-      // model で 429 を返すのは Busy だけ。走行中の口なので次へ。
+      // model で 429 を返すのは Busy だけ。走行中のエンドポイントなので次へ。
       if (answer.status === 429) continue;
       return answer;
     }
@@ -538,7 +538,7 @@ export const resolveSecrets = async (
 const captureOne = async (
   endpoints: Endpoint[],
   url: string,
-  /** このホストの中で何件目か。口を試す順をずらすのに使う。 */
+  /** このホストの中で何件目か。エンドポイントを試す順をずらすのに使う。 */
   index: number,
   crawlId: string,
   capture: CaptureSettings,
@@ -553,7 +553,7 @@ const captureOne = async (
     // **6 つ全部を送る。** 何を立てるかを決めるのは capture-ledger。
     captureFormats: capture.formats,
     signing: capture.signing,
-    // **口が 2 つある。** `behaviors` は読み込みの後、`preload` は遷移の前。
+    // **phase が 2 つある。** `behaviors` は読み込みの後、`preload` は遷移の前。
     // 空なら鍵ごと送らない —— 本文に意味の無い欄を増やさない。
     ...toBehaviors(capture.scripts),
     ...toPreload(capture.scripts),
@@ -647,7 +647,7 @@ const captureOne = async (
  *
  * `main` から切り出してあるのは、**endpoint を受け取る形なら試験できる**から。
  * `Endpoint.capture` は答えを返すだけなので、偽物はただの関数で足りる —— HTTP も
- * Windmill も要らない。`main` に残るのは「変数を読む → 口を包む → ここへ委ねる」だけで、
+ * Windmill も要らない。`main` に残るのは「変数を読む → エンドポイントを包む → ここへ委ねる」だけで、
  * そちらは往復でしか確かめられない。
  *
  * `retry` (busy のときの待ち幅) を引数にしているのも試験のため。既定の 0.5〜1.5 秒の
@@ -714,7 +714,7 @@ export async function main(
    * 成果物の押し出し先。capture-ledger が crawl ごとに 1 回きりで発行する。
    *
    * **省ける。** 省けば BrowserHive は従来どおり自前の保管庫へ書くので、2 つの経路が
-   * 同時に生きる。ここを必須にすると、受け口を建てていない配備が動かなくなる。
+   * 同時に生きる。ここを必須にすると、受け取り先を建てていない配備が動かなくなる。
    *
    * flow は運ぶだけで中身を見ない —— 発行するのも、置き場所を決めるのも capture-ledger。
    * 省いた配備からは `null` で届く (`given`)。

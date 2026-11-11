@@ -86,10 +86,10 @@ describe("合本の段の答え", () => {
     expect(readReplayBundleStep(undefined, CRAWL)?.fix).toContain("windmill:push");
   });
 
-  it("合本の段が落ちた文を、直し方に当てる（口が無い・400）", () => {
+  it("合本の段が落ちた文を、直し方に当てる（エンドポイントが無い・400）", () => {
     expect(
       readReplayBundleFailure(
-        "POST /api/crawls/c/replay-bundle → 404 {} —— capture-ledger に合本の口が無い (capture-ledger が古い)",
+        "POST /api/crawls/c/replay-bundle → 404 {} —— capture-ledger に合本のエンドポイントが無い (capture-ledger が古い)",
       ),
     ).toContain("replay-bundle route");
     expect(

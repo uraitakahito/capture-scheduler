@@ -104,7 +104,7 @@ describe("定期実行", () => {
     expect(res.status).toBe(404);
   });
 
-  it("読めない cron と短すぎる周期は 400 で、頼みの中身は始める口と同じ文で断る", async () => {
+  it("読めない cron と短すぎる周期は 400 で、頼みの中身は始めるエンドポイントと同じ文で断る", async () => {
     const bad = await post("/api/schedules", {
       name: nameOf(),
       cron: "61 4 * * *",

@@ -7,7 +7,7 @@
  * クロールは `running` のまま残り、以後の起動は全部 409 になる。
  *
  * **どれも、正しい設定と誤った設定で答えが変わる入力を使う。** たとえば jwt を「ヘッダで
- * 名乗ると 401」で見ると、名乗りの口がどちらも無い API も 401 で通ってしまう。だから issuer
+ * 名乗ると 401」で見ると、名乗りの手段がどちらも無い API も 401 で通ってしまう。だから issuer
  * から token を取り、それが 200 になることを見る。push は在るかでなく中身を比べ、変数は
  * flow が読むその値で宛先を叩く。
  *
@@ -62,7 +62,7 @@ import {
   type CurlAnswer,
 } from "./worker-probes.js";
 
-/** host から見た capture-ledger の API。smoke も同じ口を叩く。 */
+/** host から見た capture-ledger の API。smoke も同じ宛先を叩く。 */
 export const API = "http://127.0.0.1:7070";
 /** capture-ledger の開発のスタックの OpenFGA。鍵はクイックスタートの前提と同じ。 */
 const OPENFGA = "http://127.0.0.1:8090";
@@ -287,7 +287,7 @@ const mint = async (subject: string): Promise<string | undefined> => {
 
 /**
  * issuer から token を取り、Bearer で一覧を読む。**200 になるのは JWT を受ける API だけ** ——
- * ヘッダの設定の API も、どちらの口も無い API も 401 を返す。拒まれたら、同じ API にヘッダで
+ * ヘッダの設定の API も、どちらの手段も無い API も 401 を返す。拒まれたら、同じ API にヘッダで
  * `GET /api/me` を訊き、どちらなのかを `jwt-check.ts` が読み分ける。
  */
 const acceptsJwt = async (): Promise<Verdict> => {
@@ -412,8 +412,8 @@ const containerReachesApi = async (): Promise<Verdict> => {
 };
 
 /**
- * BrowserHive の口 (変数 `u/admin/browserhive_endpoints`) に、worker の中から届くか。
- * 口は browser 1 台に 1 つなので、全部を並べて `GET /status` を叩き、落ちている口を名指しする。
+ * BrowserHive のエンドポイント (変数 `u/admin/browserhive_endpoints`) に、worker の中から届くか。
+ * エンドポイントは browser 1 台に 1 つなので、全部を並べて `GET /status` を叩き、落ちているエンドポイントを名指しする。
  */
 const workerReachesBrowserhive = async (): Promise<Outcome> => {
   const [list, ca] = await Promise.all([
@@ -421,10 +421,12 @@ const workerReachesBrowserhive = async (): Promise<Outcome> => {
     variable("u/admin/browserhive_tls_ca"),
   ]);
   if (list === undefined) return unreadable("u/admin/browserhive_endpoints");
-  // TLS の口は、worker の curl に CA を渡す口が無い (変数の PEM をコンテナの中の file にする
+  // TLS のエンドポイントは、worker の curl に CA を渡す手段が無い (変数の PEM をコンテナの中の file にする
   // 手順が要る)。推測で ✓ も ✗ も出さない。
   if (ca !== undefined && ca !== "") {
-    return { skipped: "TLS の口は見ない (u/admin/browserhive_tls_ca に CA が入っている)" };
+    return {
+      skipped: "TLS のエンドポイントは見ない (u/admin/browserhive_tls_ca に CA が入っている)",
+    };
   }
   const endpoints = parse(list);
   if (!Array.isArray(endpoints) || !endpoints.every((e) => typeof e === "string")) {
@@ -503,9 +505,9 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
     name: "host→ts-compile",
     section: SECTIONS.bringUp,
     // **loopback で訊く** (capture-fixtures と同じ理由で、host の node はコンテナの subnet に届かない)。
-    // capture-ledger が、型で落ちたクロールの誤りを取り直し、直し方を確かめるのに呼ぶ口。
+    // capture-ledger が、型で落ちたクロールの誤りを取り直し、直し方を確かめるのに呼ぶ宛先。
     // worker→ts-compile は flow の側の宛先 (名前) を見るので、どちらか片方では足りない。
-    where: `${HOST_TS_COMPILE}/healthz (capture-ledger が host から呼ぶ口)`,
+    where: `${HOST_TS_COMPILE}/healthz (capture-ledger が host から呼ぶ宛先)`,
     probe: async () => readHostTsCompile(await answerOf(`${HOST_TS_COMPILE}/healthz`)),
   },
   {
@@ -584,9 +586,9 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
     name: "replay-bundle route",
     section: SECTIONS.bringUp,
     where: `POST ${API}/api/crawls/<uuid>/replay-bundle ${REPLAY_BUNDLE_PROBE_BODY} (名乗らずに 401 なら在る)`,
-    // flow の合本の段が叩く口。無い (古い capture-ledger) と、どのクロールも合本の段で落ちる。
+    // flow の合本の段が叩くエンドポイント。無い (古い capture-ledger) と、どのクロールも合本の段で落ちる。
     // 名乗らずに叩くので、台帳は版を払い出さず、何も書かない (読み分けは `replay-bundle-route.ts`)。
-    // 親は crawl route —— 台帳はクロールの口 (webhook の 2 行) を出すときだけ合本の口も出すので、webhook が
+    // 親は crawl route —— 台帳はクロールのエンドポイント (webhook の 2 行) を出すときだけ合本のエンドポイントも出すので、webhook が
     // 無いと両方 404 になる。親にしておけば、直すもの 1 つに ✗ も 1 本。
     needs: ["crawl route"],
     probe: async () =>
@@ -609,7 +611,7 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
     name: "search route",
     section: SECTIONS.bringUp,
     where: `issuer のトークンで GET ${API}${SEARCH_PROBE} (200 なら OpenSearch まで届く)`,
-    // 台帳の全文検索。口が無いか OpenSearch が答えないと、flow の索引の段が毎回落ちる (CAPTURE-53 から
+    // 台帳の全文検索。エンドポイントが無いか OpenSearch が答えないと、flow の索引の段が毎回落ちる (CAPTURE-53 から
     // 404 を飛ばさない)。トークンは jwt の行と同じ取り方なので、jwt の後に訊く。
     needs: ["jwt"],
     probe: searchAnswers,
@@ -631,7 +633,7 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
   {
     name: "worker→browserhive",
     section: SECTIONS.handOver,
-    where: "worker の中から、u/admin/browserhive_endpoints の口ごとに GET /status",
+    where: "worker の中から、u/admin/browserhive_endpoints のエンドポイントごとに GET /status",
     needs: ["変数"],
     probe: workerReachesBrowserhive,
   },

@@ -18,7 +18,7 @@ import {
  * capture-fixtures のフィクスチャで実際に取りに行った先を見るまで気づけなかった。
  */
 
-/** BrowserHive の口の一覧。並列度の上限になる。試験は 2 つで固定。 */
+/** BrowserHive のエンドポイントの一覧。並列度の上限になる。試験は 2 つで固定。 */
 const VARS: Record<string, string> = {
   "u/admin/browserhive_endpoints": JSON.stringify(["bh-1:50051", "bh-2:50051"]),
 };
@@ -266,16 +266,16 @@ describe("ホストで束ねる", () => {
   });
 });
 
-describe("並列度は BrowserHive の口の数で頭を押さえる", () => {
+describe("並列度は BrowserHive のエンドポイントの数で頭を押さえる", () => {
   /**
-   * 口より多くのホストを同時に回しても、余ったぶんは busy を引いて待つだけで
+   * エンドポイントより多くのホストを同時に回しても、余ったぶんは busy を引いて待つだけで
    * 相手から見た並列度は増えない。決めるのはここで、flow の式には置かない。
    */
-  it("host_parallelism が口より多ければ口の数", () => {
+  it("host_parallelism がエンドポイントより多ければエンドポイントの数", () => {
     expect(parallelismFor(4, 2)).toBe(2);
   });
 
-  it("host_parallelism が口より少なければそのまま", () => {
+  it("host_parallelism がエンドポイントより少なければそのまま", () => {
     expect(parallelismFor(1, 2)).toBe(1);
   });
 
@@ -296,7 +296,7 @@ describe("並列度は BrowserHive の口の数で頭を押さえる", () => {
     expect(plan.parallelism).toBe(2);
   });
 
-  it("口の一覧が空なら落ちる", () => {
+  it("エンドポイントの一覧が空なら落ちる", () => {
     // 「並列度 0」として通すと、for-loop は何も回さずに段が空で成功する。
     expect(() => endpointCount("[]")).toThrow("空でない");
     expect(() => endpointCount("bh-1:50051")).toThrow("JSON");
