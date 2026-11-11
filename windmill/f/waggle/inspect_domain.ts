@@ -9,7 +9,7 @@
  */
 import * as wmill from "windmill-client";
 
-// ── 台帳に名乗るトークン（6 本が同じ物を持つ。test/ledger-token-copies.test.ts が同じかを見る）──
+// ── 台帳に名乗るトークン（6 本が同じ物を持つ。test/ledger-token.test.ts が同じかを見る）──
 /**
  * 台帳 (capture-ledger) に名乗る access token を、client credentials で取る。
  *

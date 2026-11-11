@@ -133,12 +133,12 @@ script のコードは UI の Edit でも repo の `windmill/f/waggle/` でも�
 
 ## Variables
 
-`u/admin/*` の変数。`waggle_token` は secret なので値がマスクされて出る
-（`••••`）—— **マスクされていること自体**が「UI に token を晒していない」の証拠。
+`u/admin/*` の変数。`ledger_client` は secret なので値がマスクされて出る
+（`••••`）—— **マスクされていること自体**が「UI に app client の secret を晒していない」の証拠。
 
 <Image
   src={variables}
-  alt="Variables。waggle_token は値がマスク、他は browserhive_endpoints などが見える"
+  alt="Variables。ledger_client は値がマスク、他は browserhive_endpoints などが見える"
 />
 
 Resources は空のまま —— この repo はそこに何も置かない（v0.22 までは BrowserHive の
@@ -160,14 +160,14 @@ flow の script は設定を変数から読む（[リンクを辿る](/crawl/)�
 変数は別の script が入れる。ここを混同すると、push が緑なのに flow が最初の
 `getVariable` で落ちる。
 
-| 置き場                          | 中身                                                                                                                                                           | 入れる script                                                                    |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `u/admin/waggle_token`          | capture-ledger への JWT (secret)                                                                                                                               | `windmill:capture-ledger-token`                                                  |
-| `u/admin/waggle_api_url`        | capture-ledger API の宛先（既定は default ネットワークの gateway）                                                                                             | 同上                                                                             |
-| `u/admin/browserhive_endpoints` | BrowserHive の URL の JSON 配列。BrowserHive 1 つに 1 要素（既定 `["http://browserhive-1.capture-ledger:50051","http://browserhive-2.capture-ledger:50051"]`） | 同上                                                                             |
-| `u/admin/browserhive_tls_ca`    | `https://` のエンドポイントのための CA（空 = 平文の `http://`）                                                                                                | 同上                                                                             |
-| `u/admin/ts_compile_url`        | ts-compile-service の宛先（既定 `http://ts-compile.capture-scheduler:8080`）                                                                                   | 同上                                                                             |
-| `f/waggle_secrets/<名前>`       | スクリプトが `catalog.json` の `params` で宣言したシークレット (secret)。`crawl_host` が解いて BrowserHive にだけ渡す（[リンクを辿る](/crawl/)）               | **人が置く**（`pnpm run windmill:cli variable add`）。フォルダは `windmill:push` |
+| 置き場                          | 中身                                                                                                                                                                                           | 入れる script                                                                    |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `u/admin/ledger_client`         | capture-ledger に名乗る flow の app client の JSON (secret)。`issuer`・`tokenUrl`（コンテナから見た宛先）・`hostTokenUrl`・`clientId`・`clientSecret`・`scope`。段ごとに、これでトークンを取る | `windmill:capture-ledger-token`。capture-ledger の `.dev/idp.env` から           |
+| `u/admin/waggle_api_url`        | capture-ledger API の宛先（既定は default ネットワークの gateway）                                                                                                                             | 同上                                                                             |
+| `u/admin/browserhive_endpoints` | BrowserHive の URL の JSON 配列。BrowserHive 1 つに 1 要素（既定 `["http://browserhive-1.capture-ledger:50051","http://browserhive-2.capture-ledger:50051"]`）                                 | 同上                                                                             |
+| `u/admin/browserhive_tls_ca`    | `https://` のエンドポイントのための CA（空 = 平文の `http://`）                                                                                                                                | 同上                                                                             |
+| `u/admin/ts_compile_url`        | ts-compile-service の宛先（既定 `http://ts-compile.capture-scheduler:8080`）                                                                                                                   | 同上                                                                             |
+| `f/waggle_secrets/<名前>`       | スクリプトが `catalog.json` の `params` で宣言したシークレット (secret)。`crawl_host` が解いて BrowserHive にだけ渡す（[リンクを辿る](/crawl/)）                                               | **人が置く**（`pnpm run windmill:cli variable add`）。フォルダは `windmill:push` |
 
 エンドポイントは BrowserHive v12 から `http(s)://` の URL。`crawl_host` は v11 の `host:port` の形を
 この変数の名前を挙げて断り、`windmill:capture-ledger-token` は変数に書く前に断る ——
@@ -182,15 +182,18 @@ windmill-db の volume を消すと、workspace・token・変数が全部消え�
 pnpm run windmill:bootstrap            # workspace を作り直し、新しい token を .env.local に、
                                        # capture-ledger に渡す行を .dev/capture-ledger.env に書く
 pnpm run windmill:push                 # script / flow
-pnpm run windmill:capture-ledger-token # 変数 5 つ
+pnpm run windmill:capture-ledger-token # 上の表の変数
 cd ../capture-ledger
 pnpm run connect                       # 渡す行を取りに行く。そのあと API を起こし直す
-pnpm run fga:grant submitter windmill acme  # windmill に acme のクロールを許可する
+pnpm run idp:grant                     # windmill の app client に acme のクロールを許可する
 ```
 
 capture-ledger 側の OpenFGA も同時に消えていたら、許可を書く前に
 `fga:migrate` → `fga:deploy` で store を作り直し、出てきた 2 つの ID を
-あちらの `.env` に貼る。
+あちらの `.env` に貼る。capture-ledger で Amazon Cognito の代わりを務める
+[Floci](https://github.com/floci-io/floci) のプールも消えていたら（コンテナが作り直されたら）、最後の行の代わりに、
+`connect` の後で向こうの `pnpm run dev:up --from idp` を打つ。IdP（identity provider）を用意し直し、API を
+起こし直し、許可を与え、`windmill:capture-ledger-token` をやり直す。
 
 **コンテナを作り直すと bridge の subnet が変わりうる。** `u/admin/waggle_api_url` に入るのは、
 `windmill:capture-ledger-token` を叩いた時点の default ネットワークの gateway なので、subnet が

@@ -11,19 +11,21 @@ pnpm run check       # every check to run before pushing (the list is package.js
 
 `pretest:e2e` runs doctor with `--e2e` first and names what is missing — the checks of
 [the quickstart's "Check it"](/quickstart/#check-it-take-one-capture), plus capture-fixtures, no
-scheduled run in progress, and the crawl permission for `e2e`, the name the test uses (`fga:grant submitter e2e acme`). It checks not just that things are up but that a crawl can run to the end — miss any of
+scheduled run in progress, and the crawl permission for `e2e`, the local IdP (identity provider) user the test signs in as (`pnpm run idp:grant --user e2e` in capture-ledger). It checks not just that things are up but that a crawl can run to the end — miss any of
 these and a crawl fails only at its level report, staying `running`. Full-text search is part of
 that: capture-ledger does not start without OpenSearch (`CAPTURE_LEDGER_OPENSEARCH_URL`, which its
 `dev:up` writes). OpenSearch can still stop, or be recreated without its index, while the API runs;
-doctor's `search route` searches with an issuer token and says so. It lives outside vitest
+doctor's `search route` searches with a token from the flow's app client and says so. It lives outside vitest
 deliberately: vitest prints "No test files found, exiting with code 1" whenever a global setup
 throws, and no message written inside can survive that.
 
-The endpoints can be overridden through environment variables (`E2E_WAGGLE_URL`, `E2E_ISSUER_URL`,
+The endpoints can be overridden through environment variables (`E2E_WAGGLE_URL`,
 `E2E_FIXTURES_URL`, `E2E_FIXTURES_HOST_URL`, `E2E_SUBJECT`, `E2E_LEDGER_DIR`; the defaults are at the top
-of `test/e2e/helpers/stack.ts` and `crawl-level.e2e.test.ts`). The test that drives the ledger's CLI
-assumes a capture-ledger checkout at `../capture-ledger`, so when running from a git worktree pass
-`E2E_LEDGER_DIR=<capture-ledger checkout>` (without it the test fails with `spawnSync pnpm ENOENT`).
+of `test/e2e/helpers/stack.ts` and `crawl-level.e2e.test.ts`). The tests get their tokens from
+capture-ledger's `pnpm run --silent idp:token --user e2e --org acme`, and the test that drives the
+ledger's CLI runs there too, so they assume a capture-ledger checkout at `../capture-ledger`. When
+running from a git worktree, pass `E2E_LEDGER_DIR=<capture-ledger checkout>` (without it the tests fail
+with `spawnSync pnpm ENOENT`). doctor's check reads `CAPTURE_LEDGER_DIR` for the same place.
 
 ## Why both layers
 

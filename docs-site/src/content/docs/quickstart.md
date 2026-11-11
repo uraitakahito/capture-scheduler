@@ -22,7 +22,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'authorization: Bearer dev-key' http
 # 200 means it is up. 000 means it is not → cd ../capture-ledger && pnpm run stack:up
 ```
 
-`dev-key` is the development OpenFGA's default key. With the stack down, `fga:grant` below stops
+`dev-key` is the development OpenFGA's default key. With the stack down, `idp:grant` below stops
 with "OpenFGA (http://localhost:8090) に届きません" (OpenFGA is not reachable).
 
 Every code block below starts with a `cd` that says which repo it runs in (this assumes both repos
@@ -75,7 +75,6 @@ These are the lines, and **each one is needed** (the table says what stops witho
 CAPTURE_LEDGER_CRAWL_WEBHOOK_URL=http://127.0.0.1:8000/api/w/crawler/jobs/run/f/f/waggle/crawl_level
 CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN=<the token bootstrap created>
 CAPTURE_LEDGER_API_HOST=0.0.0.0
-CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099
 CAPTURE_LEDGER_TS_COMPILE_URL=http://127.0.0.1:28080
 ```
 
@@ -83,15 +82,28 @@ CAPTURE_LEDGER_TS_COMPILE_URL=http://127.0.0.1:28080
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `…_CRAWL_WEBHOOK_URL`, `…_CRAWL_WEBHOOK_TOKEN` | Where crawls are sent to Windmill. Without them `/api/crawls` does not exist (`404`)                                                                                                                                                             |
 | `CAPTURE_LEDGER_API_HOST=0.0.0.0`              | Level reports come from a container, and an API listening on `127.0.0.1` never receives them                                                                                                                                                     |
-| `CAPTURE_LEDGER_OIDC_ISSUER`                   | The flow identifies itself with a JWT. Without it the API trusts dev headers, and reports get `401`                                                                                                                                              |
 | `CAPTURE_LEDGER_TS_COMPILE_URL`                | Where capture-ledger, on the host, asks ts-compile-service (published on `127.0.0.1:28080`) to re-read a failed crawl's type errors and to check a proposed fix. With the Claude key set and this missing, capture-ledger's API refuses to start |
+
+The flow identifies itself with a JWT, so the API also needs `CAPTURE_LEDGER_OIDC_ISSUER` and
+`CAPTURE_LEDGER_OIDC_CLIENT_IDS`. They are not in this file: capture-ledger's `pnpm run idp:bootstrap`
+(below) writes them, because the pool ID the local IdP (identity provider) gives is part of the
+issuer. Without them the
+API trusts dev headers, and the flow's level reports get `401`.
 
 bootstrap creates a new token every time you run it (the earlier ones stay valid), so **run `connect`
 again whenever you run bootstrap again** — the handoff file is rewritten with the new token, and
 without fetching it capture-ledger keeps the old one. The old token still works, so this does not
 break: it looks like "I changed it and nothing changed".
 
-Once `connect` has run, start the issuer on the capture-ledger side and **restart the API**.
+Once `connect` has run, set up the local IdP on the capture-ledger side and **restart the API**.
+
+The production IdP is Amazon Cognito. Locally, [Floci](https://github.com/floci-io/floci), a
+Cognito emulator, stands in for it. It runs in capture-ledger's stack as the compose service `idp`
+(`127.0.0.1:4566`; `http://idp.capture-ledger:4566` from containers). `idp:bootstrap` creates the pool,
+the app clients and your user in it. One of the app clients is `windmill`: the flow gets its tokens
+with that client's ID and secret. `idp:bootstrap` writes the issuer lines above into capture-ledger's
+`.env.local`, and the client's settings into a handoff file, `.dev/idp.env`, for
+[Hand over the key](#hand-over-the-key) below.
 
 **Stop the API you started in §6 of capture-ledger's quickstart (`Ctrl-C`)** and run the same
 command again — this is not a second instance. The API reads its settings **once, at
@@ -99,23 +111,24 @@ startup**, so a process left running never sees the lines above. Trying to run b
 fails anyway: the second one exits with
 `EADDRINUSE: address already in use 0.0.0.0:7070`. **When you cannot tell what is still
 running**, capture-ledger's `pnpm run dev:status` prints the pid and start time and
-`pnpm run dev:down` stops it — neither the issuer nor the API is a container, so
-`container-compose down` leaves them alone.
-
-Keep `oidc:issuer` running. The API does not contact the issuer at startup; it fetches the
-keys the first time it verifies a token. The order does not matter, but while the issuer is
-down every request carrying a token (the flow's level reports included) gets `401`.
+`pnpm run dev:down` stops it — the API is not a container, so
+`container-compose down` leaves it alone.
 
 ```sh
 cd ../capture-ledger
-pnpm run oidc:issuer   # keep it running
-pnpm run api           # stop the one from §6 first, then use the same command
+pnpm run idp:bootstrap   # the pool, app clients and your user; writes .env.local and .dev/idp.env
+pnpm run api             # stop the one from §6 first, then use the same command
 ```
+
+Floci keeps its pool **in memory**. When its container is recreated (by `stack:up`, for example),
+the pool is gone, and the issuer, the client IDs and the secret all change. Then run
+`pnpm run dev:up --from idp` in capture-ledger: it sets the IdP up again and redoes what follows it
+(the API restart, the grant and the key handoff below).
 
 The **last line** of the API's startup log says whether the lines took:
 
 ```text
-Archive API listening on 0.0.0.0:7070 — identity: JWT (http://127.0.0.1:9099); crawl level reports: ready
+Archive API listening on 0.0.0.0:7070 — identity: JWT (http://127.0.0.1:4566/us-east-1_example); crawl level reports: ready
 ```
 
 With `blocked`, the warnings above it name the missing lines (from capture-ledger v0.44.0).
@@ -124,18 +137,23 @@ Windmill opens at `http://127.0.0.1:8000`.
 
 ### Hand over the key
 
-Put the token the Windmill flow calls capture-ledger with, and the address it calls, into
-Windmill's variables:
+Put what the Windmill flow gets its token with, and the address it calls, into Windmill's
+variables:
 
 ```sh
 cd ../capture-scheduler
-pnpm run windmill:capture-ledger-token   # the token, the API address as a container sees it, and the ts-compile-service address
+pnpm run windmill:capture-ledger-token   # the flow's app client, the API address as a container sees it, and the ts-compile-service address
 ```
+
+It reads capture-ledger's `.dev/idp.env` (from `../capture-ledger`; give another path as the
+argument, or set `CAPTURE_LEDGER_DIR`), checks that it can get a token with the `windmill` app
+client, and writes the secret variable `u/admin/ledger_client`. It stores the client, not a token.
+It also deletes `u/admin/waggle_token`, the long-lived token earlier versions stored.
 
 The API address (`u/admin/waggle_api_url`) comes from the gateway of the `default` network
 (`container network inspect default`) unless `CAPTURE_LEDGER_API_URL` is set. It changes when the
-network is recreated; re-run `windmill:capture-ledger-token` then. Do the same after restarting the
-issuer ([How the token gets there](#how-the-token-gets-there)).
+network is recreated; re-run `windmill:capture-ledger-token` then. When Floci's pool is recreated,
+`dev:up --from idp` re-runs it for you ([How the token gets there](#how-the-token-gets-there)).
 
 Names a script declares as `kind: secret` in the `params` of its `catalog.json` are placed by a
 person in Windmill variables `f/waggle_secrets/<name>` (how: "Secrets are Windmill variables" on
@@ -144,36 +162,39 @@ that uses such a script is refused by the ledger with a 400 naming the missing v
 
 ### Let windmill start crawls
 
-Windmill calls capture-ledger under the name `windmill` (the token's `sub`; organization `acme`).
-Each time it starts a crawl, reports a level, has the replay bundle written, hands over the index, or closes a crawl,
-capture-ledger asks OpenFGA "may windmill start crawls for acme?" and answers 404 when it may not.
-Even a crawl you start by hand reports its levels under the name windmill.
+Windmill calls capture-ledger as the app client `windmill`. A token got with client credentials
+names the app client: its `sub` is the client ID Floci generated, not a name. Such a machine token
+carries no organizations, so capture-ledger takes the ones where that `sub` may start crawls (here
+`acme`). Each time the flow starts a crawl, reports a level, has the replay bundle written, hands over
+the index, or closes a crawl, capture-ledger asks OpenFGA "may this client start crawls for acme?" and
+answers 404 when it may not. Even a crawl you start by hand reports its levels as the windmill client.
 
 ```
-pnpm run fga:grant submitter windmill acme      (you, once)
-    │ writes
+pnpm run idp:grant      (you, once per pool)
+    │ reads the client ID from .dev/idp.env, then writes
     ▼
-OpenFGA   user:windmill  submitter  organization:acme
+OpenFGA   user:<windmill client ID>  submitter  organization:acme
     ▲
-    │ asks: is user:windmill can_submit on organization:acme?
+    │ asks: is user:<windmill client ID> can_submit on organization:acme?
     │       (on every start, level report, replay bundle, index, and close)
-capture-ledger API   ◄── Windmill (a token with sub=windmill, orgs=[acme])
+capture-ledger API   ◄── Windmill (a client credentials token: sub = the client ID, no groups)
     │
     └─ 202 when the tuple is there; otherwise 404 {"error":"not found"}
 ```
 
-Write that permission (on the capture-ledger side, once; `fga:revoke` takes it back):
+Write that permission (on the capture-ledger side; again whenever Floci's pool is recreated, since
+the client ID changes with it):
 
 ```sh
 cd ../capture-ledger
-pnpm run fga:grant submitter windmill acme
-# windmill は acme のクロールを始められます (書いた: user:windmill submitter organization:acme)
-#   = "windmill may start crawls for acme (wrote: …)"
+pnpm run idp:grant
+# <client ID> は acme のクロールを始められます (書いた: user:<client ID> submitter organization:acme)
+#   = "<client ID> may start crawls for acme (wrote: …)"
 ```
 
-If you changed `CAPTURE_LEDGER_SUBJECT` / `_ORGANIZATIONS`, use those names. Whether it took is
-what the `can_submit` line of `doctor` below tells you; when something is missing, it prints the
-command to type, with the names capture-ledger actually saw.
+`idp:grant` also grants your own user (the one `idp:bootstrap` made), so you can start and see
+crawls with `idp:token`. `fga:revoke` takes a grant back. Whether it took is what the `can_submit`
+line of `doctor` below tells you; when something is missing, it prints the command to type.
 
 ## Check it: take one capture
 
@@ -201,7 +222,7 @@ start (the DNS remembers the "no such name" answer).
 **doctor** asks, for each heading of this page, whether that step is done — by asking the things
 the step created. It goes past "is it up": whether the scripts match the repo, whether a schedule is
 left in Windmill (the clock is in capture-ledger, and an old checkout's `windmill:push` can bring one
-back), whether the token Windmill holds may start crawls and has time left, whether the API and
+back), whether a token got with the flow's own app client may start crawls, whether the API and
 BrowserHive are reachable from inside the worker. A ✗ says what to fix and which section of this
 page the step lives in. Checks that depend on a ✗ do not run and only say "先に … を" (… first) — one thing to
 fix means one ✗.
@@ -211,11 +232,11 @@ fix means one ✗.
   ✓ windmill            http://127.0.0.1:8000/api/version
   …
   ✗ capture-ledger api  http://127.0.0.1:7070/healthz
-  ✗ oidc issuer         http://127.0.0.1:9099/.well-known/openid-configuration
+  ✗ idp                 変数 u/admin/ledger_client の iss の discovery (手元は capture-ledger の Floci)
   ・crawl route         先に capture-ledger api を
   ・replay-bundle route 先に capture-ledger api を
-  ・jwt                 先に capture-ledger api・oidc issuer を
-  ・search route        先に capture-ledger api・oidc issuer を
+  ・jwt                 先に capture-ledger api・idp を
+  ・search route        先に capture-ledger api・idp を
 
 直すもの (2):
   capture-ledger api —— capture-ledger の API が答えない → cd ../capture-ledger && pnpm run api
@@ -224,7 +245,7 @@ fix means one ✗.
 ```
 
 **smoke** captures one page, and only when doctor is all ✓. It takes the production path —
-asks capture-ledger's `POST /api/crawls` with the flow's own token, lets the Windmill flow capture,
+asks capture-ledger's `POST /api/crawls` with a token from the flow's own app client, lets the Windmill flow capture,
 waits for the level report — then fetches the archive the ledger recorded through a signed URL
 and checks that it starts with `PK` (a WACZ is a zip). The ledger marks the crawl `succeeded` at the
 level report, before the flow's replay bundle and index steps run, so smoke then waits for the level's
@@ -278,9 +299,9 @@ Every row was produced for real and checked (2026-09-19).
 | doctor: worker→browserhive ✗ "名前が引けない" ("3 秒で答えない" for a few seconds right after the stop) / smoke: `[cap] BrowserHive に届きません: …` | a BrowserHive container is stopped (a stopped container loses its DNS name too)                                    | `pnpm run stack:up` in capture-ledger                                                                                       |
 | doctor: host→ts-compile ✗ "http://127.0.0.1:28080 に届かない"                                                                                        | ts-compile has no port on the host (the compose gained `ports:` but the container was not recreated) or it is down | run `container-compose up -d ts-compile` in this repo                                                                       |
 | smoke: `failed` with 0 pages, cause `… net::ERR_NAME_NOT_RESOLVED …`                                                                                 | the URL's host does not resolve                                                                                    | check the URL; if it is right, whether BrowserHive's containers can resolve outside names                                   |
-| doctor: can_submit ✗ "… のクロールの許可が無い" / smoke: `… /pages → 404`                                                                            | windmill may not start crawls                                                                                      | `pnpm run fga:grant submitter windmill acme` in capture-ledger                                                              |
-| doctor: can_submit ✗ "トークンが通らない" / smoke: `… /pages → 401`                                                                                  | the issuer was restarted and Windmill's token is stale                                                             | `pnpm run windmill:capture-ledger-token`                                                                                    |
-| doctor: jwt ✗ "ヘッダで名乗る設定で動いている" (the startup log's last line says `crawl level reports: blocked`)                                     | capture-ledger's API does not accept JWTs (`CAPTURE_LEDGER_OIDC_ISSUER` is not in effect)                          | run `pnpm run connect` in capture-ledger and restart the API                                                                |
+| doctor: can_submit ✗ "… の組織が無い" or "… のクロールの許可が無い" / smoke: `… /pages → 404`                                                        | the windmill app client may not start crawls                                                                       | `pnpm run idp:grant` in capture-ledger                                                                                      |
+| doctor: can_submit ✗ "トークンが通らない" / smoke: `… /pages → 401`                                                                                  | Floci's pool was recreated, and the API or Windmill's variable still has the old one                               | `pnpm run dev:up --from idp` in capture-ledger                                                                              |
+| doctor: jwt ✗ "ヘッダで名乗る設定で動いている" (the startup log's last line says `crawl level reports: blocked`)                                     | capture-ledger's API does not accept JWTs (`CAPTURE_LEDGER_OIDC_ISSUER` is not in effect)                          | `pnpm run dev:up --from idp` in capture-ledger (`idp:bootstrap` writes the lines, then the API restarts)                    |
 | doctor: container→api ✗ "API が 127.0.0.1 で待っている" / smoke: `Unable to connect`                                                                 | level reports cannot reach the API from a container (`CAPTURE_LEDGER_API_HOST=0.0.0.0` is not in effect)           | run `pnpm run connect` in capture-ledger and restart the API                                                                |
 | smoke: 409 "走行中のクロールがある: …"                                                                                                               | an earlier crawl is still `running`                                                                                | wait for it, or `pnpm run smoke --close-running`                                                                            |
 
@@ -288,37 +309,37 @@ Every row was produced for real and checked (2026-09-19).
 
 ```
 host                                   │ container
-  dev issuer 127.0.0.1:9099            │
-      │ POST /token                    │
+  capture-ledger idp:bootstrap         │
+      │ writes .dev/idp.env            │
       ▼                                │
-  windmill:capture-ledger-token ───────────────┼──► secret variable u/admin/waggle_token
+  windmill:capture-ledger-token ───────┼──► secret variable u/admin/ledger_client
+                                       │    (client ID, secret, token URL, scope)
                                        │            │
-  capture-api 0.0.0.0:7070  ◄───────────┼── report_level.ts
+                                       │            ▼
+                                       │    each flow step ── client credentials ──► Floci
+                                       │            │ ◄── access token
+                                       │            ▼
+  capture-api 0.0.0.0:7070  ◄──────────┼── report_level.ts and the other steps
 ```
 
-**Keep the dev issuer on loopback.** It mints a token for whoever asks, under
-whatever name they ask for. Put it somewhere a container can reach and everyone
-on the bridge can claim to be `windmill` — and so use the crawl permission that `fga:grant`
-gave to windmill alone, which undoes the point of using JWTs at all.
+**No token is stored.** A Cognito access token lasts at most one day, so the variable holds the
+`windmill` app client instead. Each step that calls capture-ledger gets a fresh token with client
+credentials, an M2M (machine-to-machine) grant: `ledgerToken`, at the top of
+`windmill/f/waggle/report_level.ts` and the other scripts that call capture-ledger. A machine left
+running has no token to run out.
 
-The power to mint keys stays on the host. What crosses the boundary is **one
-finished token**.
+**The variable is the flow's credential.** Whoever holds the client ID and secret can act as the
+flow, which is why the variable is a secret. Locally that is not a boundary: Floci's admin API lets
+anything that reaches it, the containers on capture-ledger's network included, create users and get
+tokens (capture-ledger's
+[The dev IdP](https://uraitakahito.github.io/capture-ledger/development-environment/#the-dev-idp-floci)).
 
-**Re-run `pnpm run windmill:capture-ledger-token` after restarting the issuer.** It
-generates its keys in memory on every start (deliberately), so the old token
-starts returning 401. The error message in `report_level.ts` says so, because
-this is easy to hit and hard to guess.
-
-**The token also expires** (`exp`), and on a machine left running nothing reissues it until the next
-`dev:up`. Past that, pages still get captured, but the level report gets 401 and the crawl's row stays
-`running`, blocking every later start. The トークンの期限 (token expiry) line of `doctor` turns ✗ when
-under 24 hours remain; the fix is the same command.
-
-The API does not need a restart. The key's name (kid) changes along with the key, so the API
-refetches the keys as soon as it sees one new token (from capture-ledger v0.42.1; before that the
-kid was fixed and the API kept the old key for up to ten minutes, rejecting new tokens). For 30
-seconds right after the issuer restarts, new tokens may still be refused — the jwt line of
-`doctor` says so.
+**When Floci's pool is recreated, run `pnpm run dev:up --from idp` in capture-ledger.** Floci keeps
+the pool in memory, so recreating its container loses it: the issuer, the client ID and the secret
+all change. Old tokens stop verifying, the variable names a client that no longer exists, and the
+grant belongs to the old client ID. `dev:up --from idp` rewrites capture-ledger's `.env.local`,
+restarts the API, grants the new client and re-runs `windmill:capture-ledger-token`. The error
+messages in `report_level.ts` say so, because this is easy to hit and hard to guess.
 
 ## Viewing in the picker (paste a token)
 
@@ -328,14 +349,14 @@ capture-ledger v0.45.0). Leave the API's settings as they are and paste a token:
 
 ```sh
 cd ../capture-ledger
-pnpm run --silent oidc:token --subject "$(whoami)" --org acme | pbcopy
+pnpm run --silent idp:token | pbcopy   # your user from idp:bootstrap, in acme
 open http://127.0.0.1:7070/
 ```
 
 Paste it into the トークン (Token) field and press 読み込む (Load). When the line above the list says
-you are viewing as your name in `acme`, the API has accepted the token. A token lasts one hour, and
-after the issuer restarts, older tokens stop working once the API has fetched the new key — when
-the picker says 401 — このトークンは通らない…
+you are viewing as your `sub` (the ID Floci gave your user; `idp:token` prints it) in `acme`, the API
+has accepted the token. A token lasts one hour, and after Floci's pool is recreated, older tokens stop
+working — when the picker says 401 — このトークンは通らない…
 ("this token does not get through"), get a new one with the same command and paste it. How to use
 the screen is in capture-ledger's
 [Browsing archives](https://uraitakahito.github.io/capture-ledger/picker/).
