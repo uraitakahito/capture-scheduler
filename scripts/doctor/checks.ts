@@ -7,8 +7,8 @@
  * クロールは `running` のまま残り、以後の起動は全部 409 になる。
  *
  * **どれも、正しい設定と誤った設定で答えが変わる入力を使う。** たとえば jwt を「ヘッダで
- * 名乗ると 401」で見ると、名乗りの手段がどちらも無い API も 401 で通ってしまう。だから issuer
- * から token を取り、それが 200 になることを見る。push は在るかでなく中身を比べ、変数は
+ * 名乗ると 401」で見ると、名乗りの手段がどちらも無い API も 401 で通ってしまう。だから flow と
+ * 同じ資格 (client credentials) で token を取り、それが 200 になることを見る。push は在るかでなく中身を比べ、変数は
  * flow が読むその値で宛先を叩く。
  *
  * 読み分けは入出力を持たない module に分けてある (`windmill-contents.ts`・`worker-probes.ts`・
@@ -24,14 +24,20 @@ import { promisify } from "node:util";
 import {
   HOST_TS_COMPILE,
   ledgerApiUrl,
-  ledgerIssuer,
   optional,
   repoRoot,
   windmillUrl,
   windmillWorkspace,
 } from "../env.js";
+import {
+  LEDGER_CLIENT_VAR,
+  hostClientCredentials,
+  ledgerDir,
+  parseLedgerClient,
+  type LedgerClient,
+} from "../ledger-client.js";
 import { readCanSubmit } from "./can-submit.js";
-import { readScheduledRun, readTokenExpiry } from "./schedule-probes.js";
+import { readScheduledRun } from "./schedule-probes.js";
 import { readHostTsCompile } from "./host-probes.js";
 import { readJwt } from "./jwt-check.js";
 import {
@@ -66,7 +72,6 @@ import {
 export const API = "http://127.0.0.1:7070";
 /** capture-ledger の開発のスタックの OpenFGA。鍵はクイックスタートの前提と同じ。 */
 const OPENFGA = "http://127.0.0.1:8090";
-const ISSUER = ledgerIssuer();
 /** flow が走るコンテナ。段の報告も BrowserHive への呼び出しもここから出る。 */
 const WORKER = "windmill-worker.capture-scheduler";
 /** e2e の試験が名乗る名前 (`test/e2e/crawl-level.e2e.test.ts` と同じ既定)。 */
@@ -257,59 +262,67 @@ const leftoverSchedules = async (): Promise<Verdict> => {
 
 // ── 立ち上げる: capture-ledger ─────────────────────────────────────────
 
-/** issuer が名乗る iss。discovery から読む —— need に出す値を決め打ちしない。 */
-const issuerName = async (): Promise<string> => {
-  const { status, body } = await answerOf(`${ISSUER}/.well-known/openid-configuration`);
-  const discovery = status === 200 ? parse(body) : undefined;
-  return typeof discovery === "object" &&
-    discovery !== null &&
-    "issuer" in discovery &&
-    typeof discovery.issuer === "string"
-    ? discovery.issuer
-    : ISSUER;
+/** flow の app client の設定 (変数 `u/admin/ledger_client`)。無い・形が違うときは undefined。 */
+const ledgerClient = async (): Promise<LedgerClient | undefined> =>
+  parseLedgerClient(await variable(LEDGER_CLIENT_VAR));
+
+/** flow と同じ資格 (client credentials) で、host からトークンを取る。取れなければ undefined。 */
+const flowToken = async (): Promise<string | undefined> => {
+  const client = await ledgerClient();
+  return client === undefined ? undefined : (await hostClientCredentials(client)).token;
 };
 
-/** issuer からトークンを取る。取れなければ undefined。 */
-const mint = async (subject: string): Promise<string | undefined> => {
-  const { status, body } = await answerOf(`${ISSUER}/token`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ subject, organizations: ["acme"], expiresIn: "5m" }),
-  });
-  const token = status === 200 ? parse(body) : undefined;
-  return typeof token === "object" &&
-    token !== null &&
-    "access_token" in token &&
-    typeof token.access_token === "string"
-    ? token.access_token
-    : undefined;
+/** flow の資格でトークンを取れなかったときの 1 行。 */
+const noFlowToken: Verdict = {
+  ok: false,
+  need:
+    `flow の資格 (変数 ${LEDGER_CLIENT_VAR}) でトークンを取れない —— 変数が無いか、Floci のプールが作り直された → ` +
+    "cd ../capture-ledger && pnpm run dev:up --from idp",
+};
+
+/** IdP (手元は capture-ledger の Floci) が答え、変数の iss のプールが在るか。 */
+const idpAnswers = async (): Promise<Verdict> => {
+  const client = await ledgerClient();
+  if (client === undefined) {
+    return {
+      ok: false,
+      need: `Windmill の変数 ${LEDGER_CLIENT_VAR} が無い → cd ../capture-ledger && pnpm run dev:up --from idp`,
+    };
+  }
+  return up(
+    `${client.issuer}/.well-known/openid-configuration`,
+    `${client.issuer} が答えない (Floci が止まっているか、プールが作り直された) → ` +
+      "cd ../capture-ledger && pnpm run dev:up --from idp",
+  );
 };
 
 /**
- * issuer から token を取り、Bearer で一覧を読む。**200 になるのは JWT を受ける API だけ** ——
+ * flow の資格でトークンを取り、Bearer で一覧を読む。**200 になるのは JWT を受ける API だけ** ——
  * ヘッダの設定の API も、どちらの手段も無い API も 401 を返す。拒まれたら、同じ API にヘッダで
  * `GET /api/me` を訊き、どちらなのかを `jwt-check.ts` が読み分ける。
  */
 const acceptsJwt = async (): Promise<Verdict> => {
-  const token = await mint("doctor");
-  if (token === undefined) return readJwt({ token: "no-token", iss: ISSUER });
+  const client = await ledgerClient();
+  const iss = client?.issuer ?? `(変数 ${LEDGER_CLIENT_VAR} が無い)`;
+  const token = client === undefined ? undefined : (await hostClientCredentials(client)).token;
+  if (token === undefined) return readJwt({ token: "no-token", iss });
   const { status } = await answerOf(`${API}/api/archives`, {
     headers: { authorization: `Bearer ${token}` },
   });
-  if (status !== 401) return readJwt({ token: status, iss: ISSUER });
+  if (status !== 401) return readJwt({ token: status, iss });
   const header = await answerOf(`${API}/api/me`, {
     headers: { "x-capture-ledger-subject": "doctor", "x-capture-ledger-organizations": "acme" },
   });
-  return readJwt({ token: status, header, iss: await issuerName() });
+  return readJwt({ token: status, header, iss });
 };
 
 /**
- * issuer から token を取り、名乗って検索を引く。**名乗らずに引くと、OpenSearch が止まっていても 401 で
+ * flow の資格でトークンを取り、名乗って検索を引く。**名乗らずに引くと、OpenSearch が止まっていても 401 で
  * 終わる** (台帳は名乗りを見てから OpenSearch に訊く)。読み分けは `search-route.ts`。
  */
 const searchAnswers = async (): Promise<Verdict> => {
-  const token = await mint("doctor");
-  if (token === undefined) return readJwt({ token: "no-token", iss: ISSUER });
+  const token = await flowToken();
+  if (token === undefined) return noFlowToken;
   return readSearchRoute(
     await answerOf(`${API}${SEARCH_PROBE}`, { headers: { authorization: `Bearer ${token}` } }),
   );
@@ -318,7 +331,7 @@ const searchAnswers = async (): Promise<Verdict> => {
 // ── windmill にクロールを許可する ──────────────────────────────────────
 
 /**
- * flow のトークン (変数 `u/admin/waggle_token`) で、クロールを始められるかを capture-ledger に訊く。
+ * flow の資格 (変数 `u/admin/ledger_client`) で取ったトークンで、クロールを始められるかを capture-ledger に訊く。
  *
  * **flow が実際に使うトークンで訊く**のが要点 —— 許可が無いことも、トークンが古いことも、
  * 名前が docs とずれていることも、flow が 404 や 401 を踏む前にここで分かる。
@@ -328,24 +341,17 @@ const searchAnswers = async (): Promise<Verdict> => {
  * 問題でもあるので、can_submit と同じ資格で確かめる。
  */
 const catalogFilled = async (): Promise<Verdict> => {
-  const token = await variable("u/admin/waggle_token");
-  if (token === undefined || token === "") return unreadable("u/admin/waggle_token");
+  const token = await flowToken();
+  if (token === undefined) return noFlowToken;
   return readCatalog(
     await answerOf(`${API}/api/scripts`, { headers: { authorization: `Bearer ${token}` } }),
   );
 };
 
-/** flow のトークンの期限 (`readTokenExpiry`)。 */
-const flowTokenExpiry = async (): Promise<Verdict> => {
-  const token = await variable("u/admin/waggle_token");
-  if (token === undefined || token === "") return unreadable("u/admin/waggle_token");
-  return readTokenExpiry(token, Date.now());
-};
-
 /** 走っている定期の回 (`readScheduledRun`)。e2e はこれとぶつかると 409 で落ちる。 */
 const noScheduledRun = async (): Promise<Verdict> => {
-  const token = await variable("u/admin/waggle_token");
-  if (token === undefined || token === "") return unreadable("u/admin/waggle_token");
+  const token = await flowToken();
+  if (token === undefined) return noFlowToken;
   return readScheduledRun(
     await answerOf(`${API}/api/crawls?state=running`, {
       headers: { authorization: `Bearer ${token}` },
@@ -354,8 +360,8 @@ const noScheduledRun = async (): Promise<Verdict> => {
 };
 
 const flowCanSubmit = async (): Promise<Verdict> => {
-  const token = await variable("u/admin/waggle_token");
-  if (token === undefined || token === "") return unreadable("u/admin/waggle_token");
+  const token = await flowToken();
+  if (token === undefined) return noFlowToken;
   const { status, body } = await answerOf(`${API}/api/me`, {
     headers: { authorization: `Bearer ${token}` },
   });
@@ -460,16 +466,36 @@ const workerReachesTsCompile = async (): Promise<Verdict> => {
 
 // ── e2e ────────────────────────────────────────────────────────────────
 
-/** e2e の試験が名乗る名前に、クロールの許可があるか。 */
+/**
+ * e2e の試験が名乗る利用者 (Floci の利用者 `e2e`) に、クロールの許可があるか。トークンは capture-ledger の
+ * `idp:token` で取る (試験の `test/e2e/helpers/stack.ts` と同じ取り方)。許可は名前でなく sub に付く。
+ */
 const e2eCanSubmit = async (): Promise<Verdict> => {
-  const token = await mint(E2E_SUBJECT);
-  if (token === undefined) return readJwt({ token: "no-token", iss: ISSUER });
+  let token: string;
+  try {
+    const { stdout } = await exec(
+      "pnpm",
+      ["run", "--silent", "idp:token", "--user", E2E_SUBJECT, "--org", "acme"],
+      { cwd: ledgerDir() },
+    );
+    token = stdout.trim();
+  } catch (err) {
+    return {
+      ok: false,
+      need: `capture-ledger の idp:token で ${E2E_SUBJECT} のトークンを取れない: ${messageOf(err).slice(0, 200)}`,
+    };
+  }
   const { status, body } = await answerOf(`${API}/api/me`, {
     headers: { authorization: `Bearer ${token}` },
   });
-  // 401 は jwt の点検 (親) が ✓ の後なので起きないはずだが、起きたら Windmill のトークンの話ではない。
-  if (status === 401) return { ok: false, need: `issuer の新しい ${E2E_SUBJECT} のトークンが 401` };
-  return readCanSubmit(status, body);
+  if (status === 401) return { ok: false, need: `Floci の利用者 ${E2E_SUBJECT} のトークンが 401` };
+  const verdict = readCanSubmit(status, body);
+  return verdict.ok
+    ? verdict
+    : {
+        ok: false,
+        need: `${E2E_SUBJECT} にクロールの許可が無い → cd ../capture-ledger && pnpm run idp:grant --user ${E2E_SUBJECT}`,
+      };
 };
 
 export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
@@ -552,14 +578,11 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
       ),
   },
   {
-    name: "oidc issuer",
+    name: "idp",
     section: SECTIONS.bringUp,
-    where: `${ISSUER}/.well-known/openid-configuration`,
-    probe: () =>
-      up(
-        `${ISSUER}/.well-known/openid-configuration`,
-        "issuer が答えない → cd ../capture-ledger && pnpm run oidc:issuer (動かし続ける)",
-      ),
+    where: `変数 ${LEDGER_CLIENT_VAR} の iss の discovery (手元は capture-ledger の Floci)`,
+    needs: ["windmill"],
+    probe: idpAnswers,
   },
   {
     name: "crawl route",
@@ -603,14 +626,14 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
   {
     name: "jwt",
     section: SECTIONS.bringUp,
-    where: `issuer のトークンで GET ${API}/api/archives`,
-    needs: ["capture-ledger api", "oidc issuer"],
+    where: `flow の資格で取ったトークンで GET ${API}/api/archives`,
+    needs: ["capture-ledger api", "idp"],
     probe: acceptsJwt,
   },
   {
     name: "search route",
     section: SECTIONS.bringUp,
-    where: `issuer のトークンで GET ${API}${SEARCH_PROBE} (200 なら OpenSearch まで届く)`,
+    where: `flow の資格で取ったトークンで GET ${API}${SEARCH_PROBE} (200 なら OpenSearch まで届く)`,
     // 台帳の全文検索。エンドポイントが無いか OpenSearch が答えないと、flow の索引の段が毎回落ちる (CAPTURE-53 から
     // 404 を飛ばさない)。トークンは jwt の行と同じ取り方なので、jwt の後に訊く。
     needs: ["jwt"],
@@ -648,19 +671,9 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
     name: "can_submit",
     section: SECTIONS.grant,
     where: `flow のトークンで GET ${API}/api/me (クロールを始められるか)`,
-    // jwt の後に訊く —— issuer を起こし直した後、jwt の新しいトークンが API に鍵を取り直させる。
-    // 先に flow の古いトークンが着くと、同じ状態で ✓ と ✗ が入れ替わる (古いトークンは、API が
-    // 取り直すまで通る)。
+    // jwt の後に訊く —— jwt が ✗ なら、ここで分かることは無い (名乗りそのものが通らない)。
     needs: ["jwt", "変数", "openfga"],
     probe: flowCanSubmit,
-  },
-  {
-    name: "トークンの期限",
-    section: SECTIONS.grant,
-    where:
-      "変数 u/admin/waggle_token の exp (切れると、回が撮れても報告が 401 で行が running のまま残る)",
-    needs: ["変数"],
-    probe: flowTokenExpiry,
   },
   {
     name: "スクリプト",
@@ -704,7 +717,7 @@ export const CHECKS: readonly (Check & { e2eOnly?: true })[] = [
   {
     name: `${E2E_SUBJECT} の許可`,
     section: SECTIONS.e2e,
-    where: `issuer の ${E2E_SUBJECT} のトークンで GET ${API}/api/me`,
+    where: `Floci の利用者 ${E2E_SUBJECT} のトークン (capture-ledger の idp:token) で GET ${API}/api/me`,
     needs: ["jwt", "openfga"],
     probe: e2eCanSubmit,
     e2eOnly: true,

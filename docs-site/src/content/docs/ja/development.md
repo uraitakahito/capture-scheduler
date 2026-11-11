@@ -21,7 +21,7 @@ pnpm run windmill:push   # git を正として UI に反映する
 外すと、UI で作った schedule や前に push した schedule を `windmill:push` が消さない。古い checkout の
 `windmill:push` が戻すこともあり、戻った schedule は capture-ledger の予定と別にクロールを始めるので、doctor の
 `schedule` が残っていないかを見る。変数は秘密かどうかによらず同期しない
-（`skipVariables: true`。`skipSecrets: true` も書いてある）。`u/admin/waggle_token` は `scripts/capture-ledger-token.ts` が API 経由で入れる。
+（`skipVariables: true`。`skipSecrets: true` も書いてある）。`u/admin/ledger_client`（flow の app client。secret）は `scripts/capture-ledger-token.ts` が API 経由で入れる。
 
 フォルダは同期する（`skipFolders` は書いておらず、既定で同期）。`windmill/f/<名前>/folder.meta.yaml` が正で、
 **手元に無いフォルダは push が消す** —— API や UI で作ったフォルダは次の push で消える（2026-11-01 に
@@ -49,7 +49,7 @@ script や flow を消したら、`wmill-lock.yaml` のその行も手で消す�
 
 ```sh
 # 1. スタックを上げ、run 履歴を作る（下の 2 種が要る。無いと script が止まる）
-./setup.sh && container-compose up -d -b   # + capture-ledger 側の API / issuer
+./setup.sh && container-compose up -d -b   # + capture-ledger 側の API / IdP（identity provider）
 #    - crawl_level の成功が 1 本
 #    - report_level の失敗（何らかの失敗が 1 本）
 # 2. 撮る（Chromium は初回だけ手で取得。puppeteer は docs 撮影専用）

@@ -1,17 +1,16 @@
 /**
  * capture-ledger の `GET /api/me` の答えを、doctor の can_submit の 1 行に読む。
  *
- * 訊くのは **flow が使うのと同じトークン** (Windmill の変数 `u/admin/waggle_token`)。
- * capture-ledger は、そのトークンから解いた名前と組織をそのまま返すので、足りない許可を
- * 打つべきコマンドの形で名指しできる —— `.env` で名前を変えていても、docs に書いた
- * `windmill acme` ではなく、capture-ledger が実際に見た名前を出す。
+ * 訊くのは **flow が使うのと同じ資格で取ったトークン** (Windmill の変数 `u/admin/ledger_client`)。
+ * capture-ledger は、そのトークンから解いた主体 (機械なら app client の ID) と組織をそのまま返すので、
+ * 足りない許可を打つべきコマンドの形で名指しできる。機械の組織はトークンに載らず、台帳が保存した許可から引く。
  *
  * 読み分けるのは status と本文。直すものがそれぞれ違う:
  *
  *   200 canSubmit: true     ✓
- *   200 canSubmit: false    その名前に、その組織のクロールの許可が無い → fga:grant
- *   200 組織が空            トークンに組織が載っていない → CAPTURE_LEDGER_ORGANIZATIONS
- *   401                     トークンが通らない (issuer を起こし直した・API がヘッダの設定)
+ *   200 canSubmit: false    その主体に、その組織のクロールの許可が無い → fga:grant
+ *   200 組織が空            許可が 1 つも無い (機械の組織は許可から引く) → idp:grant
+ *   401                     トークンが通らない (Floci のプールを作り直した・API がヘッダの設定)
  *   404 Route GET:/api/me   capture-ledger が古い (`GET /api/me` は v0.42.0 から)
  *   届かない・それ以外       そのまま出す
  *
@@ -55,8 +54,8 @@ export const readCanSubmit = (status: number | undefined, body: string): Verdict
     return {
       ok: false,
       need:
-        "Windmill のトークンが通らない —— issuer を起こし直したか、API が JWT を受けていない" +
-        " (上の jwt)。pnpm run windmill:capture-ledger-token をやり直す",
+        "Windmill のトークンが通らない —— Floci のプールを作り直したか、API が JWT を受けていない" +
+        " (上の jwt)。cd ../capture-ledger && pnpm run dev:up --from idp",
     };
   }
   if (status === 404 && ROUTE_MISSING.test(body)) {
@@ -75,8 +74,8 @@ export const readCanSubmit = (status: number | undefined, body: string): Verdict
     return {
       ok: false,
       need:
-        `トークンの ${me.subject} に組織が載っていない —— CAPTURE_LEDGER_ORGANIZATIONS を見て、` +
-        "pnpm run windmill:capture-ledger-token をやり直す",
+        `${me.subject} の組織が無い —— 機械 (Windmill の app client) の組織は、台帳が保存した許可から引く。` +
+        "許可が 1 つも無い → cd ../capture-ledger && pnpm run idp:grant",
     };
   }
   return {

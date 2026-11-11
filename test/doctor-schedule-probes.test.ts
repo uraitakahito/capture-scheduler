@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { readScheduledRun, readTokenExpiry } from "../scripts/doctor/schedule-probes.js";
+import { readScheduledRun } from "../scripts/doctor/schedule-probes.js";
 import { readSchedules } from "../scripts/doctor/windmill-contents.js";
 
 const need = (verdict: { ok: boolean; need?: string }): string => verdict.need ?? "";
@@ -15,37 +15,6 @@ describe("readSchedules", () => {
     expect(verdict.ok).toBe(false);
     expect(need(verdict)).toContain("f/waggle/daily");
     expect(need(verdict)).toContain("pnpm run windmill:push");
-  });
-});
-
-describe("readTokenExpiry", () => {
-  const NOW = Date.parse("2026-11-07T00:00:00.000Z");
-  const tokenWith = (claims: Record<string, unknown>): string =>
-    `h.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.s`;
-  const expIn = (hours: number) => tokenWith({ exp: NOW / 1000 + hours * 3600 });
-
-  it("24 時間より先なら ✓", () => {
-    expect(readTokenExpiry(expIn(25), NOW)).toEqual({ ok: true });
-  });
-
-  it("24 時間を切れば ✗ で、残りと直し方を言う", () => {
-    const verdict = readTokenExpiry(expIn(5), NOW);
-    expect(verdict.ok).toBe(false);
-    expect(need(verdict)).toContain("5 時間");
-    expect(need(verdict)).toContain("pnpm run windmill:capture-ledger-token");
-  });
-
-  it("切れていれば切れていると言う", () => {
-    expect(need(readTokenExpiry(expIn(-1), NOW))).toContain("切れている");
-  });
-
-  it("exp の無いトークンは切れないので ✓", () => {
-    expect(readTokenExpiry(tokenWith({ sub: "windmill" }), NOW)).toEqual({ ok: true });
-  });
-
-  it("JWT の形でなければ ✗", () => {
-    expect(readTokenExpiry("not-a-jwt", NOW).ok).toBe(false);
-    expect(readTokenExpiry("a.%%%.c", NOW).ok).toBe(false);
   });
 });
 

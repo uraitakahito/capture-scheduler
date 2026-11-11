@@ -46,13 +46,13 @@ anything the ledger answers with 200**: the store refused the write (`error`), a
 inspected (`failed` above 0, picked up by the next replay bundle), or there was no WACZ to include yet
 (`rev: null`). It writes one log line and returns. Throwing would skip the index step and make `fail_crawl` close the crawl as `failed` while its
 next level may already be running. It throws only when the ledger does not answer 200 — 400 (the body),
-401 (the token), 404 (no such crawl, no crawl permission for the token's name, or a capture-ledger too
+401 (the token), 404 (no such crawl, no crawl permission for the token's `sub`, or a capture-ledger too
 old to have the endpoint), 5xx — or answers in the wrong shape.
 
 `index_level` runs after the report, so by then capture-ledger has already closed the crawl
 (or started the next level). Full-text search is a required part of capture-ledger, so
 the step skips nothing: it throws when the ledger answers 404 (no such crawl, or no crawl permission
-for the token's name), 503 (OpenSearch did not answer), or 202 with `failed` above 0 (an archive was
+for the token's `sub`), 503 (OpenSearch did not answer), or 202 with `failed` above 0 (an archive was
 left out of the index). On the last level that leaves the crawl `succeeded` and only the Windmill run
 red — `pnpm run smoke` waits for the run and reports it.
 
@@ -174,7 +174,7 @@ them — what runs, in what order, and in which of BrowserHive's two injection p
 capture-ledger.
 
 ```sh
-pnpm run windmill:capture-ledger-token   # waggle_token / waggle_api_url /
+pnpm run windmill:capture-ledger-token   # ledger_client / waggle_api_url /
                                  # browserhive_endpoints / browserhive_tls_ca /
                                  # ts_compile_url
 ```

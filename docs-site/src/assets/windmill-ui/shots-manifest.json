@@ -5,7 +5,7 @@
     "height": 850,
     "deviceScaleFactor": 1
   },
-  "takenAt": "2026-11-07T08:23:52.793Z",
+  "takenAt": "2026-11-11T14:41:11.061Z",
   "prerequisites": [
     "スタックが起動していること",
     "run 履歴に crawl_level の成功が 1 本あること",

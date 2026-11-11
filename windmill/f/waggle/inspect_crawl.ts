@@ -10,6 +10,47 @@
  */
 import * as wmill from "windmill-client";
 
+// ── 台帳に名乗るトークン（6 本が同じ物を持つ。test/ledger-token.test.ts が同じかを見る）──
+/**
+ * 台帳 (capture-ledger) に名乗る access token を、client credentials で取る。
+ *
+ * 台帳の IdP は Amazon Cognito (手元は代役の Floci)。Windmill の flow は機械なので、人のサインインは
+ * 使えず、app client の ID と secret で M2M のトークンを取る。トークンは最長 1 日しかもたないので、
+ * 変数に入れて使い回さず、段ごとに取る。設定は変数 `u/admin/ledger_client` (secret・JSON) から読む
+ * —— 入れるのは capture-scheduler の `pnpm run windmill:capture-ledger-token`。
+ *
+ * Windmill の relative import で 1 本にまとめないのは、この版の Windmill で効くかを確かめていないから。
+ */
+const ledgerToken = async (): Promise<string> => {
+  const raw = await wmill.getVariable("u/admin/ledger_client");
+  const client = JSON.parse(raw) as {
+    tokenUrl: string;
+    clientId: string;
+    clientSecret: string;
+    scope: string;
+  };
+  const basic = btoa(`${client.clientId}:${client.clientSecret}`);
+  const res = await fetch(client.tokenUrl, {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      authorization: `Basic ${basic}`,
+    },
+    body: `grant_type=client_credentials&scope=${encodeURIComponent(client.scope)}`,
+  });
+  if (!res.ok) {
+    throw new Error(
+      `トークンを取れない: ${client.tokenUrl} → ${String(res.status)} ${(await res.text()).slice(0, 200)}` +
+        " —— Floci のプールを作り直した後なら、capture-ledger で pnpm run dev:up --from idp",
+    );
+  }
+  const { access_token: token } = (await res.json()) as { access_token?: unknown };
+  if (typeof token !== "string" || token === "")
+    throw new Error("token endpoint の答えに access_token が無い");
+  return token;
+};
+// ── ここまで ──
+
 type Action = "follow" | "capture" | "skip";
 
 /** 規則 1 本。鍵が 1 つの object (`{ "skip": "ads.example.com" }`)。 */
@@ -185,7 +226,7 @@ export const renderCrawl = (detail: CrawlDetail, got: Decisions): Rendered => {
 /** 台帳を引く関数。設定は flow の段と同じ変数から読む (schema の既定値は UI からの実行にしか埋まらない)。 */
 const ledger = async (): Promise<Getter> => {
   const base = await wmill.getVariable("u/admin/waggle_api_url");
-  const token = await wmill.getVariable("u/admin/waggle_token");
+  const token = await ledgerToken();
   return async <T>(path: string): Promise<T> => {
     const res = await fetch(`${base}${path}`, { headers: { authorization: `Bearer ${token}` } });
     if (!res.ok) {

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { LEDGER_CLIENT_VAR, answeringToken } from "./helpers/ledger-token.js";
 import { main, renderDomain, type DomainAnswer } from "../windmill/f/waggle/inspect_domain.js";
 
 /**
@@ -10,7 +11,7 @@ import { main, renderDomain, type DomainAnswer } from "../windmill/f/waggle/insp
 
 const VARS: Record<string, string> = {
   "u/admin/waggle_api_url": "http://capture-ledger:7070",
-  "u/admin/waggle_token": "tok",
+  "u/admin/ledger_client": LEDGER_CLIENT_VAR,
 };
 
 vi.mock("windmill-client", () => ({
@@ -104,7 +105,7 @@ describe("台帳を引く", () => {
     const seen: { url: string; auth: string | null }[] = [];
     vi.stubGlobal(
       "fetch",
-      vi.fn((url: string, init: RequestInit) => {
+      answeringToken((url: string, init: RequestInit) => {
         seen.push({ url: String(url), auth: new Headers(init.headers).get("authorization") });
         return Promise.resolve({
           ok: true,
@@ -125,7 +126,7 @@ describe("台帳を引く", () => {
   it("台帳が断れば（読めないドメイン）、状態と本文を言って落ちる", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(() =>
+      answeringToken(() =>
         Promise.resolve({
           ok: false,
           status: 400,

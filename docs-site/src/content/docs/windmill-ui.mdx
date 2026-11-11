@@ -150,13 +150,13 @@ checkout's `windmill:push` can bring one back. The `schedule` line of `pnpm run 
 
 ## Variables
 
-The `u/admin/*` variables. `waggle_token` is a secret, so its value comes out
-masked (`••••`) — **the masking itself** is the proof that the token is not
-exposed in the UI.
+The `u/admin/*` variables. `ledger_client` is a secret, so its value comes out
+masked (`••••`) — **the masking itself** is the proof that the app client's
+secret is not exposed in the UI.
 
 <Image
   src={variables}
-  alt="Variables: waggle_token masked, the others show browserhive_endpoints and so on"
+  alt="Variables: ledger_client masked, the others show browserhive_endpoints and so on"
 />
 
 Resources stay empty: this repo puts nothing there (until v0.22 a copy of
@@ -180,14 +180,14 @@ flow's scripts read their settings from variables instead
 Variables are provisioned by a separate script. Confuse the two and
 push stays green while the flow dies on its first `getVariable`.
 
-| Path                            | Contents                                                                                                                                                  | Provisioned by                                                                             |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `u/admin/waggle_token`          | JWT for capture-ledger (secret)                                                                                                                           | `windmill:capture-ledger-token`                                                            |
-| `u/admin/waggle_api_url`        | Where the capture-ledger API is (default: the gateway of the `default` network)                                                                           | same                                                                                       |
-| `u/admin/browserhive_endpoints` | JSON array of BrowserHive URLs, one per BrowserHive (default `["http://browserhive-1.capture-ledger:50051","http://browserhive-2.capture-ledger:50051"]`) | same                                                                                       |
-| `u/admin/browserhive_tls_ca`    | CA for `https://` endpoints (empty = plaintext `http://`)                                                                                                 | same                                                                                       |
-| `u/admin/ts_compile_url`        | Where ts-compile-service is (default `http://ts-compile.capture-scheduler:8080`)                                                                          | same                                                                                       |
-| `f/waggle_secrets/<name>`       | A secret a script declared in the `params` of its `catalog.json`. `crawl_host` resolves it and hands it to BrowserHive only ([Following links](/crawl/))  | **a person** (`pnpm run windmill:cli variable add`); the folder comes from `windmill:push` |
+| Path                            | Contents                                                                                                                                                                                       | Provisioned by                                                                             |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `u/admin/ledger_client`         | The flow's app client for capture-ledger, as JSON (secret): `issuer`, `tokenUrl` (as a container sees it), `hostTokenUrl`, `clientId`, `clientSecret`, `scope`. Each step gets a token with it | `windmill:capture-ledger-token`, from capture-ledger's `.dev/idp.env`                      |
+| `u/admin/waggle_api_url`        | Where the capture-ledger API is (default: the gateway of the `default` network)                                                                                                                | same                                                                                       |
+| `u/admin/browserhive_endpoints` | JSON array of BrowserHive URLs, one per BrowserHive (default `["http://browserhive-1.capture-ledger:50051","http://browserhive-2.capture-ledger:50051"]`)                                      | same                                                                                       |
+| `u/admin/browserhive_tls_ca`    | CA for `https://` endpoints (empty = plaintext `http://`)                                                                                                                                      | same                                                                                       |
+| `u/admin/ts_compile_url`        | Where ts-compile-service is (default `http://ts-compile.capture-scheduler:8080`)                                                                                                               | same                                                                                       |
+| `f/waggle_secrets/<name>`       | A secret a script declared in the `params` of its `catalog.json`. `crawl_host` resolves it and hands it to BrowserHive only ([Following links](/crawl/))                                       | **a person** (`pnpm run windmill:cli variable add`); the folder comes from `windmill:push` |
 
 The endpoints are `http(s)://` URLs since BrowserHive v12. `crawl_host` refuses
 the `host:port` form of v11 and names this variable, and
@@ -204,15 +204,18 @@ The recovery order (measured on 2026-09-11):
 pnpm run windmill:bootstrap            # recreates the workspace, writes the fresh token to .env.local
                                        # and the lines for capture-ledger to .dev/capture-ledger.env
 pnpm run windmill:push                 # scripts / flow
-pnpm run windmill:capture-ledger-token # the five variables
+pnpm run windmill:capture-ledger-token # the variables in the table above
 cd ../capture-ledger
 pnpm run connect                       # fetch those lines; then restart its API
-pnpm run fga:grant submitter windmill acme  # let windmill start crawls for acme
+pnpm run idp:grant                     # let the windmill app client start crawls for acme
 ```
 
 If capture-ledger's OpenFGA store was wiped at the same time, run
 `fga:migrate` → `fga:deploy` there first and paste the two printed IDs into
-that repo's `.env` before granting.
+that repo's `.env` before granting. If the pool of [Floci](https://github.com/floci-io/floci), capture-ledger's local stand-in for
+Amazon Cognito, is gone too (its container was recreated), run
+`pnpm run dev:up --from idp` there after `connect` in place of the last line: it sets the
+IdP (identity provider) up again, restarts the API, grants, and re-runs `windmill:capture-ledger-token`.
 
 **Recreating containers can change the bridge subnet.** `u/admin/waggle_api_url` holds the
 gateway of the `default` network as it was when `windmill:capture-ledger-token` ran, so re-run it

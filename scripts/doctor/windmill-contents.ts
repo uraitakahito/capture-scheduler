@@ -145,7 +145,7 @@ export const readSecretsFolder = (answer: Answer): Verdict => {
 
 /** flow と点検が読む変数。`windmill:capture-ledger-token` が 5 つとも入れる。 */
 export const VARIABLES = [
-  "u/admin/waggle_token",
+  "u/admin/ledger_client",
   "u/admin/waggle_api_url",
   "u/admin/browserhive_endpoints",
   "u/admin/browserhive_tls_ca",

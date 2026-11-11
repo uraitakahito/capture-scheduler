@@ -21,7 +21,7 @@ push before pulling — see [Windmill CE](/windmill-ce/).
 schedules out of the sync, `windmill:push` would not remove one made in the UI or pushed earlier. An old
 checkout's `windmill:push` can bring one back, and it would start crawls apart from capture-ledger's
 schedules, so doctor's `schedule` line checks that none is left. Variables are not synced, secret or not
-(`skipVariables: true`; `skipSecrets: true` is set too); `u/admin/waggle_token` is injected through the API by
+(`skipVariables: true`; `skipSecrets: true` is set too); `u/admin/ledger_client` (the flow's app client, a secret) is injected through the API by
 `scripts/capture-ledger-token.ts`.
 
 Folders are synced (`skipFolders` is not set, so the default applies). `windmill/f/<name>/folder.meta.yaml`
@@ -54,7 +54,7 @@ if you forget.
 
 ```sh
 # 1. Bring the stack up and create the run history the script needs (two of them):
-./setup.sh && container-compose up -d -b   # + the capture-ledger API / issuer
+./setup.sh && container-compose up -d -b   # + the capture-ledger API / IdP (identity provider)
 #    - one successful crawl_level
 #    - one failed report_level (any failure)
 # 2. Capture (Chromium is fetched by hand the first time; puppeteer is docs-only)

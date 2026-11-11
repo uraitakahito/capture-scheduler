@@ -23,7 +23,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'authorization: Bearer dev-key' http
 # 200 なら動いている。000 なら止まっている → cd ../capture-ledger && pnpm run stack:up
 ```
 
-`dev-key` は開発用の OpenFGA の既定の鍵。止まったままだと、下の `fga:grant` が
+`dev-key` は開発用の OpenFGA の既定の鍵。止まったままだと、下の `idp:grant` が
 「OpenFGA (http://localhost:8090) に届きません」で止まる。
 
 以下のコードブロックは、どれも 1 行目の `cd` で「どの repo で打つか」を示す（2 つの repo は
@@ -76,7 +76,6 @@ pnpm run connect              # 上の行を読み、capture-ledger の .env.loc
 CAPTURE_LEDGER_CRAWL_WEBHOOK_URL=http://127.0.0.1:8000/api/w/crawler/jobs/run/f/f/waggle/crawl_level
 CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN=<bootstrap が作った token>
 CAPTURE_LEDGER_API_HOST=0.0.0.0
-CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099
 CAPTURE_LEDGER_TS_COMPILE_URL=http://127.0.0.1:28080
 ```
 
@@ -84,7 +83,6 @@ CAPTURE_LEDGER_TS_COMPILE_URL=http://127.0.0.1:28080
 | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `…_CRAWL_WEBHOOK_URL`・`…_CRAWL_WEBHOOK_TOKEN` | クロールを Windmill に投げる先。無いと `/api/crawls` そのものが無い（`404`）                                                                                                                       |
 | `CAPTURE_LEDGER_API_HOST=0.0.0.0`              | 段の報告はコンテナから来る。`127.0.0.1` で待つ API には届かない                                                                                                                                    |
-| `CAPTURE_LEDGER_OIDC_ISSUER`                   | flow は JWT で名乗る。無い API は開発用ヘッダの設定になり、段の報告は `401` になる                                                                                                                 |
 | `CAPTURE_LEDGER_TS_COMPILE_URL`                | host で動く台帳が、落ちたクロールの型の誤りを取り直し、直し方を検査するときに呼ぶ ts-compile-service の宛先（host の `127.0.0.1:28080`）。Claude の鍵があってこれが無いと、台帳の API は起動しない |
 
 bootstrap は打つたびに新しい token を作ります（前に作ったものも、使えるまま残ります）。
@@ -92,7 +90,19 @@ bootstrap は打つたびに新しい token を作ります（前に作ったも
 取りに行かないと capture-ledger は古い token のままです（古いほうも生きているので、
 壊れるのではなく「直したはずなのに変わらない」形になります）。
 
-`connect` を打ったら、capture-ledger 側で issuer を起こし、**API を起こし直します**。
+flow は JWT で名乗るので、API には `CAPTURE_LEDGER_OIDC_ISSUER` と `CAPTURE_LEDGER_OIDC_CLIENT_IDS` も
+要ります。どちらも上のファイルには入りません。書くのは capture-ledger の `pnpm run idp:bootstrap`（下）です。
+手元の IdP（identity provider）が付けたプールの ID が issuer に入るためです。無いと API は開発用ヘッダの
+設定になり、flow の段の報告は `401` になります。
+
+`connect` を打ったら、capture-ledger 側で手元の IdP を用意し、**API を起こし直します**。
+
+本番の IdP は Amazon Cognito です。手元では Cognito を真似る [Floci](https://github.com/floci-io/floci) が
+代わりを務めます。capture-ledger のスタックの compose のサービス `idp` で、`127.0.0.1:4566` に出ています
+（コンテナからは `http://idp.capture-ledger:4566`）。`idp:bootstrap` は、そこにプール・app client・
+自分の利用者を作ります。app client の 1 つが `windmill` で、flow はその ID と secret でトークンを取ります。
+`idp:bootstrap` は、上の issuer の行を capture-ledger の `.env.local` に書き、client の設定を引き渡しファイル
+`.dev/idp.env` に書きます。読むのは下の[鍵を渡す](#鍵を渡す)です。
 
 **capture-ledger のクイックスタート §6 で起こした API を、`Ctrl-C` で止めてから**
 同じコマンドをもう一度打ちます —— 新しく 2 本目を立てるのではありません。
@@ -100,23 +110,23 @@ API が設定を読むのは**起動のときの 1 度だけ**なので、走っ
 上の行を知りません。並べて立てようとしても、2 本目は
 `EADDRINUSE: address already in use 0.0.0.0:7070` で落ちます。**どこに残っているか
 分からなくなったら**、capture-ledger の `pnpm run dev:status` が pid と起動時刻を出し、
-`pnpm run dev:down` が止めます（issuer も API もコンテナではないので、
+`pnpm run dev:down` が止めます（API はコンテナではないので、
 `container-compose down` では消えません）。
-
-`oidc:issuer` は動かし続けます。API は起動のときには issuer に問い合わせず、トークンを
-最初に確かめるときに鍵を取りに行きます。だから起こす順は問いませんが、issuer が居ない間は、
-トークンの付いた要求（flow の段の報告も）が `401` になります。
 
 ```sh
 cd ../capture-ledger
-pnpm run oidc:issuer   # 動かし続ける
-pnpm run api           # §6 で起こしたものを止めてから、同じポートでもう一度
+pnpm run idp:bootstrap   # プール・app client・自分の利用者を作り、.env.local と .dev/idp.env に書く
+pnpm run api             # §6 で起こしたものを止めてから、同じコマンドでもう一度
 ```
+
+Floci はプールを**メモリに**持ちます。コンテナが作り直されると（`stack:up` など）プールが消え、
+issuer も client の ID も secret も替わります。そのときは capture-ledger で `pnpm run dev:up --from idp` を
+打ちます。IdP を用意し直し、その後の手（API の起こし直し・許可・下の鍵の受け渡し）もやり直します。
 
 渡した行が効いたかは、API の起動ログの**最後の行**が言います:
 
 ```text
-Archive API listening on 0.0.0.0:7070 — identity: JWT (http://127.0.0.1:9099); crawl level reports: ready
+Archive API listening on 0.0.0.0:7070 — identity: JWT (http://127.0.0.1:4566/us-east-1_example); crawl level reports: ready
 ```
 
 `blocked` なら、その上の warn が足りない行を名指しします（capture-ledger v0.44.0 から）。
@@ -125,17 +135,22 @@ Archive API listening on 0.0.0.0:7070 — identity: JWT (http://127.0.0.1:9099);
 
 ### 鍵を渡す
 
-Windmill の flow が capture-ledger を呼ぶためのトークンと、呼ぶ先を、Windmill の変数に入れる:
+Windmill の flow がトークンを取るための設定と、呼ぶ先を、Windmill の変数に入れる:
 
 ```sh
 cd ../capture-scheduler
-pnpm run windmill:capture-ledger-token   # トークンと、コンテナから見た API の宛先と、ts-compile-service の宛先を入れる
+pnpm run windmill:capture-ledger-token   # flow の app client と、コンテナから見た API の宛先と、ts-compile-service の宛先を入れる
 ```
+
+capture-ledger の `.dev/idp.env` を読み（既定は `../capture-ledger`。別の場所なら引数に渡すか
+`CAPTURE_LEDGER_DIR` に書く）、`windmill` の app client でトークンを取れることを確かめてから、secret の
+変数 `u/admin/ledger_client` に書く。入れるのは client で、トークンではない。前の版が入れていた長く
+もつトークン `u/admin/waggle_token` は消す。
 
 API の宛先（`u/admin/waggle_api_url`）は、`CAPTURE_LEDGER_API_URL` を書かなければ default
 ネットワークの gateway から組みます（`container network inspect default`）。network を作り直すと
-変わるので、そのときは `windmill:capture-ledger-token` をやり直します。issuer を起こし直したときも
-同じ（[トークンの経路](#トークンの経路)）。
+変わるので、そのときは `windmill:capture-ledger-token` をやり直します。Floci のプールが作り直されたときは、
+`dev:up --from idp` がやり直します（[トークンの経路](#トークンの経路)）。
 
 スクリプトが `catalog.json` の `params` で `kind: secret` と宣言した名前は、人が Windmill の変数
 `f/waggle_secrets/<名前>` に置く（置き方は[リンクを辿る](/crawl/)の「シークレットは Windmill の変数」）。
@@ -144,35 +159,38 @@ API の宛先（`u/admin/waggle_api_url`）は、`CAPTURE_LEDGER_API_URL` を書
 
 ### windmill にクロールを許可する
 
-Windmill は capture-ledger を `windmill` という名前で呼ぶ（トークンの `sub`。組織は `acme`）。
+Windmill は capture-ledger を app client `windmill` として呼ぶ。client credentials で取ったトークンは
+app client を指し、`sub` は名前ではなく、Floci が付けた client の ID になる。この機械のトークンには
+組織が載らないので、capture-ledger は、その `sub` がクロールを始めてよい組織（ここでは `acme`）を引く。
 capture-ledger は、クロールを始める・段を報告する・合本を書かせる・索引を渡す・締める、のたびに
-「windmill は acme のクロールを始めてよいか」を OpenFGA に訊き、許可が無ければ 404 を返す。
-手で始めたクロールでも、段の報告は windmill の名前で来る。
+「この client は acme のクロールを始めてよいか」を OpenFGA に訊き、許可が無ければ 404 を返す。
+手で始めたクロールでも、段の報告は windmill の client として来る。
 
 ```
-pnpm run fga:grant submitter windmill acme      （あなたが 1 度だけ）
-    │ 書く
+pnpm run idp:grant      （あなたが、プールごとに 1 度）
+    │ .dev/idp.env から client の ID を読み、書く
     ▼
-OpenFGA   user:windmill  submitter  organization:acme
+OpenFGA   user:<windmill の client の ID>  submitter  organization:acme
     ▲
-    │ 訊く: user:windmill は organization:acme で can_submit か
+    │ 訊く: user:<windmill の client の ID> は organization:acme で can_submit か
     │      （クロールを始める・段の報告・合本・索引・締めのたび）
-capture-ledger API   ◄── Windmill（sub=windmill, orgs=[acme] のトークン）
+capture-ledger API   ◄── Windmill（client credentials のトークン。sub は client の ID、群は無い）
     │
     └─ 行が在れば 202。無ければ 404 {"error":"not found"}
 ```
 
-その許可を 1 行書き込む（capture-ledger 側で 1 度だけ。取り消すのは `fga:revoke`）:
+その許可を書き込む（capture-ledger 側で。Floci のプールが作り直されたら、client の ID も替わるので、
+もう一度）:
 
 ```sh
 cd ../capture-ledger
-pnpm run fga:grant submitter windmill acme
-# windmill は acme のクロールを始められます (書いた: user:windmill submitter organization:acme)
+pnpm run idp:grant
+# <client の ID> は acme のクロールを始められます (書いた: user:<client の ID> submitter organization:acme)
 ```
 
-`CAPTURE_LEDGER_SUBJECT` / `_ORGANIZATIONS` を変えたなら、その名前で。書けたかどうかは、下の
-`doctor` の `can_submit` の行が教える —— 足りなければ、capture-ledger が実際に見た
-名前で、打つべきコマンドを出す。
+`idp:grant` は、自分の利用者（`idp:bootstrap` が作ったもの）にも許可を与える。`idp:token` で
+クロールを始めたり見たりできるのはそのため。取り消すのは `fga:revoke`。書けたかどうかは、下の
+`doctor` の `can_submit` の行が教える —— 足りなければ、打つべきコマンドを出す。
 
 ## 確かめる —— 1 本撮れるまで
 
@@ -200,8 +218,8 @@ DNS が覚えるため）。
 
 **doctor** は、このページの見出しごとに「その手が済んでいるか」を、その手が作ったものに訊く。
 立っているかだけでなく、script の中身が repo と同じか、Windmill に schedule が残っていないか（時計は
-capture-ledger の中に在り、古い checkout の `windmill:push` が戻すことがある）、Windmill が持っているトークンで
-クロールを始められるか、その期限まで余裕があるか、worker の中から API と BrowserHive に届くか、まで見る。✗ は、何を
+capture-ledger の中に在り、古い checkout の `windmill:push` が戻すことがある）、flow の app client で取ったトークンで
+クロールを始められるか、worker の中から API と BrowserHive に届くか、まで見る。✗ は、何を
 直すかと、このページのどの節の手かを言う。✗ の点検に頼る点検は走らせず、「先に〇〇を」とだけ
 出す —— 直すものが 1 つなら、✗ も 1 本。
 
@@ -210,11 +228,11 @@ capture-ledger の中に在り、古い checkout の `windmill:push` が戻す�
   ✓ windmill            http://127.0.0.1:8000/api/version
   …
   ✗ capture-ledger api  http://127.0.0.1:7070/healthz
-  ✗ oidc issuer         http://127.0.0.1:9099/.well-known/openid-configuration
+  ✗ idp                 変数 u/admin/ledger_client の iss の discovery (手元は capture-ledger の Floci)
   ・crawl route         先に capture-ledger api を
   ・replay-bundle route 先に capture-ledger api を
-  ・jwt                 先に capture-ledger api・oidc issuer を
-  ・search route        先に capture-ledger api・oidc issuer を
+  ・jwt                 先に capture-ledger api・idp を
+  ・search route        先に capture-ledger api・idp を
 
 直すもの (2):
   capture-ledger api —— capture-ledger の API が答えない → cd ../capture-ledger && pnpm run api
@@ -223,7 +241,7 @@ capture-ledger の中に在り、古い checkout の `windmill:push` が戻す�
 ```
 
 **smoke** は、doctor が全部 ✓ のときだけ 1 本撮る。本番と同じ道 —— capture-ledger の
-`POST /api/crawls` に flow と同じトークンで頼み、Windmill の flow に撮らせ、段の報告を待つ ——
+`POST /api/crawls` に flow と同じ app client で取ったトークンで頼み、Windmill の flow に撮らせ、段の報告を待つ ——
 を通し、台帳に載った archive を署名付き URL で取り出して、先頭が `PK`（WACZ は zip）であることまで
 見る。台帳は段の報告の時点でクロールを succeeded にし、flow の合本の段と索引の段はその後に
 走るので、smoke は段の run の終わりを待つ。合本の段の答え（書けた・検められなかった WACZ が 0 本）を
@@ -275,9 +293,9 @@ smoke は capture-ledger v0.43.0 以上を前提にする（最後の段の run 
 | doctor の worker→browserhive が ✗「名前が引けない」（止めた直後の数秒は「3 秒で答えない」）／smoke の原因が `[cap] BrowserHive に届きません: …` | BrowserHive のコンテナが止まっている（止めたコンテナは名前ごと消える）                                   | capture-ledger で `pnpm run stack:up`                                                                                |
 | doctor の host→ts-compile が ✗「http://127.0.0.1:28080 に届かない」                                                                             | ts-compile が host にポートを出していない（compose の ports を足した後に作り直していない）か、落ちている | この repo で `container-compose up -d ts-compile`                                                                    |
 | smoke が `failed`・撮ったページ 0 で、原因が `… net::ERR_NAME_NOT_RESOLVED …`                                                                   | 撮る URL の名前が引けない                                                                                | URL の綴り。正しければ、BrowserHive のコンテナから外の名前を引けるか                                                 |
-| doctor の can_submit が ✗「… のクロールの許可が無い」／smoke の原因が `… /pages → 404`                                                          | windmill にクロールの許可が無い                                                                          | capture-ledger で `pnpm run fga:grant submitter windmill acme`                                                       |
-| doctor の can_submit が ✗「トークンが通らない」／smoke の原因が `… /pages → 401`                                                                | issuer を起こし直し、Windmill のトークンが古い                                                           | `pnpm run windmill:capture-ledger-token`                                                                             |
-| doctor の jwt が ✗「ヘッダで名乗る設定で動いている」（起動ログの最後の行は `crawl level reports: blocked`）                                     | capture-ledger の API が JWT を受けない（`CAPTURE_LEDGER_OIDC_ISSUER` が効いていない）                   | capture-ledger で `pnpm run connect` を打ち、API を起こし直す                                                        |
+| doctor の can_submit が ✗「… の組織が無い」か「… のクロールの許可が無い」／smoke の原因が `… /pages → 404`                                      | windmill の app client にクロールの許可が無い                                                            | capture-ledger で `pnpm run idp:grant`                                                                               |
+| doctor の can_submit が ✗「トークンが通らない」／smoke の原因が `… /pages → 401`                                                                | Floci のプールが作り直され、API か Windmill の変数が古いプールのまま                                     | capture-ledger で `pnpm run dev:up --from idp`                                                                       |
+| doctor の jwt が ✗「ヘッダで名乗る設定で動いている」（起動ログの最後の行は `crawl level reports: blocked`）                                     | capture-ledger の API が JWT を受けない（`CAPTURE_LEDGER_OIDC_ISSUER` が効いていない）                   | capture-ledger で `pnpm run dev:up --from idp`（`idp:bootstrap` が行を書き、API を起こし直す）                       |
 | doctor の container→api が ✗「API が 127.0.0.1 で待っている」／smoke の原因が `Unable to connect`                                               | 段の報告がコンテナから API に届かない（`CAPTURE_LEDGER_API_HOST=0.0.0.0` が効いていない）                | capture-ledger で `pnpm run connect` を打ち、API を起こし直す                                                        |
 | smoke が 409「走行中のクロールがある: …」                                                                                                       | 前の 1 本が running のまま                                                                               | 終わるのを待つか `pnpm run smoke --close-running`                                                                    |
 
@@ -285,34 +303,35 @@ smoke は capture-ledger v0.43.0 以上を前提にする（最後の段の run 
 
 ```
 host                                   │ コンテナ
-  dev issuer 127.0.0.1:9099            │
-      │ POST /token                    │
+  capture-ledger の idp:bootstrap      │
+      │ .dev/idp.env に書く            │
       ▼                                │
-  windmill:capture-ledger-token ───────────────┼──► secret 変数 u/admin/waggle_token
+  windmill:capture-ledger-token ───────┼──► secret 変数 u/admin/ledger_client
+                                       │    （client の ID・secret・token の URL・scope）
                                        │            │
-  capture-api 0.0.0.0:7070  ◄───────────┼── report_level.ts
+                                       │            ▼
+                                       │    flow の各段 ── client credentials ──► Floci
+                                       │            │ ◄── access token
+                                       │            ▼
+  capture-api 0.0.0.0:7070  ◄──────────┼── report_level.ts ほかの段
 ```
 
-**dev issuer は loopback から出さないこと。** あれは頼まれれば誰の名前でもトークンを
-出すので、コンテナから引ける場所に置いた瞬間、ブリッジに届く誰もが `windmill` を
-名乗れる —— `fga:grant` で windmill だけに与えたクロールの許可を誰でも使えることになり、
-JWT にした意味が消える。
+**トークンは入れない。** Cognito の access token は最長 1 日しかもたないので、変数には `windmill` の
+app client を入れる。capture-ledger を呼ぶ段は、そのたびに client credentials で新しいトークンを取る。
+M2M（machine-to-machine。機械どうしの認可）の取り方で、`windmill/f/waggle/report_level.ts` ほか
+capture-ledger を呼ぶスクリプトの先頭の `ledgerToken` がそれをする。動かし続けた機械でも、切れるトークンが無い。
 
-鍵を作る力は host に残し、跨がせるのは**出来上がったトークン 1 本**だけ。
+**変数が flow の資格になる。** client の ID と secret を持つ者は flow を名乗れるので、変数は secret に
+してある。手元ではそこは境界ではない —— Floci の管理の API は、届くものなら誰でも（capture-ledger の
+ネットワークのコンテナも）利用者を作り、トークンを取れる（capture-ledger の
+[開発用の IdP（Floci）](https://uraitakahito.github.io/capture-ledger/ja/development-environment/#開発用の-idpfloci)）。
 
-**issuer を再起動したら `pnpm run windmill:capture-ledger-token` をやり直すこと。**
-issuer は起動のたびに鍵をメモリ上で作り直すので（意図された挙動）、古いトークンは
-401 になる。`report_level.ts` の失敗メッセージがそう書いてあるのは、
-踏みやすく、かつ status だけからは辿れないため。
-
-**トークンには期限（`exp`）もあり**、動かし続けた機械では次の `dev:up` まで誰も発行し直さない。切れると、
-ページは撮れても段の報告が 401 になり、クロールの行が `running` のまま残って、以後のクロールを全部塞ぐ。
-`doctor` の**トークンの期限**は、残りが 24 時間を切ると ✗ になる。直すのは同じコマンド。
-
-API は起こし直さなくてよい。鍵の名前（kid）も一緒に替わるので、API は新しいトークンを
-1 本見た時点で鍵を取り直す（capture-ledger v0.42.1 から。それより前は kid が固定で、
-API が古い鍵を最長 10 分覚えたまま、新しいトークンを 401 にしていた）。issuer を起こし直した
-直後の 30 秒は、新しいトークンも通らないことがある —— `doctor` の jwt がそう言う。
+**Floci のプールが作り直されたら、capture-ledger で `pnpm run dev:up --from idp` を打つこと。**
+Floci はプールをメモリに持つので、コンテナを作り直すとプールが消え、issuer も client の ID も secret も
+替わる。前のトークンは通らず、変数はもう無い client を指し、許可も前の client の ID に付いたまま。
+`dev:up --from idp` が、capture-ledger の `.env.local` を書き直し、API を起こし直し、新しい client に
+許可を与え、`windmill:capture-ledger-token` をやり直す。`report_level.ts` の失敗メッセージがそう書いて
+あるのは、踏みやすく、かつ status だけからは辿れないため。
 
 ## picker で見る（トークンを貼る）
 
@@ -322,14 +341,14 @@ picker（`http://127.0.0.1:7070/`）もそれに合わせて、名乗りの 2 �
 
 ```sh
 cd ../capture-ledger
-pnpm run --silent oidc:token --subject "$(whoami)" --org acme | pbcopy
+pnpm run --silent idp:token | pbcopy   # idp:bootstrap が作った自分の利用者。組織は acme
 open http://127.0.0.1:7070/
 ```
 
-「トークン」の欄に貼って「読み込む」を押す。一覧の上に「（名前）（acme）として見ている」と出れば、
-API はそのトークンを受けている。トークンは 1 時間で切れる。issuer を起こし直したときも、
-API が新しい鍵を取り直した時点から、前のトークンは通らない —— 「401 — このトークンは通らない…」と
-出たら、同じコマンドで取り直して貼る。
+「トークン」の欄に貼って「読み込む」を押す。一覧の上に「（自分の `sub`）（acme）として見ている」と
+出れば、API はそのトークンを受けている（`sub` は Floci が利用者に付けた ID で、`idp:token` が出す）。
+トークンは 1 時間で切れる。Floci のプールが作り直されたときも、前のトークンは通らない ——
+「401 — このトークンは通らない…」と出たら、同じコマンドで取り直して貼る。
 画面の使い方は capture-ledger の[アーカイブを見る](https://uraitakahito.github.io/capture-ledger/ja/picker/)。
 
 JWT が dev ヘッダより優先されるのは capture-ledger 側の意図された設計で、「両方設定された

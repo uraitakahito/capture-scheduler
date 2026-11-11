@@ -1,37 +1,44 @@
 #!/usr/bin/env node
 /**
- * capture-ledger の dev issuer からトークンを取り、Windmill の secret 変数に入れる。
+ * Windmill の flow が台帳 (capture-ledger) に名乗るための設定と、flow が読む宛先を、Windmill の変数に入れる。
  *
- * ## なぜ Windmill 自身に取りに行かせないのか
+ *   pnpm run windmill:capture-ledger-token                  # ../capture-ledger から読む
+ *   pnpm run windmill:capture-ledger-token ../floci-ledger  # 別の場所の capture-ledger (dev:up が渡す)
  *
- * dev issuer は **頼まれれば誰の名前でもトークンを出す**。だから届く範囲がそのまま
- * 「誰を名乗れるか」になる。コンテナから引けるところに置いた瞬間、ブリッジに届く
- * 誰もが `windmill` を名乗れる —— つまり windmill だけに与えたクロールの許可を、誰でも使える。
- * ヘッダを信じる方式をやめた意味が消える。
+ * ## トークンではなく、トークンを取る資格を入れる
  *
- * だから鍵を作る力は host の loopback に残す。ここを跨ぐのは**出来上がった
- * トークン 1 本**だけ。issuer は `127.0.0.1` のまま動かすこと。
+ * 台帳の IdP は Amazon Cognito (手元は代役の Floci。CAPTURE-185)。Cognito の access token は最長 1 日しか
+ * もたないので、以前のように 30 日のトークンを 1 本入れて使い回す形は取れない。入れるのは app client の
+ * ID と secret で、flow は段ごとに client credentials でトークンを取る (`windmill/f/waggle/` の `ledgerToken`)。
+ *
+ * 値を決めるのは capture-ledger の `pnpm run idp:bootstrap`。こちらは向こうの引き渡しファイル
+ * (`.dev/idp.env`) を **読みに行く** —— 書くのは自分の repo (と Windmill) だけ、跨ぐときは読むだけ。
  *
  * ## 再実行が要るとき
  *
- * issuer は起動のたびにメモリ上で鍵を作り直す (意図された挙動 —— 鍵の更新を
- * 再現できる)。**issuer を再起動したら、このスクリプトも実行し直すこと。**
- * 古いトークンは 401 になる。
+ * Floci はプールをメモリに持つ。capture-ledger のスタックを作り直すとプールが消え、client の ID も secret も
+ * 替わる。capture-ledger の `pnpm run dev:up` (段 idp と token) が両方を打ち直す。
  */
 import {
   guardEnv,
   ledgerApiUrl,
-  ledgerIssuer,
   optional,
   tsCompileUrl,
   windmillFetch,
   windmillWorkspace,
 } from "./env.js";
+import {
+  LEDGER_CLIENT_VAR,
+  RETIRED_TOKEN_VAR,
+  hostClientCredentials,
+  ledgerClientFrom,
+  ledgerDir,
+  readIdpHandoff,
+} from "./ledger-client.js";
 
 guardEnv();
 
-const ISSUER = ledgerIssuer();
-const SUBJECT = optional("CAPTURE_LEDGER_SUBJECT", "windmill");
+const LEDGER = ledgerDir(process.argv[2]);
 /**
  * browserhive のエンドポイント (URL)。**browser 1 台にエンドポイント 1 つなので複数**。カンマ区切りで受け、
  * 変数には JSON 配列で入れる (Windmill の変数は文字列なので、形を 1 つに決めておく)。
@@ -54,13 +61,6 @@ for (const endpoint of BROWSERHIVE_ENDPOINTS) {
     );
   }
 }
-const ORGANIZATIONS = optional("CAPTURE_LEDGER_ORGANIZATIONS", "acme")
-  .split(",")
-  .map((s) => s.trim())
-  .filter((s) => s !== "");
-const EXPIRES_IN = optional("CAPTURE_LEDGER_TOKEN_EXPIRES_IN", "30d");
-
-const TOKEN_PATH = "u/admin/waggle_token";
 const URL_PATH = "u/admin/waggle_api_url";
 /**
  * **Windmill の script は変数からしか読めない** —— schema の既定値は UI からの実行にしか
@@ -80,31 +80,6 @@ const TLS_CA_PEM = optional("CAPTURE_LEDGER_BROWSERHIVE_TLS_CA_PEM", "");
 /** TS のスクリプトを JS にする変換サービス。flow の `compile` の段が読む。 */
 const TS_COMPILE_PATH = "u/admin/ts_compile_url";
 const TS_COMPILE_URL = tsCompileUrl();
-
-const mintToken = async () => {
-  const res = await fetch(`${ISSUER}/token`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      subject: SUBJECT,
-      organizations: ORGANIZATIONS,
-      expiresIn: EXPIRES_IN,
-    }),
-  });
-  const text = await res.text();
-  if (!res.ok) {
-    throw new Error(
-      `${ISSUER}/token → ${String(res.status)} ${text.slice(0, 200)}\n` +
-        "  issuer は動いていますか (cd ../capture-ledger && pnpm run oidc:issuer)",
-    );
-  }
-  const parsed = JSON.parse(text);
-  const token = parsed.access_token ?? parsed.token ?? parsed.id_token;
-  if (typeof token !== "string" || token === "") {
-    throw new Error(`issuer の応答に token がありません: ${text.slice(0, 200)}`);
-  }
-  return token;
-};
 
 /**
  * 変数を作るか、あれば上書きする。
@@ -138,6 +113,20 @@ const upsertVariable = async (
   }
 };
 
+/** 前の形の変数を消す。無ければ何もしない。消したら true。 */
+const retireVariable = async (token: string, path: string): Promise<boolean> => {
+  const workspace = windmillWorkspace();
+  try {
+    await windmillFetch(`/api/w/${workspace}/variables/delete/${path}`, {
+      token,
+      method: "DELETE",
+    });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const main = async () => {
   const windmillToken = process.env["WINDMILL_TOKEN"];
   if (windmillToken === undefined || windmillToken === "") {
@@ -146,8 +135,29 @@ const main = async () => {
     );
   }
 
-  const jwt = await mintToken();
-  const tokenAction = await upsertVariable(windmillToken, TOKEN_PATH, jwt, true);
+  const handoff = readIdpHandoff(LEDGER);
+  if (handoff === undefined) {
+    throw new Error(
+      `${LEDGER}/.dev/idp.env が無い —— capture-ledger で pnpm run idp:bootstrap (dev:up の段 idp) を先に。` +
+        "別の場所の capture-ledger なら、その場所を引数に渡す",
+    );
+  }
+  const client = ledgerClientFrom(handoff);
+  // 入れる前に、その資格でトークンが取れることを確かめる。取れない資格を入れると、flow の段が 1 つずつ落ちる。
+  const probe = await hostClientCredentials(client);
+  if (probe.token === undefined) {
+    throw new Error(
+      `${client.hostTokenUrl} でトークンを取れない (${String(probe.status ?? "届かない")} ${probe.body.slice(0, 200)})` +
+        " —— capture-ledger で pnpm run dev:up --from idp",
+    );
+  }
+  const clientAction = await upsertVariable(
+    windmillToken,
+    LEDGER_CLIENT_VAR,
+    JSON.stringify(client),
+    true,
+  );
+  const retired = await retireVariable(windmillToken, RETIRED_TOKEN_VAR);
   // 1 度だけ決める。既定は default ネットワークの gateway を訊く (`env.ts` の `ledgerApiUrl`)。
   const apiUrl = ledgerApiUrl();
   const apiUrlFrom =
@@ -168,13 +178,15 @@ const main = async () => {
   );
 
   process.stderr.write(
-    `${TOKEN_PATH} を${tokenAction} (sub=${SUBJECT} orgs=${ORGANIZATIONS.join(",")} exp=${EXPIRES_IN})\n` +
+    `${LEDGER_CLIENT_VAR} を${clientAction} (client ${client.clientId}・iss ${client.issuer}・` +
+      `flow は ${client.tokenUrl} で取る)\n` +
+      (retired ? `${RETIRED_TOKEN_VAR} (前の形の 30 日のトークン) を消した\n` : "") +
       `${URL_PATH} を${urlAction} (${apiUrl}${apiUrlFrom})\n` +
       `${ENDPOINTS_PATH} を${endpointsAction} (${BROWSERHIVE_ENDPOINTS.join(", ")})\n` +
       `${TLS_CA_PATH} を${tlsAction} (${TLS_CA_PEM === "" ? "空 = 平文" : "CA あり"})\n` +
       `${TS_COMPILE_PATH} を${tsCompileAction} (${TS_COMPILE_URL})\n\n` +
-      `${SUBJECT} には ${ORGANIZATIONS[0] ?? "acme"} のクロールの許可が要る (1 度だけ。済んだかは pnpm run doctor の can_submit が言う):\n` +
-      `  cd ../capture-ledger && pnpm run fga:grant submitter ${SUBJECT} ${ORGANIZATIONS[0] ?? "acme"}\n`,
+      "flow の app client には、組織のクロールの許可が要る (1 度だけ。済んだかは pnpm run doctor の can_submit が言う):\n" +
+      "  cd ../capture-ledger && pnpm run idp:grant\n",
   );
 };
 

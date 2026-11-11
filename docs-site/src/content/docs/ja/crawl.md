@@ -40,12 +40,12 @@ OpenSearch に頼らないから —— 索引の段が落ちても合本は書�
 だから**この段は、台帳が 200 で答えたものでは投げない** —— 保管庫に書けなかった（`error`）、検められなかった
 WACZ がある（`failed` が 1 以上。次の合本が拾い直す）、入れる WACZ がまだ無い（`rev: null`）。1 行のログに書いて
 返す。投げると索引の段が飛び、`fail_crawl` がクロールを `failed` で締める（次の段が既に走っていても）。投げるのは、
-台帳が 200 で答えなかったとき（400 は本文の形、401 はトークン、404 はクロールが無いか、トークンの名前にクロールの
+台帳が 200 で答えなかったとき（400 は本文の形、401 はトークン、404 はクロールが無いか、トークンの `sub` にクロールの
 許可が無いか、capture-ledger が古くエンドポイントが無い、5xx）と、答えの形が違うときだけ。
 
 `index_level` は報告の後に走るので、そのとき capture-ledger はもうクロールを締めている（または
 次の段を始めている）。全文検索は capture-ledger の必須の部品なので、この段は何も飛ばさない —— 台帳が 404
-（クロールが無いか、トークンの名前にクロールの許可が無い）・503（OpenSearch が答えない）・`failed` が 1 以上の
+（クロールが無いか、トークンの `sub` にクロールの許可が無い）・503（OpenSearch が答えない）・`failed` が 1 以上の
 202（索引に載らなかったアーカイブがある）を返せば投げる。最後の段なら、クロールは `succeeded` のまま、
 Windmill の run だけが赤くなる —— `pnpm run smoke` は run の終わりを待って、それを言う。
 
@@ -151,7 +151,7 @@ capture-ledger へ運ぶ（段の報告の `compiled`）。台帳はそれをク
 決める。
 
 ```sh
-pnpm run windmill:capture-ledger-token   # waggle_token / waggle_api_url /
+pnpm run windmill:capture-ledger-token   # ledger_client / waggle_api_url /
                                  # browserhive_endpoints / browserhive_tls_ca /
                                  # ts_compile_url
 ```

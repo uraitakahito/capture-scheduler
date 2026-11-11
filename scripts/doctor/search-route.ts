@@ -1,7 +1,7 @@
 /**
  * capture-ledger の全文検索が働いているかの読み分け。
  *
- * **名乗って引く。** issuer から取ったばかりのトークンで `GET /api/search?q=x` を引く (jwt の行と同じ
+ * **名乗って引く。** flow の資格で取ったばかりのトークンで `GET /api/search?q=x` を引く (jwt の行と同じ
  * 取り方)。名乗らずに引くと、エンドポイントが在れば名乗りを見る所で 401 になるので、OpenSearch が止まっていても
  * ✓ に見える —— 台帳の検索のエンドポイントは、名乗りを見た後で OpenSearch に訊く。名乗って引けば、200 が
  * 「エンドポイントが在り、OpenSearch が答えた」、503 が「OpenSearch が答えないか、索引が無い」、404 が「エンドポイントが無い」と
@@ -18,7 +18,7 @@ import type { Answer } from "./windmill-contents.js";
 /** host から引く検索のエンドポイント。`q` は何でもよい (当たりの数は見ない)。 */
 export const SEARCH_PROBE = "/api/search?q=x";
 
-/** issuer のトークンで `GET /api/search?q=x` を引いた答え。 */
+/** flow の資格のトークンで `GET /api/search?q=x` を引いた答え。 */
 export const readSearchRoute = (answer: Answer): Verdict => {
   if (answer.status === 200) return { ok: true };
   if (answer.status === undefined) {
@@ -46,6 +46,6 @@ export const readSearchRoute = (answer: Answer): Verdict => {
   }
   return {
     ok: false,
-    need: `GET /api/search → ${String(answer.status)} (issuer のトークンで引いたので 200 のはず) ${answer.body.slice(0, 120)}`,
+    need: `GET /api/search → ${String(answer.status)} (flow の資格のトークンで引いたので 200 のはず) ${answer.body.slice(0, 120)}`,
   };
 };

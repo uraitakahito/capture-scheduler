@@ -11,7 +11,8 @@
  * 打ったのは capture-scheduler のコマンドなので、**向こうの repo には書きに行かない** ——
  * 取りに行くのは向こうの仕事で、`cd ../capture-ledger && pnpm run connect` が読む。
  *
- * 渡すのは webhook の URL と token、待ち受け、issuer、ts-compile の宛先（`env.ts` の `ledgerEnv`）。
+ * 渡すのは webhook の URL と token、待ち受け、ts-compile の宛先（`env.ts` の `ledgerEnv`）。JWT の名乗りの行は
+ * capture-ledger の `idp:bootstrap` が自分で書く（Floci のプールの ID が iss に入る）。
  * どれもここで決まるか決め打ちの値で、人に組み立てさせると古くなる。以前は webhook の 2 行だけを
  * 出していて、残りを書き漏らした API で止まった（待ち受けと issuer で 2 度、ts-compile の宛先で 1 度）。
  *
@@ -26,7 +27,6 @@ import { relative } from "node:path";
 import {
   guardEnv,
   ledgerEnv,
-  ledgerIssuer,
   optional,
   windmillFetch,
   windmillUrl,
@@ -134,9 +134,7 @@ const main = async () => {
 
   // 標準出力は `WINDMILL_TOKEN=` の 1 行のまま (上の約束)。以下は標準エラーへ。
   const { path: envLocal } = upsertEnvLocal({ WINDMILL_TOKEN: token });
-  const handoff = writeHandoff(
-    ledgerEnv({ windmillUrl: windmillUrl(), workspace, token, issuer: ledgerIssuer() }),
-  );
+  const handoff = writeHandoff(ledgerEnv({ windmillUrl: windmillUrl(), workspace, token }));
   const shown = (path: string): string => relative(process.cwd(), path);
   process.stderr.write(
     `\n── 書いたファイル (どちらもこの repo の中。.env は触っていません) ──\n` +

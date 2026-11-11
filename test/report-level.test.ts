@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { LEDGER_CLIENT_VAR, answeringToken } from "./helpers/ledger-token.js";
 import { main } from "../windmill/f/waggle/report_level.js";
 
 /**
@@ -10,7 +11,7 @@ import { main } from "../windmill/f/waggle/report_level.js";
 
 const VARS: Record<string, string> = {
   "u/admin/waggle_api_url": "http://capture-ledger:7070",
-  "u/admin/waggle_token": "tok",
+  "u/admin/ledger_client": LEDGER_CLIENT_VAR,
 };
 
 vi.mock("windmill-client", () => ({
@@ -21,7 +22,7 @@ const responding = (status: number, body: unknown) => {
   const seen: { url: string; init: RequestInit }[] = [];
   vi.stubGlobal(
     "fetch",
-    vi.fn((url: string, init: RequestInit) => {
+    answeringToken((url: string, init: RequestInit) => {
       seen.push({ url: String(url), init });
       return Promise.resolve({
         ok: status >= 200 && status < 300,
@@ -123,18 +124,18 @@ describe("run のログ", () => {
 });
 
 describe("失敗したときの言い分", () => {
-  it("401 には issuer 再起動の示唆を付ける", async () => {
-    // **この一言で原因が即分かった実績がある。** issuer は起動のたびに鍵を作り直すので、
-    // Windmill に入れてあるトークンが黙って無効になる。status だけでは辿れない。
+  it("401 にはプールの作り直しの示唆を付ける", async () => {
+    // **この一言で原因が即分かった実績がある。** Floci はプールをメモリに持つので、スタックを作り直すと
+    // Windmill に入れてある資格が黙って無効になる。status だけでは辿れない。
     responding(401, { error: "unauthenticated" });
-    await expect(main("c-1", 0, CAPTURED, COMPILED)).rejects.toThrow(/issuer/);
+    await expect(main("c-1", 0, CAPTURED, COMPILED)).rejects.toThrow(/dev:up --from idp/);
   });
 
   it("404 には許可の示唆を付ける", async () => {
     // capture-ledger は「見てはいけない」と「存在しない」を区別せずに答えるので、
     // 404 だけでは足りない。クロールの許可を疑う先を書いておく。
     responding(404, { error: "not found" });
-    await expect(main("c-1", 0, CAPTURED, COMPILED)).rejects.toThrow(/fga:grant submitter/);
+    await expect(main("c-1", 0, CAPTURED, COMPILED)).rejects.toThrow(/idp:grant/);
   });
 
   it("本文を必ず読む", async () => {

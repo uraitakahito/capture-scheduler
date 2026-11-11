@@ -1,20 +1,30 @@
 /**
- * e2e が触る相手 —— capture-ledger の API・dev issuer・capture-fixtures・Windmill。
+ * e2e が触る相手 —— capture-ledger の API と IdP (手元の Floci)・capture-fixtures・Windmill。
  *
  * 既存の試験 (`crawl-level.e2e.test.ts`) が自分の中に持っている既定と同じ物を、環境変数で差し替えられる形で
  * ここに置く。宛先が 2 つ要る理由もあちらと同じ: `FIXTURES` は**取り込む側** (BrowserHive のコンテナ) が引く
  * 名前で起点の URL に載り、`FIXTURES_HOST` は**この試験自身**が叩く loopback の宛先。macOS 26 では Apple 署名でない
  * バイナリ (node) がコンテナの subnet へ TCP を張れず、DNS 名は引けるのに `EHOSTUNREACH` になる (実測 2026-09-20)。
  */
+import { execFileSync } from "node:child_process";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect } from "vitest";
 
 export const WAGGLE = process.env["E2E_WAGGLE_URL"] ?? "http://127.0.0.1:7070";
-export const ISSUER = process.env["E2E_ISSUER_URL"] ?? "http://127.0.0.1:9099";
+/**
+ * capture-ledger の置き場。トークンは向こうの `idp:token` で取る。`crawl-level.e2e.test.ts` の
+ * スクリプトの台帳の試験と同じ環境変数で差し替える。
+ */
+export const LEDGER_DIR =
+  process.env["E2E_LEDGER_DIR"] ?? resolve(process.cwd(), "../capture-ledger");
 export const FIXTURES =
   process.env["E2E_FIXTURES_URL"] ?? "http://capture-fixtures.capture-ledger:8080";
 export const FIXTURES_HOST = process.env["E2E_FIXTURES_HOST_URL"] ?? "http://127.0.0.1:18085";
-/** 取り込みを始められる主体。capture-ledger 側でクロールの許可 (`fga:grant submitter`) が要る。 */
+/**
+ * 取り込みを始める利用者 (手元の Floci の利用者)。capture-ledger 側でクロールの許可が要る
+ * (`pnpm run idp:grant --user e2e`。許可は名前でなく、Floci が付けた sub に付く)。
+ */
 export const SUBJECT = process.env["E2E_SUBJECT"] ?? "e2e";
 
 /**
@@ -41,15 +51,18 @@ export const windmillToken = (): string => {
 export const json = async (res: Response): Promise<Record<string, unknown>> =>
   (await res.json()) as Record<string, unknown>;
 
-/** issuer からトークンを採る。issuer は起動のたびに鍵を作り直すので、その場で。 */
-export const mintToken = async (subject: string = SUBJECT): Promise<string> => {
-  const res = await fetch(`${ISSUER}/token`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ subject, organizations: ["acme"] }),
-  });
-  expect(res.ok, "issuer からトークンを採れませんでした").toBe(true);
-  return String((await json(res))["access_token"]);
+/**
+ * 利用者のトークンを採る。capture-ledger の `idp:token` が Floci の利用者を (無ければ作って) 名乗らせる。
+ * Floci はプールを作り直すと鍵も替わるので、その場で。
+ */
+export const mintToken = (subject: string = SUBJECT): Promise<string> => {
+  const token = execFileSync(
+    "pnpm",
+    ["run", "--silent", "idp:token", "--user", subject, "--org", "acme"],
+    { cwd: LEDGER_DIR, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] },
+  ).trim();
+  expect(token, "capture-ledger の idp:token からトークンを採れませんでした").toMatch(/^ey/);
+  return Promise.resolve(token);
 };
 
 /** capture-fixtures の要求ログ。**query を含む URL ごと**に数える。 */

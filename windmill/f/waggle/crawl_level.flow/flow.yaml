@@ -331,7 +331,7 @@ schema:
   # 出している配備では artifact_sink。並列度は plan_level が BrowserHive のエンドポイントの数で頭打ちにしてから for-loop に渡る。
   # schema に無い入力を台帳が送っても、Windmill は既定で引数を schema に照らさないので断らない (frontier の
   # 要素の lastFinishedAt も、ここに書いていないのに plan_level まで届いている)。
-  # capture-ledger は自分がコンテナからどう見えるかを知らないし、issuer の鍵も持っていない。
+  # capture-ledger は自分がコンテナからどう見えるかを知らないし、flow の資格 (u/admin/ledger_client) も持っていない。
   #
   # **下の default は webhook からの実行では埋まらない。** 実測: 必須の引数だけ渡して
   # 起こすと、host_parallelism も respect_robots も「渡されていない」まま届く。

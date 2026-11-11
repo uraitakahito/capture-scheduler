@@ -889,10 +889,10 @@ describe("シークレットを解く", () => {
 
   it("フォルダの外の path は読まずに投げ、名前と path を言う", async () => {
     // 台帳が path を組むので届かないはず。届いたら運ぶ途中で入れ替わったか台帳が壊れたかで、
-    // 黙って他の変数 (waggle_token など) を読んで頁に渡してはいけない。
-    const { asked, read } = reads({ "u/admin/waggle_token": "the-ledger-token" });
-    await expect(resolveSecrets({ api_token: "u/admin/waggle_token" }, read)).rejects.toThrow(
-      /secret api_token: u\/admin\/waggle_token は f\/waggle_secrets\/ の下ではない/,
+    // 黙って他の変数 (ledger_client など) を読んで頁に渡してはいけない。
+    const { asked, read } = reads({ "u/admin/ledger_client": "the-ledger-client" });
+    await expect(resolveSecrets({ api_token: "u/admin/ledger_client" }, read)).rejects.toThrow(
+      /secret api_token: u\/admin\/ledger_client は f\/waggle_secrets\/ の下ではない/,
     );
     expect(asked).toEqual([]);
   });

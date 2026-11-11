@@ -18,10 +18,7 @@ export const OPTIONAL_ENV = [
   "WINDMILL_EMAIL",
   "WINDMILL_PASSWORD",
   "CAPTURE_LEDGER_API_URL",
-  "CAPTURE_LEDGER_OIDC_ISSUER",
-  "CAPTURE_LEDGER_SUBJECT",
-  "CAPTURE_LEDGER_ORGANIZATIONS",
-  "CAPTURE_LEDGER_TOKEN_EXPIRES_IN",
+  "CAPTURE_LEDGER_DIR",
   "CAPTURE_LEDGER_BROWSERHIVE_ENDPOINTS",
   "CAPTURE_LEDGER_BROWSERHIVE_TLS_CA_PEM",
   "TS_COMPILE_URL",
@@ -102,14 +99,6 @@ export const tsCompileUrl = () =>
 export const CRAWL_FLOW_PATH = "f/waggle/crawl_level";
 
 /**
- * capture-ledger の dev issuer。**トークンを取りに行く先 (`windmill:capture-ledger-token`・doctor) と、
- * capture-ledger が照合する先 (`ledgerEnv` の issuer の行) は、同じ値でなければならない** ——
- * 一字一句違うだけで、flow の JWT は 401 になる。だから 1 か所で決める。
- */
-export const ledgerIssuer = (): string =>
-  optional("CAPTURE_LEDGER_OIDC_ISSUER", "http://127.0.0.1:9099");
-
-/**
  * capture-ledger が host から ts-compile を呼ぶ宛先。compose が `127.0.0.1:28080` に出すポート
  * (`docker-compose.yml` の ts-compile の `ports`)。**doctor が叩く先 (host→ts-compile) と、capture-ledger に
  * 渡す値 (`ledgerEnv`) は同じでなければならない** —— 違えば、doctor は ✓ なのに、台帳の型の誤りの取り直しと
@@ -122,7 +111,7 @@ export const HOST_TS_COMPILE = "http://127.0.0.1:28080";
  * capture-ledger の `pnpm run connect` が向こうの `.env.local` に写す**。クイックスタートが同じ形で載せる
  * (一致は `check-doc-refs.ts` が見る)。
  *
- * 以前は webhook の 2 行だけを出していた。残り (待ち受けと issuer) はクイックスタートと capture-ledger の
+ * 以前は webhook の 2 行だけを出していた。残り (待ち受けと当時の issuer) はクイックスタートと capture-ledger の
  * `.env.example` に `#` 付きで在るだけで、2026-09-19 と 20 の 2 回とも、止まったのはその 2 行だった ——
  * 貼ったのは道具が出した 2 行だけ。ts-compile の宛先も同じ形で漏れた (2026-11-05。capture-ledger v0.71.0 は、
  * Claude の鍵があって宛先が無いと起動で止まる。人に `.env` へ書いてもらった)。値を決めるこちらが全部を出せば、
@@ -134,19 +123,17 @@ export const ledgerEnv = ({
   windmillUrl: base,
   workspace,
   token,
-  issuer,
 }: {
   windmillUrl: string;
   workspace: string;
   token: string;
-  issuer: string;
 }): string[] => [
   `CAPTURE_LEDGER_CRAWL_WEBHOOK_URL=${base}/api/w/${workspace}/jobs/run/f/${CRAWL_FLOW_PATH}`,
   `CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN=${token}`,
   // 段の報告はコンテナ (Windmill の worker) から来る。127.0.0.1 で待つ API には届かない。
   "CAPTURE_LEDGER_API_HOST=0.0.0.0",
-  // flow は JWT で名乗る。これが無い API は開発用ヘッダで名乗る設定になり、段の報告は 401。
-  `CAPTURE_LEDGER_OIDC_ISSUER=${issuer}`,
+  // flow が JWT で名乗る先 (CAPTURE_LEDGER_OIDC_ISSUER と CLIENT_IDS) は、ここでは渡さない ——
+  // 値を決めるのは capture-ledger の idp:bootstrap (Floci のプールの ID が iss に入る)。
   // 型で落ちたクロールの誤りの取り直しと、直し方の検査 (capture-ledger v0.69.0 以降)。台帳は host で動くので、
   // 名前ではなく host に出したポートで呼ぶ。Claude の鍵があってこれが無いと、台帳の API は起動で止まる。
   `CAPTURE_LEDGER_TS_COMPILE_URL=${HOST_TS_COMPILE}`,

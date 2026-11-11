@@ -11,20 +11,22 @@ pnpm run check       # push の前に走らせる検査の全部（中身は pac
 
 `pretest:e2e` が先に doctor を `--e2e` 付きで走らせ、足りないものを名指しする ——
 [クイックスタートの「確かめる」](/quickstart/#確かめる--1-本撮れるまで)の点検に、capture-fixtures と、走っている定期の回が
-無いことと、試験が名乗る `e2e` のクロールの許可（`fga:grant submitter e2e acme`）を足した物。立っているかだけで
+無いことと、試験が名乗る手元の IdP（identity provider）の利用者 `e2e` のクロールの許可（capture-ledger で `pnpm run idp:grant --user e2e`）を足した物。立っているかだけで
 なく、クロールが最後まで走る設定かも見る —— どれかが外れていると、クロールは段の報告のところで
 初めて落ち、`running` のまま残る。全文検索もその 1 つ —— capture-ledger は OpenSearch
 （`CAPTURE_LEDGER_OPENSEARCH_URL`。台帳の `dev:up` が書く）が無ければ起動しない。それでも API が動いたまま
-OpenSearch が止まったり、索引ごと作り直されたりはするので、doctor の `search route` が issuer のトークンで
+OpenSearch が止まったり、索引ごと作り直されたりはするので、doctor の `search route` が flow の app client のトークンで
 検索を引いて言う。vitest の外に置いてあるのは意図的 —— global setup が throw すると
 vitest は必ず「No test files found, exiting with code 1」を先に出し、中に書いたどんなメッセージも
 その後ろに隠れるため。
 
-相手の宛先は環境変数で差し替えられる（`E2E_WAGGLE_URL`・`E2E_ISSUER_URL`・`E2E_FIXTURES_URL`・
+相手の宛先は環境変数で差し替えられる（`E2E_WAGGLE_URL`・`E2E_FIXTURES_URL`・
 `E2E_FIXTURES_HOST_URL`・`E2E_SUBJECT`・`E2E_LEDGER_DIR`。既定は `test/e2e/helpers/stack.ts` と
-`crawl-level.e2e.test.ts` の先頭）。台帳の CLI を打つ試験は capture-ledger の checkout が `../capture-ledger` に
-在る前提なので、git worktree から流すときは `E2E_LEDGER_DIR=<capture-ledger の checkout>` を付ける
-（無いと `spawnSync pnpm ENOENT` で落ちる）。
+`crawl-level.e2e.test.ts` の先頭）。試験はトークンを capture-ledger の
+`pnpm run --silent idp:token --user e2e --org acme` で取り、台帳の CLI を打つ試験も向こうで打つので、
+capture-ledger の checkout が `../capture-ledger` に在る前提になる。git worktree から流すときは
+`E2E_LEDGER_DIR=<capture-ledger の checkout>` を付ける（無いと `spawnSync pnpm ENOENT` で落ちる）。
+doctor の点検は、同じ場所を `CAPTURE_LEDGER_DIR` から読む。
 
 ## なぜ二層とも要るのか
 
