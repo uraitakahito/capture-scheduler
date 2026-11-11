@@ -131,8 +131,8 @@ export const readStepFailure = (step: string | undefined, message: string): stri
   }
   if (/^POST \/api\/crawls\/\S+ → 401\b/.test(message)) {
     return (
-      "段の報告を API が受けない (401) —— flow のトークンが古い (issuer を起こし直した後) → " +
-      "pnpm run windmill:capture-ledger-token"
+      "段の報告を API が受けない (401) —— flow の資格が古い (Floci のプールを作り直した後) → " +
+      "cd ../capture-ledger && pnpm run dev:up --from idp"
     );
   }
   if (/^POST \/api\/crawls\/\S+ → 404\b/.test(message)) {
@@ -233,7 +233,7 @@ export const readRefused = (status: number | undefined, body: string): Reading =
   if (status === 401) {
     return {
       evidence,
-      fix: "API が flow のトークン (u/admin/waggle_token) を受けない → pnpm run windmill:capture-ledger-token (pnpm run doctor の jwt・can_submit)",
+      fix: "API が flow のトークンを受けない → cd ../capture-ledger && pnpm run dev:up --from idp (pnpm run doctor の idp・jwt・can_submit)",
     };
   }
   if (status === 404 && /Route POST:\/api\/crawls not found/.test(body)) {

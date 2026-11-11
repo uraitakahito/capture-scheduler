@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { LEDGER_CLIENT_VAR, answeringToken } from "./helpers/ledger-token.js";
 import { main } from "../windmill/f/waggle/replay_bundle_level.js";
 
 /**
@@ -13,7 +14,7 @@ import { main } from "../windmill/f/waggle/replay_bundle_level.js";
 
 const VARS: Record<string, string> = {
   "u/admin/waggle_api_url": "http://ledger.test:7070",
-  "u/admin/waggle_token": "tok",
+  "u/admin/ledger_client": LEDGER_CLIENT_VAR,
 };
 
 vi.mock("windmill-client", () => ({
@@ -25,7 +26,7 @@ const responding = (status: number, body: unknown) => {
   const seen: { url: string; init: RequestInit }[] = [];
   vi.stubGlobal(
     "fetch",
-    vi.fn((url: string, init: RequestInit) => {
+    answeringToken((url: string, init: RequestInit) => {
       seen.push({ url: String(url), init });
       return Promise.resolve({
         ok: status >= 200 && status < 300,

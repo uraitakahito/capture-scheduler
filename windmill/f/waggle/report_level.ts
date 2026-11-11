@@ -19,6 +19,47 @@
  */
 import * as wmill from "windmill-client";
 
+// ── 台帳に名乗るトークン（6 本が同じ物を持つ。test/ledger-token-copies.test.ts が同じかを見る）──
+/**
+ * 台帳 (capture-ledger) に名乗る access token を、client credentials で取る。
+ *
+ * 台帳の IdP は Amazon Cognito (手元は代役の Floci)。Windmill の flow は機械なので、人のサインインは
+ * 使えず、app client の ID と secret で M2M のトークンを取る。トークンは最長 1 日しかもたないので、
+ * 変数に入れて使い回さず、段ごとに取る。設定は変数 `u/admin/ledger_client` (secret・JSON) から読む
+ * —— 入れるのは capture-scheduler の `pnpm run windmill:capture-ledger-token`。
+ *
+ * Windmill の relative import で 1 本にまとめないのは、この版の Windmill で効くかを確かめていないから。
+ */
+const ledgerToken = async (): Promise<string> => {
+  const raw = await wmill.getVariable("u/admin/ledger_client");
+  const client = JSON.parse(raw) as {
+    tokenUrl: string;
+    clientId: string;
+    clientSecret: string;
+    scope: string;
+  };
+  const basic = btoa(`${client.clientId}:${client.clientSecret}`);
+  const res = await fetch(client.tokenUrl, {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      authorization: `Basic ${basic}`,
+    },
+    body: `grant_type=client_credentials&scope=${encodeURIComponent(client.scope)}`,
+  });
+  if (!res.ok) {
+    throw new Error(
+      `トークンを取れない: ${client.tokenUrl} → ${String(res.status)} ${(await res.text()).slice(0, 200)}` +
+        " —— Floci のプールを作り直した後なら、capture-ledger で pnpm run dev:up --from idp",
+    );
+  }
+  const { access_token: token } = (await res.json()) as { access_token?: unknown };
+  if (typeof token !== "string" || token === "")
+    throw new Error("token endpoint の答えに access_token が無い");
+  return token;
+};
+// ── ここまで ──
+
 export interface PageResult {
   url: string;
   status: "captured" | "failed" | "skipped";
@@ -64,10 +105,9 @@ export async function main(
 ): Promise<LevelOutcome> {
   // **設定は変数から読む。引数では受けない。**
   // Windmill は schema の既定値を UI からの実行にしか埋めない (`crawl_host.ts` に詳しい)。
-  // token は capture-ledger 自身が持っていないもの —— issuer の鍵は host の loopback に在る ——
-  // なので、どちらにせよ capture-ledger からは送れない。
+  // トークンは IdP (Cognito・手元は Floci) から段ごとに取る。capture-ledger からは送らない。
   const waggle_url = await wmill.getVariable("u/admin/waggle_api_url");
-  const token = await wmill.getVariable("u/admin/waggle_token");
+  const token = await ledgerToken();
 
   const res = await fetch(`${waggle_url}/api/crawls/${crawl_id}/pages`, {
     method: "POST",
@@ -90,10 +130,10 @@ export async function main(
     const body = await res.text();
     const hint =
       res.status === 401
-        ? " —— トークンが古いかもしれません (issuer を再起動しましたか)"
+        ? " —— トークンが通らない (Floci のプールを作り直した後なら、capture-ledger で pnpm run dev:up --from idp)"
         : res.status === 404
-          ? " —— トークンの名前 (sub) に、その組織のクロールの許可がありますか" +
-            " (capture-ledger: pnpm run fga:grant submitter <sub> <org>。既定は windmill acme)"
+          ? " —— トークンの sub (Windmill の app client の ID) に、その組織のクロールの許可がありますか" +
+            " (capture-ledger: pnpm run idp:grant)"
           : "";
     throw new Error(
       `POST /api/crawls/${crawl_id}/pages → ${String(res.status)} ${body.slice(0, 300)}${hint}`,

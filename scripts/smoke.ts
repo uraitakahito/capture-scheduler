@@ -3,7 +3,7 @@
  * 1 本撮って、撮れたか、なぜ撮れなかったかを言う (`pnpm run smoke [URL]`)。
  *
  * 本番と同じ道を通す —— capture-ledger の `POST /api/crawls` に、flow と同じトークン
- * (Windmill の変数 `u/admin/waggle_token`) で頼み、Windmill の flow に撮らせ、段の報告を待つ。
+ * (Windmill の変数 `u/admin/ledger_client` の資格で取る) で頼み、Windmill の flow に撮らせ、段の報告を待つ。
  * 「撮れた」は台帳の succeeded だけでは言わない。その回の archive を台帳の一覧から探し、
  * 署名付き URL で先頭 4 バイトを取り、`PK` (WACZ は zip) であることまで見る。
  *
@@ -28,6 +28,7 @@
 import { parseArgs } from "node:util";
 
 import { guardEnv, windmillFetch, windmillUrl, windmillWorkspace } from "./env.js";
+import { LEDGER_CLIENT_VAR, hostClientCredentials, parseLedgerClient } from "./ledger-client.js";
 import { API, runDoctor } from "./doctor/checks.js";
 import { formatFixes, formatTable, pad } from "./doctor/run.js";
 import { strFromU8, unzipSync } from "fflate";
@@ -143,19 +144,21 @@ if (!values["no-doctor"]) {
 
 // ── 始める ────────────────────────────────────────────────────────────
 
-/** flow が名乗るのと同じトークン。撮るのも締めるのもこれで。 */
-const token = await windmillFetch(
-  `/api/w/${windmillWorkspace()}/variables/get_value/u/admin/waggle_token`,
-  { token: process.env["WINDMILL_TOKEN"] ?? "" },
-).then(
-  (value) => (typeof value === "string" && value !== "" ? value : undefined),
-  () => undefined,
+/** flow が名乗るのと同じ資格で取ったトークン。撮るのも締めるのもこれで。 */
+const client = parseLedgerClient(
+  await windmillFetch(`/api/w/${windmillWorkspace()}/variables/get_value/${LEDGER_CLIENT_VAR}`, {
+    token: process.env["WINDMILL_TOKEN"] ?? "",
+  }).then(
+    (value) => (typeof value === "string" ? value : undefined),
+    () => undefined,
+  ),
 );
+const token = client === undefined ? undefined : (await hostClientCredentials(client)).token;
 if (token === undefined) {
   stop(
     "トークン",
-    "Windmill の変数 u/admin/waggle_token が読めない → pnpm run windmill:capture-ledger-token " +
-      "(.env の WINDMILL_TOKEN も要る)",
+    `Windmill の変数 ${LEDGER_CLIENT_VAR} で flow の資格のトークンを取れない → ` +
+      "cd ../capture-ledger && pnpm run dev:up --from idp (.env の WINDMILL_TOKEN も要る)",
   );
 }
 const auth = { authorization: `Bearer ${token}` };

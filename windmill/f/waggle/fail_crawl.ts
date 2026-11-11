@@ -21,6 +21,47 @@
  */
 import * as wmill from "windmill-client";
 
+// ── 台帳に名乗るトークン（6 本が同じ物を持つ。test/ledger-token-copies.test.ts が同じかを見る）──
+/**
+ * 台帳 (capture-ledger) に名乗る access token を、client credentials で取る。
+ *
+ * 台帳の IdP は Amazon Cognito (手元は代役の Floci)。Windmill の flow は機械なので、人のサインインは
+ * 使えず、app client の ID と secret で M2M のトークンを取る。トークンは最長 1 日しかもたないので、
+ * 変数に入れて使い回さず、段ごとに取る。設定は変数 `u/admin/ledger_client` (secret・JSON) から読む
+ * —— 入れるのは capture-scheduler の `pnpm run windmill:capture-ledger-token`。
+ *
+ * Windmill の relative import で 1 本にまとめないのは、この版の Windmill で効くかを確かめていないから。
+ */
+const ledgerToken = async (): Promise<string> => {
+  const raw = await wmill.getVariable("u/admin/ledger_client");
+  const client = JSON.parse(raw) as {
+    tokenUrl: string;
+    clientId: string;
+    clientSecret: string;
+    scope: string;
+  };
+  const basic = btoa(`${client.clientId}:${client.clientSecret}`);
+  const res = await fetch(client.tokenUrl, {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      authorization: `Basic ${basic}`,
+    },
+    body: `grant_type=client_credentials&scope=${encodeURIComponent(client.scope)}`,
+  });
+  if (!res.ok) {
+    throw new Error(
+      `トークンを取れない: ${client.tokenUrl} → ${String(res.status)} ${(await res.text()).slice(0, 200)}` +
+        " —— Floci のプールを作り直した後なら、capture-ledger で pnpm run dev:up --from idp",
+    );
+  }
+  const { access_token: token } = (await res.json()) as { access_token?: unknown };
+  if (typeof token !== "string" || token === "")
+    throw new Error("token endpoint の答えに access_token が無い");
+  return token;
+};
+// ── ここまで ──
+
 export interface Result {
   closed: boolean;
   /** 締められなかったときの理由。締められたときは無い。 */
@@ -55,7 +96,7 @@ export async function main(crawl_id: string, error: unknown): Promise<Result> {
   // **設定は変数から読む。** Windmill は schema の既定値を UI からの実行にしか
   // 埋めない —— webhook で起こすと引数は素通りになる (`crawl_host.ts` に詳しい)。
   const waggle_url = await wmill.getVariable("u/admin/waggle_api_url");
-  const token = await wmill.getVariable("u/admin/waggle_token");
+  const token = await ledgerToken();
 
   const reason = clip(describe(error));
   console.log(`クロール ${crawl_id} を締めます: ${reason}`);

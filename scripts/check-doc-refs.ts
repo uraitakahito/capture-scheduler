@@ -43,7 +43,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { SECTIONS } from "./doctor/sections.js";
-import { ledgerEnv, ledgerIssuer, repoRoot, windmillUrl, windmillWorkspace } from "./env.js";
+import { ledgerEnv, repoRoot, windmillUrl, windmillWorkspace } from "./env.js";
 
 const ROOT = repoRoot();
 const DOCS = resolve(ROOT, "docs-site/src/content/docs");
@@ -192,7 +192,6 @@ const TOKEN_NAME = "CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN";
 const expectedLedger = ledgerEnv({
   windmillUrl: windmillUrl(),
   workspace: windmillWorkspace(),
-  issuer: ledgerIssuer(),
   token: "",
 });
 for (const page of ["quickstart.md", join("ja", "quickstart.md")]) {

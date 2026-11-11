@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it, expect, beforeAll } from "vitest";
+import { mintToken } from "./helpers/stack.js";
 
 /**
  * クロール 1 本を、**production と同じ経路**で通す。
@@ -39,7 +40,6 @@ import { describe, it, expect, beforeAll } from "vitest";
  */
 
 const WAGGLE = process.env["E2E_WAGGLE_URL"] ?? "http://127.0.0.1:7070";
-const ISSUER = process.env["E2E_ISSUER_URL"] ?? "http://127.0.0.1:9099";
 /**
  * capture-ledger のスタックの capture-fixtures。**宛先が 2 つ要る。**
  *
@@ -177,14 +177,8 @@ const mark = (run: string, state: "loading" | "complete"): string =>
   `/plain-html?inline=${run}&state=${state}`;
 
 beforeAll(async () => {
-  // issuer は起動のたびに鍵を作り直すので、その場で採る。
-  const res = await fetch(`${ISSUER}/token`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ subject: SUBJECT, organizations: ["acme"] }),
-  });
-  expect(res.ok, "issuer からトークンを採れませんでした").toBe(true);
-  token = String((await json(res))["access_token"]);
+  // Floci はプールを作り直すと鍵も替わるので、その場で採る (capture-ledger の idp:token)。
+  token = await mintToken(SUBJECT);
 });
 
 describe("クロールが flow を通って索引まで終わる", () => {
@@ -215,7 +209,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
       startedBody +
         (started.status === 404
           ? ` —— ${SUBJECT} に submitter がありますか` +
-            ` (capture-ledger: node dist/fga/ledger-commands.js grant submitter ${SUBJECT} acme)`
+            ` (capture-ledger: pnpm run idp:grant --user ${SUBJECT})`
           : started.status === 409
             ? " —— 走行中のクロールが残っています。**この試験が途中で落ちると必ずこうなる**" +
               " (flow は非同期に走り続けるため)。片付けてから: " +

@@ -118,7 +118,7 @@ describe("run が失敗し、クロールが running のまま残ったとき (�
     expect(run.closeProblem).toMatch(/\/failed → 401/);
     const reading = readStuck(run, stepMessage(fixture("f4-stale-token").failedStep));
     expect(reading.evidence).toMatch(/^run の report の段: POST \/api\/crawls\/\S+\/pages → 401/);
-    expect(reading.fix).toMatch(/flow のトークンが古い .* pnpm run windmill:capture-ledger-token$/);
+    expect(reading.fix).toMatch(/flow の資格が古い .* pnpm run dev:up --from idp$/);
   });
 
   it("F5 API が 127.0.0.1 で待っている → 届かない、container→api", () => {
@@ -181,9 +181,7 @@ describe("始められなかったとき", () => {
   });
 
   it("401 はトークン、届かなければ API を名指しする", () => {
-    expect(readRefused(401, '{"error":"unauthenticated"}').fix).toMatch(
-      /windmill:capture-ledger-token/,
-    );
+    expect(readRefused(401, '{"error":"unauthenticated"}').fix).toMatch(/dev:up --from idp/);
     expect(readRefused(undefined, "").fix).toMatch(/pnpm run api$/);
   });
 });

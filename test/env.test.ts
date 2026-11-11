@@ -22,7 +22,6 @@ import {
   ledgerApiUrl,
   HOST_TS_COMPILE,
   ledgerEnv,
-  ledgerIssuer,
   optional,
   parseGateway,
   repoRoot,
@@ -102,25 +101,34 @@ describe("CRAWL_FLOW_PATH", () => {
 
 /**
  * capture-ledger に渡す行 (`connect` が向こうの `.env.local` に写す)。以前は webhook の 2 行だけで、
- * 残り (待ち受けと issuer) を書き漏らした API で 2 度止まった (2026-09-19・20)。ts-compile の宛先は
+ * 残り (待ち受けと当時の issuer) を書き漏らした API で 2 度止まった (2026-09-19・20)。ts-compile の宛先は
  * 2026-11-05 に、人が書き足すまで API が起動で止まった。
  */
 describe("ledgerEnv", () => {
-  it("capture-ledger の変数名で、webhook の URL・token・待ち受け・issuer・ts-compile の宛先を返す", () => {
+  it("capture-ledger の変数名で、webhook の URL・token・待ち受け・ts-compile の宛先を返す", () => {
     expect(
       ledgerEnv({
         windmillUrl: "http://127.0.0.1:8000",
         workspace: "crawler",
         token: "tok",
-        issuer: "http://127.0.0.1:9099",
       }),
     ).toEqual([
       "CAPTURE_LEDGER_CRAWL_WEBHOOK_URL=http://127.0.0.1:8000/api/w/crawler/jobs/run/f/f/waggle/crawl_level",
       "CAPTURE_LEDGER_CRAWL_WEBHOOK_TOKEN=tok",
       "CAPTURE_LEDGER_API_HOST=0.0.0.0",
-      "CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099",
       "CAPTURE_LEDGER_TS_COMPILE_URL=http://127.0.0.1:28080",
     ]);
+  });
+
+  // iss は capture-ledger の idp:bootstrap が .env.local に書く (Floci のプールの ID が入る)。
+  // こちらの引き渡しが古い iss を持つと、connect がそれで上書きしてしまう。
+  it("JWT の名乗りの行 (CAPTURE_LEDGER_OIDC_*) は渡さない", () => {
+    const lines = ledgerEnv({
+      windmillUrl: "http://127.0.0.1:8000",
+      workspace: "crawler",
+      token: "tok",
+    });
+    expect(lines.filter((line) => line.startsWith("CAPTURE_LEDGER_OIDC_"))).toEqual([]);
   });
 
   it("ts-compile の宛先は、doctor が host から叩く宛先と同じ値", () => {
@@ -128,39 +136,8 @@ describe("ledgerEnv", () => {
       windmillUrl: "http://127.0.0.1:8000",
       workspace: "crawler",
       token: "tok",
-      issuer: "i",
     });
     expect(lines).toContain(`CAPTURE_LEDGER_TS_COMPILE_URL=${HOST_TS_COMPILE}`);
-  });
-});
-
-/**
- * トークンを取りに行く issuer と、capture-ledger が照合する issuer は同じ値でなければならない。
- * 別々に既定値を書いていると、片方だけ変えたときに一字一句ずれて、flow の JWT が 401 になる。
- */
-describe("ledgerIssuer", () => {
-  const original = process.env["CAPTURE_LEDGER_OIDC_ISSUER"];
-  afterEach(() => {
-    if (original === undefined) delete process.env["CAPTURE_LEDGER_OIDC_ISSUER"];
-    else process.env["CAPTURE_LEDGER_OIDC_ISSUER"] = original;
-  });
-
-  it("既定は capture-ledger の dev issuer (http://127.0.0.1:9099)", () => {
-    delete process.env["CAPTURE_LEDGER_OIDC_ISSUER"];
-    expect(ledgerIssuer()).toBe("http://127.0.0.1:9099");
-  });
-
-  it("CAPTURE_LEDGER_OIDC_ISSUER を変えると、capture-ledger に渡す issuer の行もそろって変わる", () => {
-    process.env["CAPTURE_LEDGER_OIDC_ISSUER"] = "http://127.0.0.1:9199";
-    const lines = ledgerEnv({
-      windmillUrl: "http://127.0.0.1:8000",
-      workspace: "crawler",
-      token: "tok",
-      issuer: ledgerIssuer(),
-    });
-    expect(lines.find((line) => line.startsWith("CAPTURE_LEDGER_OIDC_ISSUER="))).toBe(
-      "CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9199",
-    );
   });
 });
 

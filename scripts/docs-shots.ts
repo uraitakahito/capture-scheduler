@@ -211,7 +211,7 @@ const main = async () => {
       route: "/scripts/get/f%2Fwaggle%2Fcrawl_host",
       wait: "crawl_host",
     },
-    { file: "12-variables.png", route: "/variables", wait: "waggle_token" },
+    { file: "12-variables.png", route: "/variables", wait: "ledger_client" },
   ];
 
   for (const s of shots) {

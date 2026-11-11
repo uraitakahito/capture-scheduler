@@ -28,19 +28,19 @@ describe("readCanSubmit", () => {
     });
   });
 
-  it("組織が載っていなければ、許可ではなく組織を名指しする", () => {
+  it("組織が無ければ、許可の与え方 (idp:grant) を名指しする", () => {
     const verdict = readCanSubmit(
       200,
       me({ subject: "windmill", organizations: [], canSubmit: false }),
     );
     expect(verdict).toMatchObject({ ok: false });
-    expect(verdict.ok || verdict.need).toMatch(/CAPTURE_LEDGER_ORGANIZATIONS/);
+    expect(verdict.ok || verdict.need).toMatch(/idp:grant/);
     expect(verdict.ok || verdict.need).not.toMatch(/fga:grant/);
   });
 
   it("401 は、トークンのやり直しを名指しする", () => {
     const verdict = readCanSubmit(401, '{"error":"unauthenticated"}');
-    expect(verdict.ok || verdict.need).toMatch(/windmill:capture-ledger-token/);
+    expect(verdict.ok || verdict.need).toMatch(/dev:up --from idp/);
   });
 
   it("route が無い 404 は、capture-ledger が古いと言う", () => {

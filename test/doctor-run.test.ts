@@ -58,25 +58,28 @@ describe("本物の点検の並び", () => {
         "スクリプト",
         // シークレットのフォルダは push と同じく workspace の子。
         "シークレットのフォルダ",
-        // 残った schedule の点検も workspace の子で、トークンの期限は変数の子。
+        // 残った schedule の点検も workspace の子。
         "schedule",
-        "トークンの期限",
+        // 名乗りの点検は flow の資格 (Windmill の変数 u/admin/ledger_client) で取るので、Windmill の孫。
+        "idp",
+        "jwt",
+        "search route",
       ].sort(),
     );
     for (const r of skipped) expect(r).toMatchObject({ reason: "先に windmill を" });
     // Windmill に頼らない点検は走る。
-    expect(stateOf(results, "jwt")?.state).toBe("ok");
+    expect(stateOf(results, "capture-ledger api")?.state).toBe("ok");
     expect(stateOf(results, "openfga")?.state).toBe("ok");
   });
 
-  it("jwt が ✗ なら、can_submit は訊かない (flow の古いトークンで ✓ と ✗ が入れ替わるため)", async () => {
+  it("jwt が ✗ なら、can_submit は訊かない (名乗りそのものが通らない)", async () => {
     const results = await runChecks(withOnlyFailing("jwt"));
     expect(stateOf(results, "can_submit")).toMatchObject({ state: "skip", reason: "先に jwt を" });
   });
 
-  it("点検は 20 本で、e2e のときだけ 3 本増える", () => {
-    expect(CHECKS.filter((c) => c.e2eOnly !== true)).toHaveLength(20);
-    expect(CHECKS).toHaveLength(23);
+  it("点検は 19 本で、e2e のときだけ 3 本増える", () => {
+    expect(CHECKS.filter((c) => c.e2eOnly !== true)).toHaveLength(19);
+    expect(CHECKS).toHaveLength(22);
   });
 
   it("crawl route が ✗ なら、合本のエンドポイントは訊かない（台帳は webhook が無いと両方のエンドポイントを出さない）", async () => {
