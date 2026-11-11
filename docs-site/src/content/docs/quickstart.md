@@ -102,8 +102,9 @@ running**, capture-ledger's `pnpm run dev:status` prints the pid and start time 
 `pnpm run dev:down` stops it — neither the issuer nor the API is a container, so
 `container-compose down` leaves them alone.
 
-Start `oidc:issuer` **before** the API: the API fetches the issuer's keys at startup and
-cannot come up in JWT mode without it.
+Keep `oidc:issuer` running. The API does not contact the issuer at startup; it fetches the
+keys the first time it verifies a token. The order does not matter, but while the issuer is
+down every request carrying a token (the flow's level reports included) gets `401`.
 
 ```sh
 cd ../capture-ledger

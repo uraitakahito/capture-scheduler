@@ -103,8 +103,9 @@ API が設定を読むのは**起動のときの 1 度だけ**なので、走っ
 `pnpm run dev:down` が止めます（issuer も API もコンテナではないので、
 `container-compose down` では消えません）。
 
-`oidc:issuer` は **API より先に**起こします。API は起動時に issuer の鍵を取りに行くので、
-居ないと JWT の設定で立ち上がれません。
+`oidc:issuer` は動かし続けます。API は起動のときには issuer に問い合わせず、トークンを
+最初に確かめるときに鍵を取りに行きます。だから起こす順は問いませんが、issuer が居ない間は、
+トークンの付いた要求（flow の段の報告も）が `401` になります。
 
 ```sh
 cd ../capture-ledger
