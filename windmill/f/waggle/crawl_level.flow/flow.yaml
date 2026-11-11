@@ -9,7 +9,7 @@ description: |
   礼儀はこの flow の形で守る:
     - ホストで束ねる            (plan_level)
     - ホストを並列に回す        for-loop の parallelism —— CE で効く唯一の同時実行の枠
-                                (上限は BrowserHive の口の数。plan_level が決める)
+                                (上限は BrowserHive のエンドポイントの数。plan_level が決める)
     - ホスト内は逐次 + 間隔     (crawl_host)
 
   報告のあとに 2 段足してある。合本を書かせる段 (replay_bundle) と、索引に載せる段 (index)。
@@ -123,7 +123,7 @@ value:
                   expr: flow_input.user_agent
             # **BrowserHive が全部居ないときだけ** crawl_host は投げる (ServerUnavailable)。
             # 1 ページの失敗は投げずに結果に載せるので、ここで再試行されるのは
-            # 「口が 1 つも無い」状態だけ —— 再起動を待つぶんの間隔で 2 回。
+            # 「エンドポイントが 1 つも無い」状態だけ —— 再起動を待つぶんの間隔で 2 回。
             retry:
               constant:
                 attempts: 2
@@ -132,7 +132,7 @@ value:
           type: javascript
           expr: results.plan.groups
         parallel: true
-        # host_parallelism を BrowserHive の口の数で頭打ちにした値。判断は plan_level に
+        # host_parallelism を BrowserHive のエンドポイントの数で頭打ちにした値。判断は plan_level に
         # 置き、ここには式を書かない (単体試験の無い場所に判断を置かない)。
         parallelism:
           type: javascript
@@ -291,7 +291,7 @@ schema:
       # 保管庫へ書くので、2 つの経路が同時に生きる。切り替えを 1 本のクロールから
       # 始められるのが、この省略可能性の狙い。
       type: object
-      description: 成果物の押し出し先。capture-ledger が crawl ごとに 1 回きりの口を発行する
+      description: 成果物の押し出し先。capture-ledger が crawl ごとに 1 回きりの受け取り先を発行する
       properties:
         url:
           type: string
@@ -327,8 +327,8 @@ schema:
       description: 頼まれた User-Agent。打った字のままで、{chrome} は BrowserHive が解く。空なら browser の字のまま撮る
       default: ""
   # capture-ledger が送るのは crawl_id / depth / frontier / 間隔 / 並列度 /
-  # capture_formats / signing / scripts / variables / secrets / secret_archive / user_agent と、受け口を
-  # 出している配備では artifact_sink。並列度は plan_level が BrowserHive の口の数で頭打ちにしてから for-loop に渡る。
+  # capture_formats / signing / scripts / variables / secrets / secret_archive / user_agent と、受け取り先を
+  # 出している配備では artifact_sink。並列度は plan_level が BrowserHive のエンドポイントの数で頭打ちにしてから for-loop に渡る。
   # schema に無い入力を台帳が送っても、Windmill は既定で引数を schema に照らさないので断らない (frontier の
   # 要素の lastFinishedAt も、ここに書いていないのに plan_level まで届いている)。
   # capture-ledger は自分がコンテナからどう見えるかを知らないし、issuer の鍵も持っていない。

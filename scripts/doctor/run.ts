@@ -19,7 +19,7 @@ import { sectionUrl, type Section } from "./sections.js";
 
 export type Verdict = { ok: true } | { ok: false; need: string };
 
-/** 点検しないと決めた (TLS の口など)。✓ とも ✗ とも数えない。理由は報告に出す。 */
+/** 点検しないと決めた (TLS のエンドポイントなど)。✓ とも ✗ とも数えない。理由は報告に出す。 */
 export interface NotChecked {
   skipped: string;
 }

@@ -126,7 +126,7 @@ export const readStepFailure = (step: string | undefined, message: string): stri
   if (unreachable !== null) {
     return (
       `BrowserHive に届かない (${unreachable[1] ?? ""}) —— 止まっていれば起こす: ` +
-      "cd ../capture-ledger && pnpm run stack:up (どの口かは pnpm run doctor の worker→browserhive)"
+      "cd ../capture-ledger && pnpm run stack:up (どのエンドポイントかは pnpm run doctor の worker→browserhive)"
     );
   }
   if (/^POST \/api\/crawls\/\S+ → 401\b/.test(message)) {

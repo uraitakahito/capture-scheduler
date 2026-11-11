@@ -22,12 +22,12 @@
  * こちらの都合で縮めない。実測: 設定 1000ms に対して capture-fixtures の `Crawl-delay: 3` が
  * 勝ち、間隔は 3203 / 3014 / 3006ms になった。
  *
- * ## 並列度は BrowserHive の口の数で頭を押さえる
+ * ## 並列度は BrowserHive のエンドポイントの数で頭を押さえる
  *
- * BrowserHive は browser 1 台に口 1 つで、走行中の口は `429 Busy` で断る
- * (`crawl_host.ts`)。口より多くのホストを同時に回しても、余ったぶんは busy を引いて
+ * BrowserHive は browser 1 台にエンドポイント 1 つで、走行中のエンドポイントは `429 Busy` で断る
+ * (`crawl_host.ts`)。エンドポイントより多くのホストを同時に回しても、余ったぶんは busy を引いて
  * 待つだけで相手から見た並列度は増えない。だから for-loop に渡す `parallelism` は
- * `min(host_parallelism, 口の数)` —— 決めるのはここで、flow の式には置かない。
+ * `min(host_parallelism, エンドポイントの数)` —— 決めるのはここで、flow の式には置かない。
  */
 import robotsParser from "robots-parser";
 import * as wmill from "windmill-client";
@@ -71,7 +71,7 @@ export interface Plan {
   groups: HostGroup[];
   /** 取らなかったものと理由。capture-ledger に報告して `crawl_pages` に残す。 */
   skipped: Skipped[];
-  /** for-loop に渡す同時数。`host_parallelism` を BrowserHive の口の数で頭打ちにしたもの。 */
+  /** for-loop に渡す同時数。`host_parallelism` を BrowserHive のエンドポイントの数で頭打ちにしたもの。 */
   parallelism: number;
 }
 
@@ -81,7 +81,7 @@ const DEFAULT_HOST_PARALLELISM = 4;
 /**
  * `u/admin/browserhive_endpoints` (文字列の JSON 配列) の要素数。
  *
- * 形の検査は `crawl_host.ts` の `parseEndpoints` と同じ —— 口が 1 つも無い一覧を
+ * 形の検査は `crawl_host.ts` の `parseEndpoints` と同じ —— エンドポイントが 1 つも無い一覧を
  * 「並列度 0」として通すと、for-loop は何も回さずに段が空で成功する。
  */
 export const endpointCount = (raw: string): number => {
@@ -99,7 +99,7 @@ export const endpointCount = (raw: string): number => {
   return parsed.length;
 };
 
-/** 1 以上、口の数以下。`null` は「渡されていない」で、flow の schema と同じ既定に落とす。 */
+/** 1 以上、エンドポイントの数以下。`null` は「渡されていない」で、flow の schema と同じ既定に落とす。 */
 export const parallelismFor = (
   hostParallelism: number | null | undefined,
   endpoints: number,
@@ -203,7 +203,7 @@ export async function main(
     `${String(groups.length)} ホスト / ${String(total)} URL` +
       ` (robots: ${respectRobots ? "尊重" : "無視"}` +
       (skipped.length > 0 ? `、${String(skipped.length)} 件を見送り` : "") +
-      `、同時 ${String(parallelism)} ホスト / 口 ${String(endpoints)})`,
+      `、同時 ${String(parallelism)} ホスト / エンドポイント ${String(endpoints)})`,
   );
 
   return { groups, skipped, parallelism };

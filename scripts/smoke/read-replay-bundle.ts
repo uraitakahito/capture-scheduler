@@ -55,7 +55,7 @@ export const readReplayBundleOutcome = (job: unknown): ReplayBundleOutcome | und
   return { rev, pages, members, skipped, failed, error };
 };
 
-/** 合本を作り直す手 (capture-ledger の道具。口と同じ関数で、新しい版を書く)。 */
+/** 合本を作り直す手 (capture-ledger の道具。エンドポイントと同じ関数で、新しい版を書く)。 */
 const rebuild = (crawlId: string): string =>
   `cd ../capture-ledger && pnpm run replay-bundle:rebuild --crawl ${crawlId}`;
 
@@ -96,9 +96,9 @@ export const readReplayBundleStep = (
  * (呼ぶ側が段の失敗の読み分け `readStepFailure` に回す。401・許可の 404 はそちらが読む)。
  */
 export const readReplayBundleFailure = (message: string): string | undefined => {
-  if (/合本の口が無い/.test(message)) {
+  if (/合本のエンドポイントが無い/.test(message)) {
     return (
-      "capture-ledger に合本の口が無い (capture-ledger が古い) → cd ../capture-ledger && git pull && " +
+      "capture-ledger に合本のエンドポイントが無い (capture-ledger が古い) → cd ../capture-ledger && git pull && " +
       "pnpm run dev:up (pnpm run doctor の replay-bundle route)"
     );
   }

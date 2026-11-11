@@ -80,12 +80,12 @@ CAPTURE_LEDGER_OIDC_ISSUER=http://127.0.0.1:9099
 CAPTURE_LEDGER_TS_COMPILE_URL=http://127.0.0.1:28080
 ```
 
-| 行                                             | なぜ要るか                                                                                                                                                                                       |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `…_CRAWL_WEBHOOK_URL`・`…_CRAWL_WEBHOOK_TOKEN` | クロールを Windmill に投げる先。無いと `/api/crawls` そのものが無い（`404`）                                                                                                                     |
-| `CAPTURE_LEDGER_API_HOST=0.0.0.0`              | 段の報告はコンテナから来る。`127.0.0.1` で待つ API には届かない                                                                                                                                  |
-| `CAPTURE_LEDGER_OIDC_ISSUER`                   | flow は JWT で名乗る。無い API は開発用ヘッダの設定になり、段の報告は `401` になる                                                                                                               |
-| `CAPTURE_LEDGER_TS_COMPILE_URL`                | host で動く台帳が、落ちたクロールの型の誤りを取り直し、直し方を検査するときに呼ぶ ts-compile-service の口（host の `127.0.0.1:28080`）。Claude の鍵があってこれが無いと、台帳の API は起動しない |
+| 行                                             | なぜ要るか                                                                                                                                                                                         |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `…_CRAWL_WEBHOOK_URL`・`…_CRAWL_WEBHOOK_TOKEN` | クロールを Windmill に投げる先。無いと `/api/crawls` そのものが無い（`404`）                                                                                                                       |
+| `CAPTURE_LEDGER_API_HOST=0.0.0.0`              | 段の報告はコンテナから来る。`127.0.0.1` で待つ API には届かない                                                                                                                                    |
+| `CAPTURE_LEDGER_OIDC_ISSUER`                   | flow は JWT で名乗る。無い API は開発用ヘッダの設定になり、段の報告は `401` になる                                                                                                                 |
+| `CAPTURE_LEDGER_TS_COMPILE_URL`                | host で動く台帳が、落ちたクロールの型の誤りを取り直し、直し方を検査するときに呼ぶ ts-compile-service の宛先（host の `127.0.0.1:28080`）。Claude の鍵があってこれが無いと、台帳の API は起動しない |
 
 bootstrap は打つたびに新しい token を作ります（前に作ったものも、使えるまま残ります）。
 **打ち直したら `connect` も打ち直すこと** —— 引き渡しファイルは新しい token で書き換わるので、
@@ -110,7 +110,7 @@ API が設定を読むのは**起動のときの 1 度だけ**なので、走っ
 ```sh
 cd ../capture-ledger
 pnpm run oidc:issuer   # 動かし続ける
-pnpm run api           # §6 で起こしたものを止めてから、同じ口でもう一度
+pnpm run api           # §6 で起こしたものを止めてから、同じポートでもう一度
 ```
 
 渡した行が効いたかは、API の起動ログの**最後の行**が言います:
@@ -267,19 +267,19 @@ smoke は capture-ledger v0.43.0 以上を前提にする（最後の段の run 
 
 どれも実物で起こして確かめた見え方（2026-09-19）。
 
-| 見えたもの                                                                                                                                      | 意味                                                                                                 | 直す                                                                                                                 |
-| ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| doctor のスクリプトが ✗ ／ smoke が 400 `no scripts are registered`                                                                             | 台帳にスクリプトが無いか、全部が既定に入らない（無効）。何も名指さないクロールは断られる             | capture-ledger で `pnpm run scripts import .upstream/capture-scripts`。全部が無効なら `pnpm run scripts enable <id>` |
-| doctor の windmill が ✗ で、下の点検が「先に windmill を」                                                                                      | Windmill が落ちている                                                                                | `container-compose up -d`（この repo で）                                                                            |
-| doctor の push が ✗「repo と中身が違う」                                                                                                        | script を直したが push していない（または Windmill の UI で直した）                                  | `pnpm run windmill:push`（違いを見るだけなら `windmill:diff`）                                                       |
-| doctor の worker→browserhive が ✗「名前が引けない」（止めた直後の数秒は「3 秒で答えない」）／smoke の原因が `[cap] BrowserHive に届きません: …` | BrowserHive のコンテナが止まっている（止めたコンテナは名前ごと消える）                               | capture-ledger で `pnpm run stack:up`                                                                                |
-| doctor の host→ts-compile が ✗「http://127.0.0.1:28080 に届かない」                                                                             | ts-compile が host に口を出していない（compose の ports を足した後に作り直していない）か、落ちている | この repo で `container-compose up -d ts-compile`                                                                    |
-| smoke が `failed`・撮ったページ 0 で、原因が `… net::ERR_NAME_NOT_RESOLVED …`                                                                   | 撮る URL の名前が引けない                                                                            | URL の綴り。正しければ、BrowserHive のコンテナから外の名前を引けるか                                                 |
-| doctor の can_submit が ✗「… のクロールの許可が無い」／smoke の原因が `… /pages → 404`                                                          | windmill にクロールの許可が無い                                                                      | capture-ledger で `pnpm run fga:grant submitter windmill acme`                                                       |
-| doctor の can_submit が ✗「トークンが通らない」／smoke の原因が `… /pages → 401`                                                                | issuer を起こし直し、Windmill のトークンが古い                                                       | `pnpm run windmill:capture-ledger-token`                                                                             |
-| doctor の jwt が ✗「ヘッダで名乗る設定で動いている」（起動ログの最後の行は `crawl level reports: blocked`）                                     | capture-ledger の API が JWT を受けない（`CAPTURE_LEDGER_OIDC_ISSUER` が効いていない）               | capture-ledger で `pnpm run connect` を打ち、API を起こし直す                                                        |
-| doctor の container→api が ✗「API が 127.0.0.1 で待っている」／smoke の原因が `Unable to connect`                                               | 段の報告がコンテナから API に届かない（`CAPTURE_LEDGER_API_HOST=0.0.0.0` が効いていない）            | capture-ledger で `pnpm run connect` を打ち、API を起こし直す                                                        |
-| smoke が 409「走行中のクロールがある: …」                                                                                                       | 前の 1 本が running のまま                                                                           | 終わるのを待つか `pnpm run smoke --close-running`                                                                    |
+| 見えたもの                                                                                                                                      | 意味                                                                                                     | 直す                                                                                                                 |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| doctor のスクリプトが ✗ ／ smoke が 400 `no scripts are registered`                                                                             | 台帳にスクリプトが無いか、全部が既定に入らない（無効）。何も名指さないクロールは断られる                 | capture-ledger で `pnpm run scripts import .upstream/capture-scripts`。全部が無効なら `pnpm run scripts enable <id>` |
+| doctor の windmill が ✗ で、下の点検が「先に windmill を」                                                                                      | Windmill が落ちている                                                                                    | `container-compose up -d`（この repo で）                                                                            |
+| doctor の push が ✗「repo と中身が違う」                                                                                                        | script を直したが push していない（または Windmill の UI で直した）                                      | `pnpm run windmill:push`（違いを見るだけなら `windmill:diff`）                                                       |
+| doctor の worker→browserhive が ✗「名前が引けない」（止めた直後の数秒は「3 秒で答えない」）／smoke の原因が `[cap] BrowserHive に届きません: …` | BrowserHive のコンテナが止まっている（止めたコンテナは名前ごと消える）                                   | capture-ledger で `pnpm run stack:up`                                                                                |
+| doctor の host→ts-compile が ✗「http://127.0.0.1:28080 に届かない」                                                                             | ts-compile が host にポートを出していない（compose の ports を足した後に作り直していない）か、落ちている | この repo で `container-compose up -d ts-compile`                                                                    |
+| smoke が `failed`・撮ったページ 0 で、原因が `… net::ERR_NAME_NOT_RESOLVED …`                                                                   | 撮る URL の名前が引けない                                                                                | URL の綴り。正しければ、BrowserHive のコンテナから外の名前を引けるか                                                 |
+| doctor の can_submit が ✗「… のクロールの許可が無い」／smoke の原因が `… /pages → 404`                                                          | windmill にクロールの許可が無い                                                                          | capture-ledger で `pnpm run fga:grant submitter windmill acme`                                                       |
+| doctor の can_submit が ✗「トークンが通らない」／smoke の原因が `… /pages → 401`                                                                | issuer を起こし直し、Windmill のトークンが古い                                                           | `pnpm run windmill:capture-ledger-token`                                                                             |
+| doctor の jwt が ✗「ヘッダで名乗る設定で動いている」（起動ログの最後の行は `crawl level reports: blocked`）                                     | capture-ledger の API が JWT を受けない（`CAPTURE_LEDGER_OIDC_ISSUER` が効いていない）                   | capture-ledger で `pnpm run connect` を打ち、API を起こし直す                                                        |
+| doctor の container→api が ✗「API が 127.0.0.1 で待っている」／smoke の原因が `Unable to connect`                                               | 段の報告がコンテナから API に届かない（`CAPTURE_LEDGER_API_HOST=0.0.0.0` が効いていない）                | capture-ledger で `pnpm run connect` を打ち、API を起こし直す                                                        |
+| smoke が 409「走行中のクロールがある: …」                                                                                                       | 前の 1 本が running のまま                                                                               | 終わるのを待つか `pnpm run smoke --close-running`                                                                    |
 
 ## トークンの経路
 

@@ -88,7 +88,7 @@ flow の中の 1 段（ここでは `report_level`）を開くと、その段だ
 **`report_level` が capture-ledger の `POST /api/crawls/…/pages` に届かなかった**
 （`Unable to connect`・`ConnectionRefused`）。Runs が言うのはここまで —— どの段が・どの宛先に
 （`path` の `http://127.0.0.1:9/…`）・何で落ちたか。宛先が API ではないので、原因は
-`u/admin/waggle_api_url` の値の側に在る（この絵は、変数をわざと閉じた口に向けて撮った）。
+`u/admin/waggle_api_url` の値の側に在る（この絵は、変数をわざと閉じたポートに向けて撮った）。
 宛先に届いたうえで `500` などを受け取ったなら、**中身は capture-ledger のログにしか無い**。
 UI で分かるのは「どの段が・どの宛先に・何で落ちたか」で、原因の特定は宛先側に渡す、という切り分けになる。
 
@@ -98,7 +98,7 @@ UI で分かるのは「どの段が・どの宛先に・何で落ちたか」�
 />
 
 `crawl_host` の失敗も同じ読み方をする。段ごと落ちるのは BrowserHive に 1 つも届かない
-ときだけ（`BrowserHive に届きません: …` に口が全部並ぶ）。1 つの BrowserHive に断られた
+ときだけ（`BrowserHive に届きません: …` にエンドポイントが全部並ぶ）。1 つの BrowserHive に断られた
 （`400 ValidationException: …`、断られた項目つき）のは段の結果の中のそのページの失敗で、
 クロールは続く。どちらでも、BrowserHive がその要求をどう扱ったかは BrowserHive のログに在る。
 
@@ -165,11 +165,11 @@ flow の script は設定を変数から読む（[リンクを辿る](/crawl/)�
 | `u/admin/waggle_token`          | capture-ledger への JWT (secret)                                                                                                                               | `windmill:capture-ledger-token`                                                  |
 | `u/admin/waggle_api_url`        | capture-ledger API の宛先（既定は default ネットワークの gateway）                                                                                             | 同上                                                                             |
 | `u/admin/browserhive_endpoints` | BrowserHive の URL の JSON 配列。BrowserHive 1 つに 1 要素（既定 `["http://browserhive-1.capture-ledger:50051","http://browserhive-2.capture-ledger:50051"]`） | 同上                                                                             |
-| `u/admin/browserhive_tls_ca`    | `https://` の口のための CA（空 = 平文の `http://`）                                                                                                            | 同上                                                                             |
+| `u/admin/browserhive_tls_ca`    | `https://` のエンドポイントのための CA（空 = 平文の `http://`）                                                                                                | 同上                                                                             |
 | `u/admin/ts_compile_url`        | ts-compile-service の宛先（既定 `http://ts-compile.capture-scheduler:8080`）                                                                                   | 同上                                                                             |
 | `f/waggle_secrets/<名前>`       | スクリプトが `catalog.json` の `params` で宣言したシークレット (secret)。`crawl_host` が解いて BrowserHive にだけ渡す（[リンクを辿る](/crawl/)）               | **人が置く**（`pnpm run windmill:cli variable add`）。フォルダは `windmill:push` |
 
-口は BrowserHive v12 から `http(s)://` の URL。`crawl_host` は v11 の `host:port` の形を
+エンドポイントは BrowserHive v12 から `http(s)://` の URL。`crawl_host` は v11 の `host:port` の形を
 この変数の名前を挙げて断り、`windmill:capture-ledger-token` は変数に書く前に断る ——
 `.env` に残った古い `CAPTURE_LEDGER_BROWSERHIVE_ENDPOINTS` は flow ではなく道具で止まる。
 

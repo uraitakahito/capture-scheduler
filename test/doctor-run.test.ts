@@ -79,8 +79,8 @@ describe("本物の点検の並び", () => {
     expect(CHECKS).toHaveLength(23);
   });
 
-  it("crawl route が ✗ なら、合本の口は訊かない（台帳は webhook が無いと両方の口を出さない）", async () => {
-    // 合本の口が 404 で ✗ を足すと、webhook の 2 行という 1 つの原因に ✗ が 2 本並ぶ
+  it("crawl route が ✗ なら、合本のエンドポイントは訊かない（台帳は webhook が無いと両方のエンドポイントを出さない）", async () => {
+    // 合本のエンドポイントが 404 で ✗ を足すと、webhook の 2 行という 1 つの原因に ✗ が 2 本並ぶ
     const results = await runChecks(withOnlyFailing("crawl route"));
     expect(results.filter((r) => r.state === "fail").map((r) => r.check.name)).toEqual([
       "crawl route",
@@ -185,10 +185,13 @@ describe("runChecks", () => {
 
   it("点検しないと決めたものは ・ で、子は走らせる", async () => {
     const results = await runChecks([
-      check("tls", [], () => Promise.resolve({ skipped: "TLS の口は見ない" })),
+      check("tls", [], () => Promise.resolve({ skipped: "TLS のエンドポイントは見ない" })),
       check("child", ["tls"]),
     ]);
-    expect(stateOf(results, "tls")).toMatchObject({ state: "skip", reason: "TLS の口は見ない" });
+    expect(stateOf(results, "tls")).toMatchObject({
+      state: "skip",
+      reason: "TLS のエンドポイントは見ない",
+    });
     expect(stateOf(results, "child")?.state).toBe("ok");
   });
 

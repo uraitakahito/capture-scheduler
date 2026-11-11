@@ -9,10 +9,10 @@ import { describe, it, expect, beforeAll } from "vitest";
  *
  * ## flow を直接叩かない
  *
- * Windmill の口 (`/jobs/run/f/...`) を直接叩けば速いが、それでは意味が無い。
+ * Windmill のエンドポイント (`/jobs/run/f/...`) を直接叩けば速いが、それでは意味が無い。
  * この試験の目的は **capture-ledger が実際に送る引数**を通すことで、capture-ledger が送るのは
  * `crawl_id` / `depth` / `frontier` / `per_host_delay_ms` / `host_parallelism` /
- * `capture_formats` / `signing` / `scripts` / `variables` / `secrets` / `user_agent` と、受け口を出している配備では
+ * `capture_formats` / `signing` / `scripts` / `variables` / `secrets` / `user_agent` と、受け取り先を出している配備では
  * `artifact_sink`。
  * `respect_robots` は**送られない**。
  *
@@ -44,7 +44,7 @@ const ISSUER = process.env["E2E_ISSUER_URL"] ?? "http://127.0.0.1:9099";
  * capture-ledger のスタックの capture-fixtures。**宛先が 2 つ要る。**
  *
  * `FIXTURES` は**取り込む側**が引く名前 —— 起点の URL に載り、
- * BrowserHive のコンテナがこれを解決する。`FIXTURES_HOST` は**この試験自身**が叩く口で、loopback。
+ * BrowserHive のコンテナがこれを解決する。`FIXTURES_HOST` は**この試験自身**が叩く宛先で、loopback。
  *
  * 分けるのは macOS 26 の制限のため: Apple 署名でないバイナリ (node) はコンテナの
  * subnet へ TCP を張れず、DNS 名は引けるのに `EHOSTUNREACH` になる
@@ -55,7 +55,7 @@ const FIXTURES = process.env["E2E_FIXTURES_URL"] ?? "http://capture-fixtures.cap
 const FIXTURES_HOST = process.env["E2E_FIXTURES_HOST_URL"] ?? "http://127.0.0.1:18085";
 
 /**
- * Windmill の口。調べ物の script (`f/waggle/inspect_*`) を走らせるのに使う —— doctor・smoke と同じく、
+ * Windmill のエンドポイント。調べ物の script (`f/waggle/inspect_*`) を走らせるのに使う —— doctor・smoke と同じく、
  * この repo の `.env`・`.env.local` の `WINDMILL_*` で叩く。試験の process にはどちらも読まれていない
  * ので、ここで読む。**`.env.local` が先**: `loadEnvFile` は既に在る値を上書きしないので、先に読んだ
  * 値が勝つ (`--env-file-if-exists=.env --env-file-if-exists=.env.local` と同じ勝ち方)。
@@ -163,7 +163,7 @@ const runScript = async (path: string, args: Record<string, unknown>): Promise<u
 };
 
 /**
- * 走った口を、ページの中から印に残すその場の TS。`run` は試験ごとの token、`state` は走ったときの
+ * 走った phase を、ページの中から印に残すその場の TS。`run` は試験ごとの token、`state` は走ったときの
  * `document.readyState` —— 遷移の前に走れば `loading`、読み込みの後なら `complete` になる。
  *
  * **同じ文字列を behavior でも preload でも送れる形にする**（await を使わない IIFE）。読み込みの後なら、
@@ -325,18 +325,19 @@ describe("クロールが flow を通って索引まで終わる", () => {
       `合本の頁の行 (${String(replayBundle?.pages)}) が、この回のアーカイブ (${String(crawlArchives.size)} 本) より少ない`,
     ).toBeGreaterThanOrEqual(crawlArchives.size);
 
-    // ── ④ 成果物が受け口を通ったか ──────────────────────────────────
-    // **受け口の有無は capture-ledger に訊く。** トークン無しの PUT は、口が在ればトークンの検査で
+    // ── ④ 成果物が受け取り先を通ったか ──────────────────────────────────
+    // **受け取り先の有無は capture-ledger に訊く。** トークン無しの PUT は、受け取り先が在ればトークンの検査で
     // 401、無ければ route ごと無いので 404。走らせる人に env で宣言させる形は採らない ——
-    // 宣言を忘れた回が緑で通る。dispatch が口を載せ忘れていた間 (capture-ledger #226 から)、
-    // 受け口の値を渡した capture-ledger でもクロールは成功し、成果物は黙って BrowserHive の
+    // 宣言を忘れた回が緑で通る。dispatch が受け取り先を載せ忘れていた間 (capture-ledger #226 から)、
+    // 受け取り先の値を渡した capture-ledger でもクロールは成功し、成果物は黙って BrowserHive の
     // 自前の保管庫へ置かれていた。
     //
-    // **401 と 404 以外は落とす。** 見分けを誤って「口が無い」側に倒すと、この検査が黙って飛ぶ。
+    // **401 と 404 以外は落とす。** 見分けを誤って「受け取り先が無い」側に倒すと、この検査が黙って飛ぶ。
     const probe = await fetch(`${WAGGLE}/api/sink/${crawlId}/probe`, { method: "PUT" });
-    expect([401, 404], `受け口の有無を見分けられない (PUT → ${String(probe.status)})`).toContain(
-      probe.status,
-    );
+    expect(
+      [401, 404],
+      `受け取り先の有無を見分けられない (PUT → ${String(probe.status)})`,
+    ).toContain(probe.status);
     if (probe.status === 401) {
       // この回の取り込みを、出発点の下の URL とクロールの開始時刻で絞る。`GET /api/crawls/:id`
       // は取り込んだページを返さないので、一覧 (新しい順に 50 件) から採る。見てよいかの判定は
@@ -351,9 +352,9 @@ describe("クロールが flow を通って索引まで終わる", () => {
       );
       expect(ours.length, "この回の取り込みが capture-ledger の一覧に無い").toBeGreaterThan(0);
       for (const archive of ours) {
-        // 受け口はクロールを作ったときに決めた `org/<組織>/<YYYY-MM>/` の下に置く。平らな鍵は
-        // BrowserHive が自前の保管庫へ書いた印 —— 口が配られていない。
-        expect(archive.objectKey, "受け口を通っていない (鍵が平ら)").toMatch(
+        // 受け取り先はクロールを作ったときに決めた `org/<組織>/<YYYY-MM>/` の下に置く。平らな鍵は
+        // BrowserHive が自前の保管庫へ書いた印 —— 受け取り先が配られていない。
+        expect(archive.objectKey, "受け取り先を通っていない (鍵が平ら)").toMatch(
           /^org\/acme\/\d{4}-\d{2}\//,
         );
       }
@@ -625,13 +626,13 @@ describe("クロールが flow を通って索引まで終わる", () => {
       bytes: Buffer.byteLength(probe(run)),
     });
     expect(scripts[1]).not.toHaveProperty("inline");
-    // 書いた物は、名前の口から取り戻す（capture-ledger v0.59.0。画面の「欄に戻す」が使う）
+    // 書いた物は、名前で引くエンドポイントから取り戻す（capture-ledger v0.59.0。画面の「欄に戻す」が使う）
     const back = await json(
       await fetch(`${WAGGLE}/api/crawls/${String(got["crawlId"])}/inline/probe`, {
         headers: auth(),
       }),
     );
-    expect(back["source"], "名前の口が、書いた TS を返さない").toBe(probe(run));
+    expect(back["source"], "名前で引くエンドポイントが、書いた TS を返さない").toBe(probe(run));
     // どちらも変換され、走った JS の hash が報告で台帳に戻っている
     for (const script of scripts) {
       expect(script.jsSha256, `${script.id}: JS の hash が台帳に戻っていない`).toMatch(
@@ -762,7 +763,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
  *
  * 判定は 3 か所で見る。**相手が受け取った物**は capture-fixtures のリクエストログ、**取りに行ったが届かな
  * かった物** (外の 2 本はどちらも `.invalid` で、相手のログには来ない) は台帳の失敗、**台帳が決めた物**は
- * 判断の口と、それを Windmill で描く調べ物の script。
+ * 判断のエンドポイントと、それを Windmill で描く調べ物の script。
  */
 describe("規則の並びで辿る", () => {
   const RULES = [

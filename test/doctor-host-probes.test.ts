@@ -1,5 +1,5 @@
 /**
- * host から、compose が loopback に出した ts-compile の口を叩いた答えの読み分け。
+ * host から、compose が loopback に出した ts-compile のポートを叩いた答えの読み分け。
  *
  * 200 が返っても、答えたのが ts-compile とは限らない (同じ番号を別のスタックが持ちうる)。
  * だから `/healthz` の形まで見る —— 形を見なければ、下の「ts-compile の形でない」は ✓ になる。
@@ -17,7 +17,7 @@ describe("readHostTsCompile", () => {
     expect(readHostTsCompile({ status: 200, body: health })).toEqual({ ok: true });
   });
 
-  it("届かなければ、口を出していないか落ちたと言って container-compose up -d ts-compile を指す", () => {
+  it("届かなければ、ポートを出していないか落ちたと言って container-compose up -d ts-compile を指す", () => {
     const verdict = readHostTsCompile({ status: undefined, body: "" });
     expect(verdict.ok).toBe(false);
     expect(need(verdict)).toContain(HOST_TS_COMPILE);

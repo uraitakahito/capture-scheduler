@@ -62,7 +62,7 @@ describe("撮れたとき・撮っている最中", () => {
 });
 
 describe("台帳の error で終わったとき (締める段が締めた)", () => {
-  it("F2 BrowserHive が 2 台とも止まっている → 口を挙げて stack:up", () => {
+  it("F2 BrowserHive が 2 台とも止まっている → エンドポイントを挙げて stack:up", () => {
     const reading = readFinished(crawlOf("f2-browserhive-down"));
     expect(reading?.fix).toMatch(
       /^BrowserHive に届かない \(browserhive-1\.capture-ledger:50051, browserhive-2\.capture-ledger:50051\)/,

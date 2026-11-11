@@ -13,7 +13,7 @@ import { readSearchRoute, SEARCH_PROBE } from "../scripts/doctor/search-route.js
 const need = (verdict: { ok: boolean; need?: string }): string => verdict.need ?? "";
 
 describe("readSearchRoute", () => {
-  it("200 なら ✓（口が在り、OpenSearch まで届いた）", () => {
+  it("200 なら ✓（エンドポイントが在り、OpenSearch まで届いた）", () => {
     expect(readSearchRoute({ status: 200, body: '{"hits":[],"total":0}' })).toEqual({ ok: true });
   });
 
@@ -28,20 +28,20 @@ describe("readSearchRoute", () => {
     expect(need(verdict)).toContain("pnpm run search:reindex");
   });
 
-  it("名乗って引いたのに 401 なら ✗（口が在る印にしない）", () => {
+  it("名乗って引いたのに 401 なら ✗（エンドポイントが在る印にしない）", () => {
     // 名乗らずに引いていた頃の ✓ の形。いまは、OpenSearch が止まっていても返る答えでしかない。
     const verdict = readSearchRoute({ status: 401, body: '{"error":"unauthenticated"}' });
     expect(verdict.ok).toBe(false);
     expect(need(verdict)).toContain("401");
   });
 
-  it("404 なら、台帳に検索の口が無いと言い、OPENSEARCH_URL を名指す", () => {
+  it("404 なら、台帳に検索のエンドポイントが無いと言い、OPENSEARCH_URL を名指す", () => {
     const verdict = readSearchRoute({
       status: 404,
       body: '{"message":"Route GET:/api/search?q=x not found"}',
     });
     expect(verdict.ok).toBe(false);
-    expect(need(verdict)).toContain("検索の口が無い");
+    expect(need(verdict)).toContain("検索のエンドポイントが無い");
     expect(need(verdict)).toContain("CAPTURE_LEDGER_OPENSEARCH_URL");
   });
 
@@ -51,7 +51,7 @@ describe("readSearchRoute", () => {
     expect(need(verdict)).toContain("pnpm run api");
   });
 
-  it("引く口は q つきの GET /api/search", () => {
+  it("引くエンドポイントは q つきの GET /api/search", () => {
     expect(SEARCH_PROBE).toBe("/api/search?q=x");
   });
 });

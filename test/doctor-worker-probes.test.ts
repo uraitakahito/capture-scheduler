@@ -2,9 +2,9 @@
  * worker の中の curl の終わり方の読み分け。
  *
  * 入力は 2026-09-19 に worker (windmill-worker.capture-scheduler) の中で実測した答え:
- * 名前が引けないと `000 6` (container stop した BrowserHive も)、閉じた口は `000 7`、
+ * 名前が引けないと `000 6` (container stop した BrowserHive も)、閉じたポートは `000 7`、
  * 答えない宛先は `000 28` (止めた直後の数秒の BrowserHive も —— 約 5 秒で 6 に変わった)。
- * BrowserHive の口は v12 から HTTP で、`GET /status` が `200 0` (v11 までの gRPC の口は `415 0` だった)。
+ * BrowserHive のエンドポイントは v12 から HTTP で、`GET /status` が `200 0` (v11 までの gRPC のエンドポイントは `415 0` だった)。
  */
 import { describe, expect, it } from "vitest";
 
@@ -37,13 +37,13 @@ describe("readBrowserhiveProbes", () => {
     answer: { http, rc },
   });
 
-  it("どの口も GET /status に 200 で答えれば ✓", () => {
+  it("どのエンドポイントも GET /status に 200 で答えれば ✓", () => {
     expect(readBrowserhiveProbes([probe(EP1, "200", 0), probe(EP, "200", 0)])).toEqual({
       ok: true,
     });
   });
 
-  it("答えたが 200 でない口は、status を添えて言う (v11 の gRPC の口なら 415)", () => {
+  it("答えたが 200 でないエンドポイントは、status を添えて言う (v11 の gRPC のエンドポイントなら 415)", () => {
     expect(need(readBrowserhiveProbes([probe(EP1, "200", 0), probe(EP, "415", 0)]))).toBe(
       `${EP}/status → http=415`,
     );
@@ -69,7 +69,7 @@ describe("readBrowserhiveProbes", () => {
     );
   });
 
-  it("落ちた口と 200 でない口が混ざれば、両方言う", () => {
+  it("落ちたエンドポイントと 200 でないエンドポイントが混ざれば、両方言う", () => {
     const text = need(readBrowserhiveProbes([probe(EP1, "000", 7), probe(EP, "503", 0)]));
     expect(text).toMatch(/^待っていない: /);
     expect(text).toMatch(new RegExp(`${EP}/status → http=503$`));

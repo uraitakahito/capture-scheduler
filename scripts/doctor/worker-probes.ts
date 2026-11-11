@@ -8,9 +8,9 @@
  * curl には `-w '%{http_code} %{exitcode}'` を付け、終わり方を 2 つの数で受ける。
  * 2026-09-19 に worker の中で実測した終わり方:
  *
- *   BrowserHive の口 (GET /status)     200 0   server が答え、browser も抱えている証拠 (v12 から HTTP)
+ *   BrowserHive の GET /status         200 0   server が答え、browser も抱えている証拠 (v12 から HTTP)
  *   名前が引けない                     000 6   **止めたコンテナもこれ** —— 名前ごと消える (refused にならない)
- *   口が閉じている                     000 7
+ *   ポートが閉じている                 000 7
  *   答えない                           000 28  (--max-time の切れ)。**止めた直後の数秒もこれ** ——
  *                                              名前が消えるまでは、残った名前の先が答えない
  *
@@ -35,7 +35,7 @@ export const parseCurl = (stdout: string): CurlAnswer | undefined => {
   return { http: match[1] ?? "000", rc: Number(match[2]) };
 };
 
-/** 落ちた口の終わり方ごとの言い方。知らない終わり方は rc をそのまま出す。 */
+/** 落ちたエンドポイントの終わり方ごとの言い方。知らない終わり方は rc をそのまま出す。 */
 const DOWN: Readonly<Record<number, (endpoints: string) => string>> = {
   6: (endpoints) =>
     `名前が引けない: ${endpoints} —— コンテナが止まっている (cd ../capture-ledger && pnpm run stack:up) か、` +
@@ -47,11 +47,11 @@ const DOWN: Readonly<Record<number, (endpoints: string) => string>> = {
 };
 
 /**
- * BrowserHive の口ごとの答え。`GET /status` が 200 なら ✓ —— 答えるのは、server が
+ * BrowserHive のエンドポイントごとの答え。`GET /status` が 200 なら ✓ —— 答えるのは、server が
  * 起動し切って browser を抱えている証拠 (browser に繋げない server は起動を拒む)。
  *
- * 落ちた口は、終わり方の同じものをまとめて名指しする —— 2 台とも止まっているときに、
- * 同じ直し方を 2 度読ませない。答えたが 200 でない口は、status を添えて別に言う。
+ * 落ちたエンドポイントは、終わり方の同じものをまとめて名指しする —— 2 台とも止まっているときに、
+ * 同じ直し方を 2 度読ませない。答えたが 200 でないエンドポイントは、status を添えて別に言う。
  */
 export const readBrowserhiveProbes = (
   probes: readonly { endpoint: string; answer: CurlAnswer }[],
@@ -73,7 +73,7 @@ export const readBrowserhiveProbes = (
       ? `${endpoints.join("・")} → curl rc=${String(rc)}`
       : say(endpoints.join("・"));
   });
-  // 落ちた口と、答えたが 200 でない口は別の直し方なので、両方とも言う。
+  // 落ちたエンドポイントと、答えたが 200 でないエンドポイントは別の直し方なので、両方とも言う。
   return { ok: false, need: [...parts, ...odd].join("。") };
 };
 
@@ -81,7 +81,7 @@ export const readBrowserhiveProbes = (
  * 段の報告の宛先 (変数 `u/admin/waggle_api_url`) の `/healthz`。
  *
  * **届かないときは、変数の宛先をいまの gateway と比べる。** 同じなのに refused なら、
- * gateway の口で待っているものが無い —— host からは答える API が 127.0.0.1 で待っている。
+ * gateway のポートで待っているものが無い —— host からは答える API が 127.0.0.1 で待っている。
  * 違うなら、network を作り直して宛先が古くなった。この 2 つは curl の答えだけでは分けられない。
  */
 export const readContainerApi = ({

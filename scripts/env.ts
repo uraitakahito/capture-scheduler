@@ -1,5 +1,5 @@
 /**
- * 環境変数の読み口。capture-ledger の `src/config/env.ts` と同じ規約に揃えてある。
+ * 環境変数を読む関数。capture-ledger の `src/config/env.ts` と同じ規約に揃えてある。
  *
  * どちらの getter も空文字を「無い」と同じに扱う。POSIX の `${VAR:-word}` 側の
  * 意味で、`??` (`${VAR-word}` 側) は使わない —— `.env` の `NAME=` は既定値を
@@ -110,10 +110,10 @@ export const ledgerIssuer = (): string =>
   optional("CAPTURE_LEDGER_OIDC_ISSUER", "http://127.0.0.1:9099");
 
 /**
- * capture-ledger が host から ts-compile を呼ぶ宛先。compose が `127.0.0.1:28080` に出す口
+ * capture-ledger が host から ts-compile を呼ぶ宛先。compose が `127.0.0.1:28080` に出すポート
  * (`docker-compose.yml` の ts-compile の `ports`)。**doctor が叩く先 (host→ts-compile) と、capture-ledger に
  * 渡す値 (`ledgerEnv`) は同じでなければならない** —— 違えば、doctor は ✓ なのに、台帳の型の誤りの取り直しと
- * 直し方の口だけが 503 になる。だから 1 か所で決める。
+ * 直し方のエンドポイントだけが 503 になる。だから 1 か所で決める。
  */
 export const HOST_TS_COMPILE = "http://127.0.0.1:28080";
 
@@ -148,7 +148,7 @@ export const ledgerEnv = ({
   // flow は JWT で名乗る。これが無い API は開発用ヘッダで名乗る設定になり、段の報告は 401。
   `CAPTURE_LEDGER_OIDC_ISSUER=${issuer}`,
   // 型で落ちたクロールの誤りの取り直しと、直し方の検査 (capture-ledger v0.69.0 以降)。台帳は host で動くので、
-  // 名前ではなく host に出した口で呼ぶ。Claude の鍵があってこれが無いと、台帳の API は起動で止まる。
+  // 名前ではなく host に出したポートで呼ぶ。Claude の鍵があってこれが無いと、台帳の API は起動で止まる。
   `CAPTURE_LEDGER_TS_COMPILE_URL=${HOST_TS_COMPILE}`,
 ];
 
