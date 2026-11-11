@@ -1,7 +1,7 @@
 /**
  * smoke が、撮った 1 本が合本に入り、replayweb-server から読めるところまでを読む読み分け (CAPTURE-57)。
  *
- * 合本の段は台帳が 200 で返す失敗では投げない (クロールを止めないため) ので、run が緑でも合本が書けたとは
+ * 合本の段は capture-ledger が 200 で返す失敗では投げない (クロールを止めないため) ので、run が緑でも合本が書けたとは
  * 限らない —— 段の答えの error・failed・rev の null を、smoke が止める理由として読むかを見る。
  */
 import { describe, expect, it } from "vitest";
@@ -41,7 +41,7 @@ describe("合本の段の答え", () => {
     expect(replayBundleJobOf("nope")).toBeUndefined();
   });
 
-  it("合本の段の job の result から、台帳の答えを読む", () => {
+  it("合本の段の job の result から、capture-ledger の答えを読む", () => {
     expect(readReplayBundleOutcome({ result: WROTE })).toEqual(WROTE);
     expect(readReplayBundleOutcome({ result: { ...WROTE, rev: null } })?.rev).toBeNull();
   });
@@ -94,7 +94,7 @@ describe("合本の段の答え", () => {
     ).toContain("replay-bundle route");
     expect(
       readReplayBundleFailure(
-        "POST /api/crawls/c/replay-bundle → 400 {} —— 台帳が本文の形を断った",
+        "POST /api/crawls/c/replay-bundle → 400 {} —— capture-ledger が本文の形を断った",
       ),
     ).toContain("版の組");
     // 401・許可の 404 は段の失敗の読み分け (readStepFailure) に任せる
@@ -103,7 +103,7 @@ describe("合本の段の答え", () => {
   });
 });
 
-describe("台帳が指す合本", () => {
+describe("capture-ledger が指す合本", () => {
   it("段が書いた版を指していれば、鍵と版を読む", () => {
     const read = readLedgerReplayBundle(
       {

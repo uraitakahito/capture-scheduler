@@ -36,7 +36,7 @@ import { mintToken } from "./helpers/stack.js";
  *
  * ## 判定は capture-fixtures のリクエストログで採る
  *
- * 台帳は「記録したこと」しか言わない。**相手が何を受け取ったか**は相手しか知らない。
+ * capture-ledger は「記録したこと」しか言わない。**相手が何を受け取ったか**は相手しか知らない。
  */
 
 const WAGGLE = process.env["E2E_WAGGLE_URL"] ?? "http://127.0.0.1:7070";
@@ -80,7 +80,7 @@ const auth = () => ({ authorization: `Bearer ${token}` });
 const json = async (res: Response): Promise<Record<string, unknown>> =>
   (await res.json()) as Record<string, unknown>;
 
-/** 1 本始めて crawlId を返す。202 でなければ、台帳の本文を理由に落とす。 */
+/** 1 本始めて crawlId を返す。202 でなければ、capture-ledger の本文を理由に落とす。 */
 const startCrawl = async (body: Record<string, unknown>): Promise<string> => {
   const res = await fetch(`${WAGGLE}/api/crawls`, {
     method: "POST",
@@ -113,7 +113,7 @@ const resetFixtures = async (): Promise<void> => {
 /**
  * クロールの最後の段の run (`lastJob`) が終わるまで待ち、その job を返す。
  *
- * **succeeded だけを待たない。** 台帳は段の報告の時点でクロールを succeeded にし、flow の合本の段と索引の段は
+ * **succeeded だけを待たない。** capture-ledger は段の報告の時点でクロールを succeeded にし、flow の合本の段と索引の段は
  * その後に走る —— succeeded の直後に検索すると、索引より先になりうる (CAPTURE-53 の調べ)。合本も同じ。
  * flow の run は最後の段 (index) まで走り終えて初めて CompletedJob になるので、段を足してもここで待てる。
  */
@@ -122,7 +122,9 @@ const lastRunFinished = async (crawlId: string): Promise<Record<string, unknown>
   expect(windmillToken, "WINDMILL_TOKEN が無い —— pnpm run windmill:bootstrap").toBeTruthy();
   const crawl = await json(await fetch(`${WAGGLE}/api/crawls/${crawlId}`, { headers: auth() }));
   const lastJob = crawl["lastJob"] as { id?: unknown } | null | undefined;
-  expect(typeof lastJob?.id, "台帳が段の run を知らない (lastJob が無い)").toBe("string");
+  expect(typeof lastJob?.id, "capture-ledger が段の run を知らない (lastJob が無い)").toBe(
+    "string",
+  );
   const headers = { authorization: `Bearer ${String(windmillToken)}` };
   for (let i = 0; i < 60; i++) {
     const job = await json(
@@ -220,7 +222,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
 
     // 完了を待つ。取り込みは本物のブラウザなので分単位になりうる。
     let state = "running";
-    // ② と ④ で「この回の取り込み」を絞るのに使う。台帳が記録した開始時刻で、この試験の時計ではない。
+    // ② と ④ で「この回の取り込み」を絞るのに使う。capture-ledger が記録した開始時刻で、この試験の時計ではない。
     let startedAt = Number.NaN;
     for (let i = 0; i < 100 && state === "running"; i++) {
       await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -236,7 +238,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
 
     // ── ① robots が守られたか ──────────────────────────────────────
     // capture-fixtures の /robots.txt は /links/hidden を Disallow している。**capture-fixtures 自身が
-    // 受け取っていないこと**を見る —— 台帳を見ても「記録しなかった」としか言えない。
+    // 受け取っていないこと**を見る —— capture-ledger を見ても「記録しなかった」としか言えない。
     //
     // これを守っているのは `plan_level.ts` の `?? true` **1 か所だけ**。
     // schema の `default: true` は webhook 実行では埋まらないので効いていない。
@@ -250,7 +252,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
     expect(Object.keys(counts)).toContain("/links/hub");
 
     // ── ② 索引まで flow の中で終わったか ────────────────────────────
-    // report の後に合本の段 (replay_bundle) と索引の段 (index) が並んでいる。**台帳は report の時点で
+    // report の後に合本の段 (replay_bundle) と索引の段 (index) が並んでいる。**capture-ledger は report の時点で
     // succeeded にする**ので、succeeded を見た時点では、最後の段の合本も索引もまだ走っているかもしれない。
     // run の終わりを待つ (③ の合本もこれを待ってから見る)。
     const lastRun = await lastRunFinished(crawlId);
@@ -259,7 +261,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
       `最後の段の run が失敗した: ${JSON.stringify(lastRun["result"])}`,
     ).toBe(true);
     // 当たりは、この回のクロールのアーカイブに絞る —— 前の回に /links/hub を撮っていれば、それにも当たる。
-    // 見てよいかの権限は台帳が 5 秒ごとに OpenFGA へ書くので、当たるまで少し引き直す。
+    // 見てよいかの権限は capture-ledger が 5 秒ごとに OpenFGA へ書くので、当たるまで少し引き直す。
     const listedForSearch = await json(await fetch(`${WAGGLE}/api/archives`, { headers: auth() }));
     const crawlArchives = new Set(
       (listedForSearch["archives"] as { id: string; sourceUrl: string; capturedAt: string }[])
@@ -286,9 +288,9 @@ describe("クロールが flow を通って索引まで終わる", () => {
     expect(ourHits.length, "この回のクロールのアーカイブが索引に載っていない").toBeGreaterThan(0);
 
     // ── ③ 合本が書かれたか ──────────────────────────────────────────
-    // **run が緑でも、合本が書けたとは限らない。** 合本の段は台帳が 200 で返す失敗 (保管庫に書けない・
+    // **run が緑でも、合本が書けたとは限らない。** 合本の段は capture-ledger が 200 で返す失敗 (保管庫に書けない・
     // 検められない WACZ・入れる WACZ が無い) では投げない (クロールを止めないため) ので、② の run の成功は
-    // その証拠にならない。台帳が指す合本を見る。段ごとに版が増え、台帳が指すのは書き終えたいちばん
+    // その証拠にならない。capture-ledger が指す合本を見る。段ごとに版が増え、capture-ledger が指すのは書き終えたいちばん
     // 大きい版 —— 最後の段の run を待った後なので、この回のアーカイブを全部含む版を指している。
     const detail = await json(await fetch(`${WAGGLE}/api/crawls/${crawlId}`, { headers: auth() }));
     const replayBundle = detail["replayBundle"] as
@@ -297,12 +299,12 @@ describe("クロールが flow を通って索引まで終わる", () => {
       | undefined;
     expect(
       replayBundle,
-      "台帳がこのクロールの合本を指していない (replayBundle が null か無い) —— " +
+      "capture-ledger がこのクロールの合本を指していない (replayBundle が null か無い) —— " +
         "最後の段の run の replay_bundle の段の log を見る",
     ).toBeTruthy();
     expect(
       replayBundle?.error,
-      "合本を保管庫に書けなかった (台帳の replay_bundle_error)",
+      "合本を保管庫に書けなかった (capture-ledger の replay_bundle_error)",
     ).toBeNull();
     expect(
       Number.isInteger(replayBundle?.rev),
@@ -356,9 +358,9 @@ describe("クロールが flow を通って索引まで終わる", () => {
   });
 
   /**
-   * **台帳に入れたスクリプトが、ページの中で走ったか。**
+   * **登録したスクリプトが、ページの中で走ったか。**
    *
-   * ここまでの検査は「撮れたか」「記録できたか」しか見ていない。台帳にスクリプトが無くても、flow が
+   * ここまでの検査は「撮れたか」「記録できたか」しか見ていない。登録済みのスクリプトが無くても、flow が
    * `scripts` を落としても、取り込みは成功しアーカイブも出る —— `complete: true` のまま。
    * その差を外から見分ける手が要る。
    *
@@ -366,14 +368,14 @@ describe("クロールが flow を通って索引まで終わる", () => {
    * 「1280px・DPR 1 の取り込みは要素ごとに 1 候補しか要求しないので、`autofetch` が
    * 無ければ control の `hero.svg` しか届かない」。
    *
-   * つまり **`hero-2x.svg` が相手に届いたこと**が、「台帳 → flow → BrowserHive → ページ」の
+   * つまり **`hero-2x.svg` が相手に届いたこと**が、「capture-ledger → flow → BrowserHive → ページ」の
    * 鎖が全部通った証拠になる。判定を相手のリクエストログで採るのは ① と同じ理由 ——
-   * 台帳は「記録したこと」しか言わない。
+   * capture-ledger は「記録したこと」しか言わない。
    *
-   * autofetch は capture-scripts v0.5.0 から既定に入らない（カタログの `default: false`。台帳 v0.64.0 は
-   * 全部の版を無効にして持つ）ので、名指して頼む。名指せば、台帳は最新版を配る。
+   * autofetch は capture-scripts v0.5.0 から既定に入らない（カタログの `default: false`。capture-ledger v0.64.0 は
+   * 全部の版を無効にして持つ）ので、名指して頼む。名指せば、capture-ledger は最新版を配る。
    */
-  it("台帳に入れたスクリプトが、ページの中で走る", async () => {
+  it("登録したスクリプトが、ページの中で走る", async () => {
     await fetch(`${FIXTURES_HOST}/__reset`, { method: "POST" });
 
     const started = await fetch(`${WAGGLE}/api/crawls`, {
@@ -391,7 +393,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
       started.status,
       startedBody +
         (started.status === 400
-          ? " —— 台帳に autofetch は入っていますか (capture-ledger: pnpm run scripts import .upstream/capture-scripts)"
+          ? " —— autofetch は登録されていますか (capture-ledger: pnpm run scripts import .upstream/capture-scripts)"
           : started.status === 409
             ? " —— 走行中のクロールが残っています。**この試験が途中で落ちると必ずこうなる**"
             : ""),
@@ -405,7 +407,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
       state = String(got["state"]);
       if (state !== "running") {
         expect(state, `stopReason=${String(got["stopReason"])}`).toBe("succeeded");
-        // 台帳が何を固定したか。**走ったことと、記録したことは別の主張**なので両方見る。
+        // capture-ledger が何を固定したか。**走ったことと、記録したことは別の主張**なので両方見る。
         const scripts = got["scripts"] as {
           id: string;
           sha256: string;
@@ -414,14 +416,15 @@ describe("クロールが flow を通って索引まで終わる", () => {
         }[];
         expect(
           scripts.map((script) => script.id),
-          "台帳が名指した autofetch を配っていない",
+          "capture-ledger が名指した autofetch を配っていない",
         ).toEqual(["autofetch"]);
-        // 走った JS の hash と変換の記録が、報告で台帳に戻っている。台帳のスクリプトの sha256 は TS の物なので、
+        // 走った JS の hash と変換の記録が、報告で capture-ledger に戻っている。登録済みのスクリプトの sha256 は TS の物なので、
         // JS の物と同じなら「変換されていない」。
         for (const script of scripts) {
-          expect(script.jsSha256, `${script.id}: JS の hash が台帳に戻っていない`).toMatch(
-            /^[0-9a-f]{64}$/,
-          );
+          expect(
+            script.jsSha256,
+            `${script.id}: JS の hash が capture-ledger に戻っていない`,
+          ).toMatch(/^[0-9a-f]{64}$/);
           expect(script.jsSha256, `${script.id}: JS の hash が TS の hash と同じ`).not.toBe(
             script.sha256,
           );
@@ -442,23 +445,23 @@ describe("クロールが flow を通って索引まで終わる", () => {
     expect(counts["/assets/hero.svg"], "取り込みが届いていない").toBeGreaterThan(0);
 
     // **ここが本題。** 1280px・DPR 1 のブラウザは -2x を要求しない。届いているなら、
-    // 台帳の autofetch がページの中で走った。
+    // 登録済みの autofetch がページの中で走った。
     expect(
       counts["/assets/hero-2x.svg"],
-      "autofetch が走っていない —— 台帳のスクリプト・flow の scripts・BrowserHive の受け皿のどれかで切れている",
+      "autofetch が走っていない —— 登録済みのスクリプト・flow の scripts・BrowserHive の受け皿のどれかで切れている",
     ).toBeGreaterThan(0);
   });
 
   /**
    * **スクリプトを空にしたクロールは、何も走らせずに成功する。**
    *
-   * 上の試験の対照。同じページ・同じ条件で、台帳に `scripts: []` (「何も走らせない」という意思) を渡す。
+   * 上の試験の対照。同じページ・同じ条件で、capture-ledger に `scripts: []` (「何も走らせない」という意思) を渡す。
    * compile の段はスクリプトが空でも 200 で通し (ts-compile-service v0.2.1 から)、BrowserHive はページの中で
    * 何も走らせない。その証拠は fixtures の request log に在る —— autofetch が居なければ hero-2x.svg は
    * 誰も要求しない。これが無いと、上の試験の hero-2x.svg が本当に autofetch の仕業かを、走らなかった
    * ときの姿と比べて言えない。
    *
-   * compile の段が空を断る版 (v0.2.0 まで) では、台帳の error に "[compile] compile 400 …" が残って
+   * compile の段が空を断る版 (v0.2.0 まで) では、capture-ledger の error に "[compile] compile 400 …" が残って
    * state で落ちる。その文面をそのまま失敗の理由にする。
    */
   it("スクリプトを空にしたクロールは、何も走らせずに成功する", async () => {
@@ -484,7 +487,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
       if (got["state"] !== "running") break;
     }
     expect(got["state"], String(got["error"])).toBe("succeeded");
-    // 台帳はスクリプトを空で固定した (省略なら台帳の既定が入る)
+    // capture-ledger はスクリプトを空で固定した (省略なら capture-ledger の既定が入る)
     expect(got["scripts"]).toEqual([]);
 
     const counts = (await json(await fetch(`${FIXTURES_HOST}/__request-counts`))) as Record<
@@ -501,9 +504,9 @@ describe("クロールが flow を通って索引まで終わる", () => {
   /**
    * **`scripts` を省いたクロールに、autofetch は入らない。**
    *
-   * 上の 2 本のもう 1 つの対照。autofetch は capture-scripts v0.5.0 から既定に入らず、台帳は全部の版を
+   * 上の 2 本のもう 1 つの対照。autofetch は capture-scripts v0.5.0 から既定に入らず、capture-ledger は全部の版を
    * 無効にして持つ。だから何も名指さないクロールは走らせない。
-   * 台帳が固定した顔ぶれと、相手のリクエストログの両方で見る: 顔ぶれに居なくても、ページの中で
+   * capture-ledger が固定した顔ぶれと、相手のリクエストログの両方で見る: 顔ぶれに居なくても、ページの中で
    * 走っていれば hero-2x.svg が届く。
    */
   it("scripts を省いたクロールに、autofetch は入らない", async () => {
@@ -526,11 +529,11 @@ describe("クロールが flow を通って索引まで終わる", () => {
     }
     expect(got["state"], String(got["error"])).toBe("succeeded");
     const ids = (got["scripts"] as { id: string }[]).map((script) => script.id);
-    // 既定は空ではない（空なら台帳は 400 で断る）。その中に autofetch が居ない
+    // 既定は空ではない（空なら capture-ledger は 400 で断る）。その中に autofetch が居ない
     expect(ids.length, "既定のスクリプトが走っていない").toBeGreaterThan(0);
     expect(
       ids,
-      "既定に autofetch が入っている —— 台帳は capture-scripts v0.5.0 以降を取り込んだか",
+      "既定に autofetch が入っている —— capture-ledger は capture-scripts v0.5.0 以降を取り込んだか",
     ).not.toContain("autofetch");
 
     const counts = (await json(await fetch(`${FIXTURES_HOST}/__request-counts`))) as Record<
@@ -543,16 +546,16 @@ describe("クロールが flow を通って索引まで終わる", () => {
   });
 
   /**
-   * **型が通らないスクリプトを台帳に入れると、クロールは compile の段で落ちる。**
+   * **型が通らないスクリプトを登録すると、クロールは compile の段で落ちる。**
    *
-   * 台帳のスクリプトは tag を経ずに CLI でも足せる。だから capture-scripts の CI が緑でも、走る前にもう 1 か所の
+   * 登録済みのスクリプトは tag を経ずに CLI でも足せる。だから capture-scripts の CI が緑でも、走る前にもう 1 か所の
    * 門番が要る —— flow の `compile` の段 (ts-compile-service)。ここではその門番が本当に段を落とし、
-   * 台帳が failed で締められる (fail_crawl) ことを見る。落ちる理由に型エラーの code が載るのは、
-   * Windmill の履歴を開かなくても台帳だけで「なぜ落ちたか」が読めるようにするため。
+   * capture-ledger の行が failed で締められる (fail_crawl) ことを見る。落ちる理由に型エラーの code が載るのは、
+   * Windmill の履歴を開かなくても capture-ledger だけで「なぜ落ちたか」が読めるようにするため。
    *
-   * 壊れた 1 本は試験の最後に台帳から消す。残すと以後のクロールが全部ここで落ちる。
+   * 壊れた 1 本は試験の最後に消す。残すと以後のクロールが全部ここで落ちる。
    */
-  it("型が通らないスクリプトを台帳に入れると、クロールは compile の段で落ちる", async () => {
+  it("型が通らないスクリプトを登録すると、クロールは compile の段で落ちる", async () => {
     const ledgerDir = process.env["E2E_LEDGER_DIR"] ?? resolve(process.cwd(), "../capture-ledger");
     const broken = fileURLToPath(new URL("./fixtures/broken-script.txt", import.meta.url));
     const ledger = (...args: string[]): string =>
@@ -579,8 +582,8 @@ describe("クロールが flow を通って索引まで終わる", () => {
         got = await json(await fetch(`${WAGGLE}/api/crawls/${crawlId}`, { headers: auth() }));
       }
       expect(got["state"], `stopReason=${String(got["stopReason"])}`).toBe("failed");
-      // fail_crawl が段の例外の文をそのまま reason に送り、台帳は crawls.error に入れて
-      // GET /api/crawls/:id の `error` で返す (stopReason は "failed" の 1 語)。診断の code まで台帳に残る
+      // fail_crawl が段の例外の文をそのまま reason に送り、capture-ledger は crawls.error に入れて
+      // GET /api/crawls/:id の `error` で返す (stopReason は "failed" の 1 語)。診断の code まで capture-ledger に残る
       const reason = String(got["error"]);
       expect(reason, "落ちた段が compile ではない").toContain("compile 422");
       expect(reason, "型エラーの code が error に無い").toContain("TS2322");
@@ -590,10 +593,10 @@ describe("クロールが flow を通って索引まで終わる", () => {
   });
 
   /**
-   * **その場の TS は、台帳のスクリプトと同じ道でページの中まで届く。** 台帳はスクリプトとして登録せずに行の写しを作り
+   * **その場の TS は、登録済みのスクリプトと同じ道でページの中まで届く。** capture-ledger はスクリプトとして登録せずに行の写しを作り
    * (`inline-<name>`・版 1)、flow は区別せずに変換して BrowserHive へ渡す。並びは頼んだとおり。
    */
-  it("その場の TS と台帳のスクリプトを並べると、頼んだ順に写り、どちらもページの中で走る", async () => {
+  it("その場の TS と登録済みのスクリプトを並べると、頼んだ順に写り、どちらもページの中で走る", async () => {
     await resetFixtures();
     const run = randomUUID().slice(0, 8);
     const got = await finished(
@@ -627,9 +630,9 @@ describe("クロールが flow を通って索引まで終わる", () => {
       }),
     );
     expect(back["source"], "名前で引くエンドポイントが、書いた TS を返さない").toBe(probe(run));
-    // どちらも変換され、走った JS の hash が報告で台帳に戻っている
+    // どちらも変換され、走った JS の hash が報告で capture-ledger に戻っている
     for (const script of scripts) {
-      expect(script.jsSha256, `${script.id}: JS の hash が台帳に戻っていない`).toMatch(
+      expect(script.jsSha256, `${script.id}: JS の hash が capture-ledger に戻っていない`).toMatch(
         /^[0-9a-f]{64}$/,
       );
     }
@@ -641,9 +644,10 @@ describe("クロールが flow を通って索引まで終わる", () => {
       counts[mark(run, "complete")] ?? 0,
       "その場の TS が、読み込みの後に走っていない",
     ).toBeGreaterThan(0);
-    expect(counts["/assets/hero-2x.svg"] ?? 0, "台帳の autofetch が走っていない").toBeGreaterThan(
-      0,
-    );
+    expect(
+      counts["/assets/hero-2x.svg"] ?? 0,
+      "登録済みの autofetch が走っていない",
+    ).toBeGreaterThan(0);
   });
 
   /**
@@ -686,8 +690,8 @@ describe("クロールが flow を通って索引まで終わる", () => {
   });
 
   /**
-   * **型の通らないその場の TS は、compile の段でクロールごと落ちる。** 台帳の broken の試験と違い、
-   * CLI で台帳に入れて消す手間が無い —— その場の TS は行の写しにだけ在る。
+   * **型の通らないその場の TS は、compile の段でクロールごと落ちる。** 登録したスクリプトの broken の試験と違い、
+   * CLI で登録して消す手間が無い —— その場の TS は行の写しにだけ在る。
    */
   it("型の通らないその場の TS は、compile の段でクロールごと落ちる", async () => {
     const got = await finished(
@@ -714,7 +718,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
 
   /**
    * **型の誤りがいくつあっても、クロールは failed で締まり、次を塞がない。** 束ねた JS を貼ると
-   * 診断は数百件になる。全部を reason に載せると台帳の /failed（2,000 字まで）が 400 で断り、
+   * 診断は数百件になる。全部を reason に載せると capture-ledger の /failed（2,000 字まで）が 400 で断り、
    * running の行が残って、次のクロールが全部 409 になる（v0.24.2 まで）。
    */
   it("型の誤りが多い TS でも、クロールは failed で締まり、次を塞がない", async () => {
@@ -735,13 +739,15 @@ describe("クロールが flow を通って索引まで終わる", () => {
         ],
       }),
     );
-    expect(got["state"], "締まらずに running のまま —— 失敗の文を台帳が断った").toBe("failed");
+    expect(got["state"], "締まらずに running のまま —— 失敗の文を capture-ledger が断った").toBe(
+      "failed",
+    );
     const reason = String(got["error"]);
     expect(reason, "件数が error に無い").toContain("型の誤り 300 件");
     expect(reason, "最初の診断が、その場の TS の行を名指していない").toContain(
       "inline-many.ts:2:9 TS2322",
     );
-    expect(reason.length, "reason が台帳の上限を超えた").toBeLessThanOrEqual(2000);
+    expect(reason.length, "reason が capture-ledger の上限を超えた").toBeLessThanOrEqual(2000);
 
     // 次を塞がない —— 締まっていなければ、ここは 409 で startCrawl が赤くなる
     const next = await finished(
@@ -756,7 +762,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
  * ごとにリンクを 1 本ずつ持つ頁 (同じホストのリーフ・暦の罠・落とすドメイン・外のホスト)。
  *
  * 判定は 3 か所で見る。**相手が受け取った物**は capture-fixtures のリクエストログ、**取りに行ったが届かな
- * かった物** (外の 2 本はどちらも `.invalid` で、相手のログには来ない) は台帳の失敗、**台帳が決めた物**は
+ * かった物** (外の 2 本はどちらも `.invalid` で、相手のログには来ない) は capture-ledger に載った失敗、**capture-ledger が決めた物**は
  * 判断のエンドポイントと、それを Windmill で描く調べ物の script。
  */
 describe("規則の並びで辿る", () => {
@@ -767,20 +773,20 @@ describe("規則の並びで辿る", () => {
     { capture: "any" },
   ];
 
-  it("前方一致とドメインで落とし、外は撮るだけにする。台帳の判断と Windmill の調べ物が同じことを言う", async () => {
+  it("前方一致とドメインで落とし、外は撮るだけにする。capture-ledger の判断と Windmill の調べ物が同じことを言う", async () => {
     await resetFixtures();
     const crawlId = await startCrawl({
       seeds: [`${FIXTURES}/links/rules`],
       maxDepth: 2,
       maxPages: 20,
       rules: RULES,
-      // 規則だけを見る。台帳のスクリプトは走らせない (速く、台帳の中身に左右されない)
+      // 規則だけを見る。登録済みのスクリプトは走らせない (速く、何が登録されているかに左右されない)
       scripts: [],
     });
     const crawl = await finished(crawlId);
     expect(crawl["state"], `stopReason=${String(crawl["stopReason"])}`).toBe("succeeded");
 
-    // ① 相手が受け取った物。台帳は「記録したこと」しか言わない
+    // ① 相手が受け取った物。capture-ledger は「記録したこと」しか言わない
     const paths = Object.keys(await requestCounts());
     expect(paths).toContain("/links/rules");
     expect(paths, "同じホストを辿る規則で、リーフを取っていない").toContain("/links/leaf/1");
@@ -796,7 +802,7 @@ describe("規則の並びで辿る", () => {
       "http://skipped.invalid/page",
     );
 
-    // ③ 台帳が残した判断。どの規則も別々の URL 1 本ずつ。/links/rules に robots で禁じた頁は無い
+    // ③ capture-ledger が残した判断。どの規則も別々の URL 1 本ずつ。/links/rules に robots で禁じた頁は無い
     const decided = await json(
       await fetch(`${WAGGLE}/api/crawls/${crawlId}/decisions`, { headers: auth() }),
     );

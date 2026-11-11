@@ -1,7 +1,7 @@
 /**
  * capture-ledger に合本のエンドポイントが在るかの読み分け (CAPTURE-57)。
  *
- * 名乗らずに、形の合う本文で叩くので、エンドポイントが在れば 401。404 を ✓ にすると、合本のエンドポイントの無い古い台帳の上で、どの
+ * 名乗らずに、形の合う本文で叩くので、エンドポイントが在れば 401。404 を ✓ にすると、合本のエンドポイントの無い古い capture-ledger の上で、どの
  * クロールも合本の段で落ちるのを doctor が見逃す (合本の段は 404 で投げる)。
  */
 import { describe, expect, it } from "vitest";
@@ -21,7 +21,7 @@ describe("readReplayBundleRoute", () => {
     });
   });
 
-  it("404 なら ✗ で、台帳に合本のエンドポイントが無い（capture-ledger が古い）と言う", () => {
+  it("404 なら ✗ で、capture-ledger に合本のエンドポイントが無い（capture-ledger が古い）と言う", () => {
     const verdict = readReplayBundleRoute({
       status: 404,
       body: `{"message":"Route POST:${REPLAY_BUNDLE_PROBE} not found","error":"Not Found","statusCode":404}`,
@@ -41,7 +41,7 @@ describe("readReplayBundleRoute", () => {
     expect(need(verdict)).toContain("版の組");
   });
 
-  it("名乗っていないのに 200 なら ✗（名乗りを見ない台帳）", () => {
+  it("名乗っていないのに 200 なら ✗（名乗りを見ない capture-ledger）", () => {
     const verdict = readReplayBundleRoute({ status: 200, body: "{}" });
     expect(verdict.ok).toBe(false);
     expect(need(verdict)).toContain("401 のはず");

@@ -101,7 +101,7 @@ export const CRAWL_FLOW_PATH = "f/waggle/crawl_level";
 /**
  * capture-ledger が host から ts-compile を呼ぶ宛先。compose が `127.0.0.1:28080` に出すポート
  * (`docker-compose.yml` の ts-compile の `ports`)。**doctor が叩く先 (host→ts-compile) と、capture-ledger に
- * 渡す値 (`ledgerEnv`) は同じでなければならない** —— 違えば、doctor は ✓ なのに、台帳の型の誤りの取り直しと
+ * 渡す値 (`ledgerEnv`) は同じでなければならない** —— 違えば、doctor は ✓ なのに、capture-ledger の型の誤りの取り直しと
  * 直し方のエンドポイントだけが 503 になる。だから 1 か所で決める。
  */
 export const HOST_TS_COMPILE = "http://127.0.0.1:28080";
@@ -134,8 +134,8 @@ export const ledgerEnv = ({
   "CAPTURE_LEDGER_API_HOST=0.0.0.0",
   // flow が JWT で名乗る先 (CAPTURE_LEDGER_OIDC_ISSUER と CLIENT_IDS) は、ここでは渡さない ——
   // 値を決めるのは capture-ledger の idp:bootstrap (Floci のプールの ID が iss に入る)。
-  // 型で落ちたクロールの誤りの取り直しと、直し方の検査 (capture-ledger v0.69.0 以降)。台帳は host で動くので、
-  // 名前ではなく host に出したポートで呼ぶ。Claude の鍵があってこれが無いと、台帳の API は起動で止まる。
+  // 型で落ちたクロールの誤りの取り直しと、直し方の検査 (capture-ledger v0.69.0 以降)。capture-ledger は host で動くので、
+  // 名前ではなく host に出したポートで呼ぶ。Claude の鍵があってこれが無いと、capture-ledger の API は起動で止まる。
   `CAPTURE_LEDGER_TS_COMPILE_URL=${HOST_TS_COMPILE}`,
 ];
 

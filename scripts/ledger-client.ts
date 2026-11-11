@@ -1,7 +1,7 @@
 /**
- * Windmill の flow が台帳 (capture-ledger) に名乗るための、app client の設定とトークンの取り方。
+ * Windmill の flow が capture-ledger に名乗るための、app client の設定とトークンの取り方。
  *
- * 台帳の IdP は Amazon Cognito。手元は代役の Floci で、capture-ledger の compose のサービス `idp` に在る
+ * capture-ledger の IdP は Amazon Cognito。手元は代役の Floci で、capture-ledger の compose のサービス `idp` に在る
  * (CAPTURE-185)。flow は機械なので、人のサインインではなく client credentials で M2M の access token を取る。
  * トークンは最長 1 日しかもたないので、変数に入れて使い回さず、使うたびに取る。
  *
@@ -25,7 +25,7 @@ export const RETIRED_TOKEN_VAR = "u/admin/waggle_token";
 export const IDP_HANDOFF = ".dev/idp.env";
 
 export interface LedgerClient {
-  /** トークンの iss。台帳が照らす値で、その下に鍵 (JWKS) と discovery が在る。 */
+  /** トークンの iss。capture-ledger が照らす値で、その下に鍵 (JWKS) と discovery が在る。 */
   issuer: string;
   /** flow (コンテナ) から届く token endpoint。 */
   tokenUrl: string;

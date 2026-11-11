@@ -12,7 +12,7 @@ import {
 /**
  * クロール 1 本の判断を読む調べ物の script。
  *
- * 判断そのものは台帳の物で、ここは引いて描くだけ。押さえるのは **違うクロールを読まないこと**
+ * 判断そのものは capture-ledger の物で、ここは引いて描くだけ。押さえるのは **違うクロールを読まないこと**
  * (前の字の引き当て) と、**読み違えない描き方** (0 回の規則の印・どれにも当たらない物・robots)。
  */
 
@@ -36,7 +36,7 @@ const listed = (crawlId: string, startedAt: string) => ({
   seeds: ["http://capture-fixtures.capture-ledger:8080/links/rules"],
 });
 
-/** 一覧のページを順に返す偽の台帳。引かれた path を記録する。 */
+/** 一覧のページを順に返す偽の capture-ledger。引かれた path を記録する。 */
 const pages = (...answers: { crawls: unknown[] }[]) => {
   const asked: string[] = [];
   const get = (<T>(path: string): Promise<T> => {
@@ -236,7 +236,7 @@ describe("クロール 1 本の判断を描く", () => {
   });
 });
 
-describe("台帳を引く", () => {
+describe("capture-ledger を引く", () => {
   it("クロールの答えと判断を、変数の宛先とトークンで引いて描く", async () => {
     const seen: { url: string; auth: string | null }[] = [];
     vi.stubGlobal(
@@ -259,7 +259,7 @@ describe("台帳を引く", () => {
     expect(rendered.render_all).toHaveLength(5);
   });
 
-  it("台帳が断れば、状態と本文を言って落ちる", async () => {
+  it("capture-ledger が断れば、状態と本文を言って落ちる", async () => {
     vi.stubGlobal(
       "fetch",
       answeringToken(() =>

@@ -17,7 +17,7 @@
  *   4. スクリーンショットの参照 —— windmill-ui のページが import する画像が実在するか。
  *      **両方向** で見る: assets/windmill-ui/ に在るのにどのページからも import され
  *      ない置き去りの PNG も落とす (撮ったが使われない写真は腐る)。shots-manifest.json は
- *      台帳なので参照検査から除く。
+ *      撮影条件の記録なので参照検査から除く。
  *   5. スクショの版 —— shots-manifest.json の windmillVersion が docker-compose.yml の
  *      windmill の pin と一致するか。**compose を上げたら撮り直せ** を機械で言う。
  *      UI が変わったのに写真が古い、を緑で出荷させない (pnpm run docs:shots が撮る)。

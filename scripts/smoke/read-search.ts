@@ -1,13 +1,13 @@
 /**
  * smoke が、撮った 1 本が **索引に載り、検索に当たる** ところまでを読む (CAPTURE-53)。
  *
- * 台帳は段の報告の時点でクロールを succeeded にし、その後に flow の索引の段が走る。だから succeeded を
+ * capture-ledger は段の報告の時点でクロールを succeeded にし、その後に flow の索引の段が走る。だから succeeded を
  * 見ただけでは、索引が載ったかは分からない —— smoke は段の run の終わりを待ち、索引の段の答え
- * (`pending・indexed・failed・pages`) を読み、撮った頁の語で台帳の検索を引いて、当たった時点を照らす。
+ * (`pending・indexed・failed・pages`) を読み、撮った頁の語で capture-ledger の検索を引いて、当たった時点を照らす。
  *
  * **当たるはずの時点は、その WACZ のページ一覧から決める。** BrowserHive v25.0.0 から、ページ一覧の
- * 1 行目は取り込んだ文書の行 (stage が無い) で、写しがあればその後に時点ごとの行が並ぶ。台帳
- * (capture-ledger v0.70.0 から) は、写しの行があれば写しの時点だけを索引に入れ、文書の行は入れない
+ * 1 行目は取り込んだ文書の行 (stage が無い) で、写しがあればその後に時点ごとの行が並ぶ。capture-ledger
+ * (v0.70.0 から) は、写しの行があれば写しの時点だけを索引に入れ、文書の行は入れない
  * (文書の行は after-behaviors の写しとほぼ同じ文なので、入れると同じ語が 1 本で 2 回当たる)。写しの行が
  * 無ければ、文書の行の 1 件 (`page`) を入れる。
  *
@@ -35,7 +35,7 @@ export const SMOKE_PAGE = "smoke";
  * capture-fixtures の印付きの頁は、題に `title-<名前>-<印>`、本文に `text-<名前>-<印>` を書く。**印を
  * 撮るたびに変える**ので、印で引けば、この回の archive にだけ当たる —— 前の回の取り込みが索引に
  * 残っていても混ざらない (検索は 1 回 50 件まで。同じ語の当たりが溜まると、この回が外れうる)。
- * 印は capture-fixtures の決まり (`^[a-z0-9-]{1,32}$`) に収め、`-` を含めない —— 台帳の解析器は `-` で
+ * 印は capture-fixtures の決まり (`^[a-z0-9-]{1,32}$`) に収め、`-` を含めない —— capture-ledger の解析器は `-` で
  * 語を切るので、`-` の無い 1 語にしておけば、印そのもので引ける。
  */
 export const smokeTarget = (
@@ -95,7 +95,7 @@ export const readIndexStep = (outcome: IndexOutcome | undefined): Reading | unde
   if (outcome.indexed < 1) {
     return {
       evidence: `索引の段が載せたアーカイブは 0 本 (待っていた ${String(outcome.pending)} 本)`,
-      fix: "この回の archive が台帳に載る前に索引の段が走った —— run を開いて report と index の段の log を見る",
+      fix: "この回の archive が capture-ledger に載る前に索引の段が走った —— run を開いて report と index の段の log を見る",
     };
   }
   return undefined;

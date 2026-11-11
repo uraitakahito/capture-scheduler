@@ -19,14 +19,14 @@ report_level         capture-ledger に報告し、次の段があるかを受�
   ↓
 replay_bundle_level  クロールの合本（replay が 1 つのアーカイブとして開く）を書き直すよう capture-ledger に頼む
   ↓
-index_level          台帳に載ったぶんを索引に載せるよう capture-ledger に頼む
+index_level          記録に載ったぶんを索引に載せるよう capture-ledger に頼む
 ```
 
 `compile_scripts` は、この flow で唯一、スタックの外のサービスを呼ぶ段 ——
 [ts-compile-service](https://github.com/uraitakahito/ts-compile-service) で、この repo の
 compose の `ts-compile` として動く。1 本でも型が通らなければサービスは 422 を返し、段が投げる。
 flow は `fail_crawl` へ落ち、クロールは診断の件数と最初の 5 件を reason に載せて `failed` で終わる。
-reason は台帳の上限の 2,000 字に切る。超えると台帳が報告を断り、クロールは running のまま残って、
+reason は capture-ledger の上限の 2,000 字に切る。超えると capture-ledger が報告を断り、クロールは running のまま残って、
 後のクロールを全部塞ぐ。型が通らないスクリプトはページに届かない。
 
 `replay_bundle_level` も報告の後に走る。段の深さ（`depth`）を capture-ledger の `POST /api/crawls/:id/replay-bundle`
@@ -37,14 +37,14 @@ reason は台帳の上限の 2,000 字に切る。超えると台帳が報告を
 OpenSearch に頼らないから —— 索引の段が落ちても合本は書かれる。
 
 合本は撮った物から作る派生物で、作り直せる（capture-ledger の `pnpm run replay-bundle:rebuild --crawl <id>`）。
-だから**この段は、台帳が 200 で答えたものでは投げない** —— 保管庫に書けなかった（`error`）、検められなかった
+だから**この段は、capture-ledger が 200 で答えたものでは投げない** —— 保管庫に書けなかった（`error`）、検められなかった
 WACZ がある（`failed` が 1 以上。次の合本が拾い直す）、入れる WACZ がまだ無い（`rev: null`）。1 行のログに書いて
 返す。投げると索引の段が飛び、`fail_crawl` がクロールを `failed` で締める（次の段が既に走っていても）。投げるのは、
-台帳が 200 で答えなかったとき（400 は本文の形、401 はトークン、404 はクロールが無いか、トークンの `sub` にクロールの
+capture-ledger が 200 で答えなかったとき（400 は本文の形、401 はトークン、404 はクロールが無いか、トークンの `sub` にクロールの
 許可が無いか、capture-ledger が古くエンドポイントが無い、5xx）と、答えの形が違うときだけ。
 
 `index_level` は報告の後に走るので、そのとき capture-ledger はもうクロールを締めている（または
-次の段を始めている）。全文検索は capture-ledger の必須の部品なので、この段は何も飛ばさない —— 台帳が 404
+次の段を始めている）。全文検索は capture-ledger の必須の部品なので、この段は何も飛ばさない —— capture-ledger が 404
 （クロールが無いか、トークンの `sub` にクロールの許可が無い）・503（OpenSearch が答えない）・`failed` が 1 以上の
 202（索引に載らなかったアーカイブがある）を返せば投げる。最後の段なら、クロールは `succeeded` のまま、
 Windmill の run だけが赤くなる —— `pnpm run smoke` は run の終わりを待って、それを言う。
@@ -134,14 +134,14 @@ Windmill は schema の既定値を **UI からの実行にしか埋めない**�
 引数で届くのは、そのクロールについて capture-ledger が決めて**必ず送る**もの —— URL と
 間隔、`capture_formats` / `signing`、**`scripts`**（ページの中で走らせる TypeScript）、そして
 **`variables` / `secrets` / `secret_archive`**（クロールごとの値。[下の節](#クロールごとの値--変数とシークレット)）。
-台帳が持つのは書いたままの TS で、`sha256` はそのバイト列に打たれている。`compile_scripts` が
+capture-ledger が持つのは書いたままの TS で、`sha256` はそのバイト列に打たれている。`compile_scripts` が
 JS にして hash を打ち直し、BrowserHive は JS の hash を照合する。2 つの hash はその 1 段で継がれる。
 `report_level` はその JS の hash を、サービスが名乗った compiler の版と受け皿の型の tag と一緒に
-capture-ledger へ運ぶ（段の報告の `compiled`）。台帳はそれをクロールの TS の hash の隣に書き、
+capture-ledger へ運ぶ（段の報告の `compiled`）。capture-ledger はそれをクロールの TS の hash の隣に書き、
 後の段が違う hash を報告すれば 409 で断る。スクリプトが空のクロール（`scripts: []`）も 1 段として通る。
 サービスは 200 で scripts 無しを返し、ページでは何も走らず、報告には typescript と hostTypes が付く。
 その場で書いた TS（`scripts` の `inline` の要素）も同じ道を通る。capture-ledger がクロールに
-`inline-<name>` で固定し、flow は台帳のスクリプトと同じく変換して差し込む。
+`inline-<name>` で固定し、flow は登録済みのスクリプトと同じく変換して差し込む。
 
 `scripts` を必須にしてあるのは `capture_formats` と同じ理由。BrowserHive v11.0.0 は
 走らせるものの顔ぶれを持たないので、送らなければページの中では何も走らず、**それでも
@@ -191,24 +191,24 @@ robots.txt の規則を照らすのに使う: 字に `BrowserHive` があれば�
 どちらも受け皿で、`defineParams` は JS で `__bh.vars` に置き換わる。
 **flow はどちらも運ぶだけで中身を見ない。**
 
-| 経路             | 台帳が送る物                                                                                                 | `crawl_host` がすること                                                                    | 記録に残る物                                                                                   |
-| ---------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| `variables`      | 名前 → 値。`POST /api/crawls` の `variables` で頼んだ物を台帳が固定する                                      | そのまま BrowserHive の要求に載せる                                                        | 値（WACZ の `settings.variables`・台帳の行）                                                   |
-| `secrets`        | 名前 → Windmill の変数の path（`f/waggle_secrets/<名前>`）。スクリプトの宣言から台帳が集め、在るかを確かめる | `getVariable` で値に解き、BrowserHive の要求に**だけ**載せる。フォルダの外の path は投げる | 名前だけ（WACZ の `settings.secrets`。台帳の行には path と、置いた時刻）                       |
-| `secret_archive` | 値を WARC に残すシークレットの名前 → `"keep"`（宣言の `archive: "keep"`）。無ければ `{}`                     | 要求の `secretArchive` に載せる。**`secrets` で解いた名前だけを残す**                      | どのシークレットを残したか（`settings.secretArchive`）。ほかのシークレットの値は WARC で `***` |
+| 経路             | capture-ledger が送る物                                                                                                  | `crawl_host` がすること                                                                    | 記録に残る物                                                                                   |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `variables`      | 名前 → 値。`POST /api/crawls` の `variables` で頼んだ物を capture-ledger が固定する                                      | そのまま BrowserHive の要求に載せる                                                        | 値（WACZ の `settings.variables`・capture-ledger の行）                                        |
+| `secrets`        | 名前 → Windmill の変数の path（`f/waggle_secrets/<名前>`）。スクリプトの宣言から capture-ledger が集め、在るかを確かめる | `getVariable` で値に解き、BrowserHive の要求に**だけ**載せる。フォルダの外の path は投げる | 名前だけ（WACZ の `settings.secrets`。capture-ledger の行には path と、置いた時刻）            |
+| `secret_archive` | 値を WARC に残すシークレットの名前 → `"keep"`（宣言の `archive: "keep"`）。無ければ `{}`                                 | 要求の `secretArchive` に載せる。**`secrets` で解いた名前だけを残す**                      | どのシークレットを残したか（`settings.secretArchive`）。ほかのシークレットの値は WARC で `***` |
 
-どれも空なら鍵ごと送らない（v21 までの BrowserHive は知らない欄を 400 で断る）。古い台帳は
+どれも空なら鍵ごと送らない（v21 までの BrowserHive は知らない欄を 400 で断る）。古い capture-ledger は
 どれも送らないので flow からは `null` で届き、`crawl_host` は「無い」と読む —— `artifact_sink` も
 同じ扱いにした（以前は `undefined` しか見ておらず、省いた配備では `null` を送っていた）。`secret_archive` が
 届かなければ全部のシークレットを隠すので、安全な側に倒れる。逆向きに、`secret_archive` の入力を持たない古い flow も、
-この引数を断らない。Windmill は既定で引数を flow の schema に照らさず（台帳が `frontier` の要素に足す `lastFinishedAt` は、
+この引数を断らない。Windmill は既定で引数を flow の schema に照らさず（capture-ledger が `frontier` の要素に足す `lastFinishedAt` は、
 schema に無いまま `plan_level` まで届いてきた）、運ぶ段が無いので、そこでも値は隠れる。
 
 **BrowserHive は WARC の中でもシークレットの値を隠す**（v29.0.0 から）。スクリプトが送った値もサイトが返した値も、
 `secretArchive` に名前の無い物は `***` になる。`crawl_host` が `secretArchive` に残すのは、自分が組んだ `secrets` に在る
 名前だけ —— BrowserHive は `secrets` に無い名前を 400 で断り、それは 1 ページではなくクロールの全部の取り込みに当たる。
-台帳も行に固定した名前だけを送るが、ここでも見直す。BrowserHive は 8 字未満の隠す値と、隠す値を書いた取り込みの URL も
-断るので、そうしたクロールはページごとに BrowserHive の 400 で失敗する（台帳は値を見ないので先に断れない）。
+capture-ledger も行に固定した名前だけを送るが、ここでも見直す。BrowserHive は 8 字未満の隠す値と、隠す値を書いた取り込みの URL も
+断るので、そうしたクロールはページごとに BrowserHive の 400 で失敗する（capture-ledger は値を見ないので先に断れない）。
 
 ### シークレットは Windmill の変数
 
@@ -219,13 +219,13 @@ schema に無いまま `plan_level` まで届いてきた）、運ぶ段が無�
 pnpm run windmill:cli variable add '<値>' f/waggle_secrets/<名前> --secret --description '<何の鍵か>'
 ```
 
-- 名前はスクリプトが宣言した綴り（`^[a-z][a-z0-9_]*$`）。path を組むのは台帳で、`crawl_host` は
+- 名前はスクリプトが宣言した綴り（`^[a-z][a-z0-9_]*$`）。path を組むのは capture-ledger で、`crawl_host` は
   `f/waggle_secrets/` の外の path を名前と一緒に投げる。
 - フォルダ `f/waggle_secrets` は `windmill/f/waggle_secrets/folder.meta.yaml` が正で、`windmill:push` が作る。
   **API や UI で作ったフォルダは次の push で消える**（`wmill sync push` は手元に無いフォルダを消す）。中の変数は
   同期しない（`skipVariables`）ので、push で消えも増えもしない。`pnpm run doctor` の「シークレットのフォルダ」が
   在るかを見る。
-- 宣言したシークレットが Windmill に無ければ、台帳はクロールを始めずに 400 で名前と path を言う。
+- 宣言したシークレットが Windmill に無ければ、capture-ledger はクロールを始めずに 400 で名前と path を言う。
   `crawl_host` が解くときに無い（クロールの途中で消された）なら段ごと落ち、`fail_crawl` が締める。
 - 値が通るのは、Windmill の worker から BrowserHive への要求の本文だけ。run の履歴に載る引数は path。
   Windmill の job のログは、secret の値の全体一致を `zzp*****c3b` の形に伏せる（1.806.0 で実測。部分文字列は
@@ -233,4 +233,4 @@ pnpm run windmill:cli variable add '<値>' f/waggle_secrets/<名前> --secret --
   側の扱い（残すと言わなければ WARC でも隠す・ログで伏せる・頁の JS からは読める）は BrowserHive の docs を見ること。
 
 予定の `request` は `POST /api/crawls` と同じ形なので、`variables` も書ける。シークレットは書かない —— スクリプトが
-宣言した名前を、台帳が回ごとに Windmill の変数に結ぶので、定期の回でも手で始めたクロールでも同じ値が届く。
+宣言した名前を、capture-ledger が回ごとに Windmill の変数に結ぶので、定期の回でも手で始めたクロールでも同じ値が届く。

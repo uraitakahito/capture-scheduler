@@ -15,7 +15,7 @@ description: |
   報告のあとに 2 段足してある。合本を書かせる段 (replay_bundle) と、索引に載せる段 (index)。
   合本は、そのクロールの WACZ を全部並べた replay.json と頁の行の pages.json の組で、replay が
   1 つのアーカイブとして開く。合本を先に置くのは、合本が OpenSearch に頼らないから —— 索引が
-  落ちても合本は書かれる。合本の段は、台帳が 200 で返す失敗 (保管庫に書けない など) では投げない。
+  落ちても合本は書かれる。合本の段は、capture-ledger が 200 で返す失敗 (保管庫に書けない など) では投げない。
   投げると索引の段が飛び、クロールが failed で締められる。何を入れ・何を載せるかを選ぶのは
   capture-ledger で、ここが渡すのは crawl_id と段の深さだけ —— 判断を、単体試験の無い場所に置かないため。
 
@@ -45,7 +45,7 @@ value:
           user_agent:
             type: javascript
             expr: flow_input.user_agent
-    # **TS のスクリプトを JS にする。** 台帳が持つのは書いたままの TS (sha256 は TS のバイト列)。
+    # **TS のスクリプトを JS にする。** capture-ledger が持つのは書いたままの TS (sha256 は TS のバイト列)。
     # BrowserHive が評価するのは JS (sha256 は JS のバイト列)。その継ぎ目がこの段で、
     # 変換するのは ts-compile-service —— 型が通らなければ 422 でこの段が落ち、failure_module が
     # クロールを failed で締める。通らない TS を黙って走らせない。
@@ -106,7 +106,7 @@ value:
                 # crawl_host (f/waggle_secrets/ の下だけ)。secret_archive は値を WARC に残すシークレットの
                 # 名前 → "keep" で、crawl_host が解いた名前だけを BrowserHive の secretArchive にする。ここを
                 # 書き忘れると null で届き、keep の値も隠れる (残すつもりの値が黙って消える側に倒れる)。
-                # 古い台帳はどれも送らないので null で届き、crawl_host が「無い」と読む。
+                # 古い capture-ledger はどれも送らないので null で届き、crawl_host が「無い」と読む。
                 variables:
                   type: javascript
                   expr: flow_input.variables
@@ -117,7 +117,7 @@ value:
                   type: javascript
                   expr: flow_input.secret_archive
                 # 頼まれた User-Agent。**flow は運ぶだけで解かない** ({chrome} を解くのは BrowserHive)。
-                # 台帳は必ず文字列を送る (指定なしは "")。ここを書き忘れると null で届き、crawl_host が投げる。
+                # capture-ledger は必ず文字列を送る (指定なしは "")。ここを書き忘れると null で届き、crawl_host が投げる。
                 user_agent:
                   type: javascript
                   expr: flow_input.user_agent
@@ -157,14 +157,14 @@ value:
                 results.plan.skipped.map((s) => ({ url: s.url, status: "skipped", skipReason: s.reason }))
               )
           # compile の段の出力そのもの。JS の sha256 と、何で・何に向けて変換したか。
-          # report_level が身元と hash だけに削って台帳へ運ぶ
+          # report_level が身元と hash だけに削って capture-ledger へ運ぶ
           compiled:
             type: javascript
             expr: results.compile
-    # **合本を書かせる。** 報告の後なので、この段で台帳に載った WACZ も入る。index より前に置くのは、
-    # 合本が OpenSearch に頼らないから。台帳が 200 で返す失敗では投げない (replay_bundle_level.ts) ——
-    # ここで投げると index が飛び、failure_module がクロールを failed で締める。depth は台帳が
-    # replay.json に記録するだけで、版は台帳が払い出す。
+    # **合本を書かせる。** 報告の後なので、この段で capture-ledger に載った WACZ も入る。index より前に置くのは、
+    # 合本が OpenSearch に頼らないから。capture-ledger が 200 で返す失敗では投げない (replay_bundle_level.ts) ——
+    # ここで投げると index が飛び、failure_module がクロールを failed で締める。depth は capture-ledger が
+    # replay.json に記録するだけで、版は capture-ledger が払い出す。
     - id: replay_bundle
       summary: 合本を書かせる (replay で 1 つのアーカイブとして開ける形)
       value:
@@ -309,7 +309,7 @@ schema:
       # 届き、crawl_host が getVariable で解いて BrowserHive にだけ渡す。flow の入力にも run の履歴にも
       # 値は現れない。BrowserHive (v29.0.0 から) は値を WARC でも既定で隠す (secret_archive に在る物だけ残す)。
       type: object
-      description: クロールごとのシークレット (名前 → Windmill の変数の path)。crawl_host が解き、スクリプトが __bh.secrets で読む。値は台帳にも run の引数にも無く、WARC では既定で *** に置き換わる
+      description: クロールごとのシークレット (名前 → Windmill の変数の path)。crawl_host が解き、スクリプトが __bh.secrets で読む。値は capture-ledger にも run の引数にも無く、WARC では既定で *** に置き換わる
       additionalProperties:
         type: string
     secret_archive:
@@ -329,7 +329,7 @@ schema:
   # capture-ledger が送るのは crawl_id / depth / frontier / 間隔 / 並列度 /
   # capture_formats / signing / scripts / variables / secrets / secret_archive / user_agent と、受け取り先を
   # 出している配備では artifact_sink。並列度は plan_level が BrowserHive のエンドポイントの数で頭打ちにしてから for-loop に渡る。
-  # schema に無い入力を台帳が送っても、Windmill は既定で引数を schema に照らさないので断らない (frontier の
+  # schema に無い入力を capture-ledger が送っても、Windmill は既定で引数を schema に照らさないので断らない (frontier の
   # 要素の lastFinishedAt も、ここに書いていないのに plan_level まで届いている)。
   # capture-ledger は自分がコンテナからどう見えるかを知らないし、flow の資格 (u/admin/ledger_client) も持っていない。
   #

@@ -9,11 +9,11 @@
  *
  * 失敗の文は 3 か所から来る:
  *
- *   台帳の error          flow が落ち、締める段 (fail_crawl) が `[段] 文` で締めたとき
- *   取れなかったページ     succeeded・0 ページ。理由は台帳の failures[].reason
- *   run の落ちた段の job   締める段も落ち、クロールが running のまま残ったとき
- *                          (段の報告と同じトークン・同じ宛先で締めるので、報告が 401・404・
- *                          届かない、のときは締めるのも同じ理由で落ちる)
+ *   capture-ledger の error  flow が落ち、締める段 (fail_crawl) が `[段] 文` で締めたとき
+ *   取れなかったページ       succeeded・0 ページ。理由は capture-ledger の failures[].reason
+ *   run の落ちた段の job     締める段も落ち、クロールが running のまま残ったとき
+ *                            (段の報告と同じトークン・同じ宛先で締めるので、報告が 401・404・
+ *                            届かない、のときは締めるのも同じ理由で落ちる)
  *
  * 入出力を持たない。訊くのは `smoke.ts`。
  */
@@ -96,7 +96,7 @@ export const readRun = (job: unknown): Run => {
 
 /**
  * 落ちた段の job から、投げられた文を読む。素の script の段だけが持っている —— for ループの
- * 段 (hosts) の job は `{ closed: true }` しか返さない (実測)。そのときは台帳の error を読む。
+ * 段 (hosts) の job は `{ closed: true }` しか返さない (実測)。そのときは capture-ledger の error を読む。
  */
 export const stepMessage = (job: unknown): string | undefined => {
   if (!isRecord(job) || !isRecord(job["result"])) return undefined;
@@ -106,7 +106,7 @@ export const stepMessage = (job: unknown): string | undefined => {
 
 /** 何を見て、何を直すか。smoke はこれを 2 行に印字する。 */
 export interface Reading {
-  /** 台帳か Windmill が言ったそのままの文と、その出どころ。 */
+  /** capture-ledger か Windmill が言ったそのままの文と、その出どころ。 */
   evidence: string;
   /** 意味と直し方。 */
   fix: string;
@@ -118,7 +118,7 @@ const DIG = `run を開いて、落ちた段の log を見る (${sectionUrl(SECT
 const API_STEPS = new Set(["report", "replay_bundle", "index", "failure"]);
 
 /**
- * 段の失敗の文 (台帳の `[段] 文`、または落ちた段の job の文) を、直し方に当てる。
+ * 段の失敗の文 (capture-ledger の `[段] 文`、または落ちた段の job の文) を、直し方に当てる。
  * 型はどれも実物で見たもの (`test/fixtures/crawl/`)。知らない型は文をそのまま出して run を見させる。
  */
 export const readStepFailure = (step: string | undefined, message: string): string => {
@@ -171,25 +171,28 @@ export const splitStep = (error: string): { step?: string; message: string } => 
 /**
  * running でなくなったクロール。撮れていれば undefined (中身を取り出せるかは smoke が見る)。
  *
- * **succeeded は 1 枚以上撮れたクロールだけ** (capture-ledger v0.77.0 から)。1 枚も撮れなければ台帳が failed で締め、
+ * **succeeded は 1 枚以上撮れたクロールだけ** (capture-ledger v0.77.0 から)。1 枚も撮れなければ capture-ledger が failed で締め、
  * error は段の名前の無い文になる。段の失敗 (`[段] 文`) とはそれで分かれる。
  */
 export const readFinished = (crawl: Crawl): Reading | undefined => {
   if (crawl.state === "succeeded") return undefined;
   if (crawl.error === null) {
     return {
-      evidence: `${crawl.state} (${crawl.stopReason ?? "理由なし"})、台帳に error が無い`,
+      evidence: `${crawl.state} (${crawl.stopReason ?? "理由なし"})、capture-ledger に error が無い`,
       fix: DIG,
     };
   }
   const { step, message } = splitStep(crawl.error);
   if (step !== undefined) {
-    return { evidence: `台帳の error: ${crawl.error}`, fix: readStepFailure(step, message) };
+    return {
+      evidence: `capture-ledger の error: ${crawl.error}`,
+      fix: readStepFailure(step, message),
+    };
   }
   const [first] = crawl.failures ?? [];
   if (first === undefined) {
     return {
-      evidence: `台帳の error: ${crawl.error}`,
+      evidence: `capture-ledger の error: ${crawl.error}`,
       fix: `取れなかったページの記録が無い。全部を robots.txt で見送った —— ${DIG}`,
     };
   }

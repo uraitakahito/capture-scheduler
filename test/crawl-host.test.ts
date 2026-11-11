@@ -41,7 +41,7 @@ interface Call {
 const CAPTURE = {
   formats: { png: false, webp: false, html: false, links: true, mhtml: false, wacz: true },
   signing: false,
-  // 走らせるものを持たないクロール。**これは異常ではない** —— 台帳が空配列を渡せば、
+  // 走らせるものを持たないクロール。**これは異常ではない** —— capture-ledger が空配列を渡せば、
   // ページの中では何も走らない。ここでは注入の形ではなく礼儀と再試行を見ているので、
   // いちばん静かな値を置く。
   scripts: [],
@@ -190,7 +190,7 @@ describe("結果の判定", () => {
   it("success でなければ失敗として、理由に status と message を残す", async () => {
     // 1 往復で答えが返るので、「まだ終わっていない」状態は存在しない。success でない
     // report はそれ自体が失敗。taskId は必ず載せる —— capture-ledger が manifest から
-    // 拾い直す鍵で、落とすと成果物が S3 に在っても永久に台帳へ入らない。
+    // 拾い直す鍵で、落とすと成果物が S3 に在っても永久に capture-ledger へ入らない。
     const endpoint = fakeEndpoint("bh-1", {
       responses: [{ status: "http_error", errorType: "http" }],
     });
@@ -381,7 +381,7 @@ describe("エンドポイントを選ぶ", () => {
   /**
    * **ここが「server が落ちているクロールが成功で完了する」を止めている。**
    *
-   * 潰すと、届かなかったことが「このページは取れない」として台帳に残り、しかも
+   * 潰すと、届かなかったことが「このページは取れない」として capture-ledger に残り、しかも
    * リンクが辿れないので木がそこで切れる。取れなかったのはページのせいではない。
    */
   it("全部居なければ 1 ページの失敗にせず、段ごと落とす", async () => {
@@ -596,7 +596,7 @@ describe("成果物の送り先", () => {
  * **走らせるものを運ぶ。** BrowserHive v11.0.0 から、サーバは顔ぶれを持たない ——
  * 送らなければページの中では何も走らず、それでも取り込みは成功してアーカイブも出る。
  *
- * この層は中身を見ない。見ているのは「台帳が渡したものが、2 つの phase に正しく分かれて、
+ * この層は中身を見ない。見ているのは「capture-ledger が渡したものが、2 つの phase に正しく分かれて、
  * 並びを保ったまま本文に載るか」だけ。欄の綴りは BrowserHive の model (`Script` は
  * id / source / sha256 / options、`behaviors` と `preload` は素の配列) —— 届く形は
  * e2e が本物の server で確かめる。
@@ -645,7 +645,7 @@ describe("ページで走らせるスクリプト", () => {
     expect(req.behaviors?.map((i) => i["id"])).toEqual(["b", "a", "c"]);
   });
 
-  it("version は送らない —— 版は台帳の言葉", async () => {
+  it("version は送らない —— 版は capture-ledger の言葉", async () => {
     // BrowserHive の `Script` は id / source / sha256 / options しか持たない。
     // どの版が走ったかは `crawls.scripts` とサーバのログが答える。
     const req = await sendWith([script("autoscroll", "behavior")]);
@@ -668,7 +668,7 @@ describe("ページで走らせるスクリプト", () => {
   });
 
   it("空なら、どちらの鍵も送らない", async () => {
-    // **これは異常ではない。** 台帳が「何も走らせない」と決めた形。
+    // **これは異常ではない。** capture-ledger が「何も走らせない」と決めた形。
     const req = await sendWith([]);
     expect(req).not.toHaveProperty("behaviors");
     expect(req).not.toHaveProperty("preload");
@@ -682,7 +682,7 @@ describe("ページで走らせるスクリプト", () => {
 });
 
 /**
- * **クロールごとの値を運ぶ。** 変数は台帳が固定した名前 → 値、シークレットは `main` が Windmill の
+ * **クロールごとの値を運ぶ。** 変数は capture-ledger が固定した名前 → 値、シークレットは `main` が Windmill の
  * 変数から解いた名前 → 値。この層は中身を見ず、要求の `variables` / `secrets` に載せるだけ。
  * 頁の中では受け皿の `__bh.vars` (スクリプトは `defineParams` で読む) / `__bh.secrets` になる。
  */
@@ -711,7 +711,7 @@ describe("頼まれた User-Agent", () => {
     expect(await sendWith("")).not.toHaveProperty("userAgent");
   });
 
-  it("届かなければ投げる。null は flow か台帳の取り違えで、黙って Headless のまま撮らせない", () => {
+  it("届かなければ投げる。null は flow か capture-ledger の取り違えで、黙って Headless のまま撮らせない", () => {
     expect(() => askedUserAgent(null)).toThrow(/user_agent/);
     expect(() => askedUserAgent(undefined)).toThrow(/user_agent/);
   });
@@ -787,7 +787,7 @@ describe("クロールごとの値", () => {
     expect(req.secretArchive).toEqual({ note: "keep" });
   });
 
-  it("送るシークレットが無ければ、secretArchive は鍵ごと送らない（台帳が keep を送っていても）", async () => {
+  it("送るシークレットが無ければ、secretArchive は鍵ごと送らない（capture-ledger が keep を送っていても）", async () => {
     const without = await sendWith({});
     expect(without).not.toHaveProperty("secretArchive");
     const seen: unknown[] = [];
@@ -836,7 +836,7 @@ describe("クロールごとの値", () => {
   });
 
   it("シークレットの値は結果に出ない", async () => {
-    // 値が在るのは BrowserHive への要求の本文だけ。PageResult に写れば、台帳の行と Windmill の
+    // 値が在るのは BrowserHive への要求の本文だけ。PageResult に写れば、capture-ledger の行と Windmill の
     // run の履歴に残る。
     const results = await captureHost(
       [fakeEndpoint("bh-1")],
@@ -853,7 +853,7 @@ describe("クロールごとの値", () => {
 });
 
 describe("flow が省いた入力", () => {
-  // Windmill CE の実測: flow の schema に在って台帳が送らなかった欄は null で届く (undefined ではない)。
+  // Windmill CE の実測: flow の schema に在って capture-ledger が送らなかった欄は null で届く (undefined ではない)。
   it("null も undefined も「無い」", () => {
     expect(given(null)).toBeUndefined();
     expect(given(undefined)).toBeUndefined();
@@ -888,7 +888,7 @@ describe("シークレットを解く", () => {
   });
 
   it("フォルダの外の path は読まずに投げ、名前と path を言う", async () => {
-    // 台帳が path を組むので届かないはず。届いたら運ぶ途中で入れ替わったか台帳が壊れたかで、
+    // capture-ledger が path を組むので届かないはず。届いたら運ぶ途中で入れ替わったか capture-ledger が壊れたかで、
     // 黙って他の変数 (ledger_client など) を読んで頁に渡してはいけない。
     const { asked, read } = reads({ "u/admin/ledger_client": "the-ledger-client" });
     await expect(resolveSecrets({ api_token: "u/admin/ledger_client" }, read)).rejects.toThrow(

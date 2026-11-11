@@ -3,18 +3,18 @@
  *
  * **クロールの通り道には居ない。** Windmill の画面で引数を書いて走らせる調べ物の道具で、何も書かない。
  *
- * 判断は台帳が決め、台帳に残している (`report_level.ts` の冒頭、capture-ledger の `crawl_decisions`)。
- * ここは台帳の `GET /api/crawls/:id/decisions` を引き、規則ごとの数と、落とした物を表に描くだけ
- * (Windmill の rich display の `render_all`)。run の中身は最長 30 日で消えるが、台帳の行はクロールが
+ * 判断は capture-ledger が決め、自分の DB に残している (`report_level.ts` の冒頭、capture-ledger の `crawl_decisions`)。
+ * ここは capture-ledger の `GET /api/crawls/:id/decisions` を引き、規則ごとの数と、落とした物を表に描くだけ
+ * (Windmill の rich display の `render_all`)。run の中身は最長 30 日で消えるが、capture-ledger の行はクロールが
  * ある限り残るので、いつでも走らせ直せる。
  */
 import * as wmill from "windmill-client";
 
-// ── 台帳に名乗るトークン（6 本が同じ物を持つ。test/ledger-token.test.ts が同じかを見る）──
+// ── capture-ledger に名乗るトークン（6 本が同じ物を持つ。test/ledger-token.test.ts が同じかを見る）──
 /**
- * 台帳 (capture-ledger) に名乗る access token を、client credentials で取る。
+ * capture-ledger に名乗る access token を、client credentials で取る。
  *
- * 台帳の IdP は Amazon Cognito (手元は代役の Floci)。Windmill の flow は機械なので、人のサインインは
+ * capture-ledger の IdP は Amazon Cognito (手元は代役の Floci)。Windmill の flow は機械なので、人のサインインは
  * 使えず、app client の ID と secret で M2M のトークンを取る。トークンは最長 1 日しかもたないので、
  * 変数に入れて使い回さず、段ごとに取る。設定は変数 `u/admin/ledger_client` (secret・JSON) から読む
  * —— 入れるのは capture-scheduler の `pnpm run windmill:capture-ledger-token`。
@@ -56,7 +56,7 @@ type Action = "follow" | "capture" | "skip";
 /** 規則 1 本。鍵が 1 つの object (`{ "skip": "ads.example.com" }`)。 */
 export type Rule = Partial<Record<Action, string>>;
 
-/** 台帳の `GET /api/crawls/:id` のうち、見出しに要る欄。 */
+/** capture-ledger の `GET /api/crawls/:id` のうち、見出しに要る欄。 */
 export interface CrawlDetail {
   crawlId: string;
   seeds: string[];
@@ -67,7 +67,7 @@ export interface CrawlDetail {
   maxPages: number;
 }
 
-/** 台帳の `GET /api/crawls/:id/decisions` の答え。 */
+/** capture-ledger の `GET /api/crawls/:id/decisions` の答え。 */
 export interface Decisions {
   rules: Rule[];
   decisions: {
@@ -97,7 +97,7 @@ export const ACTION_LABEL: Record<Action, string> = {
   skip: "落とす",
 };
 
-/** 前の字で探すとき、台帳の一覧を何ページまで読むか (新しい順)。 */
+/** 前の字で探すとき、capture-ledger の一覧を何ページまで読むか (新しい順)。 */
 export const LIST_PAGES = 10;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -223,7 +223,7 @@ export const renderCrawl = (detail: CrawlDetail, got: Decisions): Rendered => {
   };
 };
 
-/** 台帳を引く関数。設定は flow の段と同じ変数から読む (schema の既定値は UI からの実行にしか埋まらない)。 */
+/** capture-ledger を引く関数。設定は flow の段と同じ変数から読む (schema の既定値は UI からの実行にしか埋まらない)。 */
 const ledger = async (): Promise<Getter> => {
   const base = await wmill.getVariable("u/admin/waggle_api_url");
   const token = await ledgerToken();

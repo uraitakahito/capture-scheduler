@@ -11,7 +11,7 @@ import { readWacz, textOf } from "./helpers/wacz.js";
  * 違反の報告が飛ばないか、BrowserHive が終わりを待てるかは、本物を通さないと言えない。
  *
  * 判定は 2 か所で採る。相手が何を受け取ったかは capture-fixtures のリクエストログ、ページの中で何が起きたかは
- * 台帳の `GET /api/crawls/:id/pages/:page/log` (BrowserHive の答えのログ)。
+ * capture-ledger の `GET /api/crawls/:id/pages/:page/log` (BrowserHive の答えのログ)。
  *
  * ## `await` の後で動かす
  *

@@ -61,7 +61,7 @@ describe("撮れたとき・撮っている最中", () => {
   });
 });
 
-describe("台帳の error で終わったとき (締める段が締めた)", () => {
+describe("capture-ledger の error で終わったとき (締める段が締めた)", () => {
   it("F2 BrowserHive が 2 台とも止まっている → エンドポイントを挙げて stack:up", () => {
     const reading = readFinished(crawlOf("f2-browserhive-down"));
     expect(reading?.fix).toMatch(
@@ -70,7 +70,7 @@ describe("台帳の error で終わったとき (締める段が締めた)", () 
     expect(reading?.fix).toMatch(/pnpm run stack:up/);
   });
 
-  it("for ループの段 (hosts) の job に文は無い —— だから台帳の error を読む", () => {
+  it("for ループの段 (hosts) の job に文は無い —— だから capture-ledger の error を読む", () => {
     for (const name of ["f2-browserhive-down"]) {
       expect(failedRun(name).step).toBe("hosts");
       expect(stepMessage(fixture(name).failedStep)).toBeUndefined();
@@ -94,7 +94,7 @@ describe("1 枚も撮れず failed で終わったとき", () => {
       failures: [],
     });
     expect(reading?.evidence).toBe(
-      "台帳の error: 1 枚も撮れませんでした（取れず 0・見送り 1）。最初の理由: robots",
+      "capture-ledger の error: 1 枚も撮れませんでした（取れず 0・見送り 1）。最初の理由: robots",
     );
     expect(reading?.fix).toMatch(/全部を robots\.txt で見送った/);
   });
@@ -192,7 +192,7 @@ describe("知らない失敗", () => {
       ...crawlOf("f2-browserhive-down"),
       error: "[cap] 見たことのない失敗",
     });
-    expect(reading?.evidence).toBe("台帳の error: [cap] 見たことのない失敗");
+    expect(reading?.evidence).toBe("capture-ledger の error: [cap] 見たことのない失敗");
     expect(reading?.fix).toMatch(DIG);
   });
 

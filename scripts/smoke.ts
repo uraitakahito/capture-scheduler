@@ -4,15 +4,15 @@
  *
  * 本番と同じ道を通す —— capture-ledger の `POST /api/crawls` に、flow と同じトークン
  * (Windmill の変数 `u/admin/ledger_client` の資格で取る) で頼み、Windmill の flow に撮らせ、段の報告を待つ。
- * 「撮れた」は台帳の succeeded だけでは言わない。その回の archive を台帳の一覧から探し、
+ * 「撮れた」は capture-ledger の succeeded だけでは言わない。その回の archive を capture-ledger の一覧から探し、
  * 署名付き URL で先頭 4 バイトを取り、`PK` (WACZ は zip) であることまで見る。
  *
- * **合本と索引と検索まで見る (CAPTURE-57・CAPTURE-53)。** 台帳は段の報告の時点で succeeded にし、合本の段と
+ * **合本と索引と検索まで見る (CAPTURE-57・CAPTURE-53)。** capture-ledger は段の報告の時点で succeeded にし、合本の段と
  * 索引の段はその後に走るので、段の run の終わりを待つ。合本の段の答え (書けた・検められなかった 0 本) を照らし、
- * 台帳が指す合本の `replay.json` を replayweb-server の `/wacz/<鍵>` から読んで、この回の archive が入っているかを見る
- * (`smoke/read-replay-bundle.ts`)。合本の段は台帳の 200 の失敗では投げない (クロールを止めないため) ので、
+ * capture-ledger が指す合本の `replay.json` を replayweb-server の `/wacz/<鍵>` から読んで、この回の archive が入っているかを見る
+ * (`smoke/read-replay-bundle.ts`)。合本の段は capture-ledger の 200 の失敗では投げない (クロールを止めないため) ので、
  * run が緑でも合本が書けたとは限らない。続けて索引の段の答え (載らなかった 0 本・載せた 1 本以上) を照らす。
- * 既定の頁 (capture-fixtures の印付きの頁。印は撮るたびに変える) なら、その印で台帳の検索を引き、
+ * 既定の頁 (capture-fixtures の印付きの頁。印は撮るたびに変える) なら、その印で capture-ledger の検索を引き、
  * この回の archive の当たりの時点が、WACZ のページ一覧から予想した時点と同じかまで照らす
  * (`smoke/read-search.ts`)。URL を渡したときは、検索は照らさない (その頁で当たる語が分からない)。
  *
@@ -89,7 +89,7 @@ function stop(label: string, text: string): never {
 const FIXTURES = "http://capture-fixtures.capture-ledger:8080";
 /**
  * host から見た capture-ledger のスタックの replayweb-server (compose が loopback の 8899 に出すポート)。合本の `replay.json` を
- * `/wacz/<鍵>` から読む —— ReplayWeb.page が合本を開くときと同じエンドポイントで読めるかを見る。`API` と同じく、台帳の
+ * `/wacz/<鍵>` から読む —— ReplayWeb.page が合本を開くときと同じエンドポイントで読めるかを見る。`API` と同じく、capture-ledger の
  * 開発のスタックの決まったポート。
  */
 const REPLAYWEB_SERVER = "http://127.0.0.1:8899";
@@ -180,10 +180,10 @@ const ledger = async (
 };
 
 /**
- * Windmill の run を取り消す。**締める前に。** 走っている flow を残して台帳だけ締めると、後から
+ * Windmill の run を取り消す。**締める前に。** 走っている flow を残して capture-ledger の行だけ締めると、後から
  * 届いた段の報告が、締めたクロールを succeeded に書き戻していた (2026-09-19 に実測)。いまの
  * capture-ledger は、締めるのを走行中の行だけにして書き戻さない (CAPTURE-61)。それでも、残した run は
- * 台帳に報告を足し続けるので、先に取り消す。取り消した run では締める段が走らないので、締めるのはこちら。
+ * capture-ledger に報告を足し続けるので、先に取り消す。取り消した run では締める段が走らないので、締めるのはこちら。
  * 終わった run の取り消しは、何もせずに 200 を返す。
  */
 const cancelRun = async (jobId: string, reason: string): Promise<void> => {
@@ -361,7 +361,7 @@ if (finished !== undefined) report(finished, crawl);
 // ── 取り出す ──────────────────────────────────────────────────────────
 
 /**
- * 台帳に載ったこの回の archive。一覧は新しい順なので、最初に当たったもの。
+ * capture-ledger に載ったこの回の archive。一覧は新しい順なので、最初に当たったもの。
  *
  * **一覧に出るまで待つ。** 一覧は見てよいかを OpenFGA に訊いて絞っていて、archive の関係は
  * capture-ledger の outbox が 5 秒ごとに書く (CAPTURE_LEDGER_DRAIN_INTERVAL_MS)。succeeded の
@@ -387,7 +387,7 @@ const archive = await findArchive(crawl.startedAt);
 if (archive === undefined) {
   report(
     {
-      evidence: `succeeded だが、30 秒待っても台帳の一覧に ${url} のこの回の archive が出ない`,
+      evidence: `succeeded だが、30 秒待っても capture-ledger の一覧に ${url} のこの回の archive が出ない`,
       fix:
         "見てよいかの関係が書かれていない —— capture-ledger の API のログの " +
         "「Scheduled outbox drain failed」と、OpenFGA (pnpm run doctor の openfga)",
@@ -422,7 +422,7 @@ say("取り出す", `archive ${archive.id} の先頭が PK (WACZ = zip)`);
 // ── 段の run の終わり ─────────────────────────────────────────────────
 
 /**
- * 段の run が終わるまで待つ。**台帳は段の報告の時点で succeeded にし、合本の段と索引の段はその後に走る** ——
+ * 段の run が終わるまで待つ。**capture-ledger は段の報告の時点で succeeded にし、合本の段と索引の段はその後に走る** ——
  * succeeded を見ただけでは、合本が書けたか・索引が載ったかは分からない (CAPTURE-53 の調べ)。
  */
 const finishedRun = async (
@@ -503,7 +503,7 @@ if (
     crawl,
   );
 }
-// 台帳が指す合本の鍵を、段の run の後に読み直す (待っている間に読んだクロールは、合本の段より前の物)
+// capture-ledger が指す合本の鍵を、段の run の後に読み直す (待っている間に読んだクロールは、合本の段より前の物)
 const pointed = readLedgerReplayBundle(
   parse((await ledger(`/api/crawls/${crawlId}`)).body),
   replayBundleOutcome.rev,
@@ -592,7 +592,7 @@ if (target === undefined) {
           got.status === 503
             ? "capture-ledger の OpenSearch が答えない → cd ../capture-ledger && pnpm run dev:up --from search"
             : got.status === 404
-              ? "台帳に検索のエンドポイントが無い (pnpm run doctor の search route)"
+              ? "capture-ledger に検索のエンドポイントが無い (pnpm run doctor の search route)"
               : "答えの形が違う (total が数でない) —— capture-ledger が古い",
       };
       break;

@@ -82,7 +82,7 @@ describe("本物の点検の並び", () => {
     expect(CHECKS).toHaveLength(22);
   });
 
-  it("crawl route が ✗ なら、合本のエンドポイントは訊かない（台帳は webhook が無いと両方のエンドポイントを出さない）", async () => {
+  it("crawl route が ✗ なら、合本のエンドポイントは訊かない（capture-ledger は webhook が無いと両方のエンドポイントを出さない）", async () => {
     // 合本のエンドポイントが 404 で ✗ を足すと、webhook の 2 行という 1 つの原因に ✗ が 2 本並ぶ
     const results = await runChecks(withOnlyFailing("crawl route"));
     expect(results.filter((r) => r.state === "fail").map((r) => r.check.name)).toEqual([

@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Windmill の flow が台帳 (capture-ledger) に名乗るための設定と、flow が読む宛先を、Windmill の変数に入れる。
+ * Windmill の flow が capture-ledger に名乗るための設定と、flow が読む宛先を、Windmill の変数に入れる。
  *
  *   pnpm run windmill:capture-ledger-token                  # ../capture-ledger から読む
  *   pnpm run windmill:capture-ledger-token ../floci-ledger  # 別の場所の capture-ledger (dev:up が渡す)
  *
  * ## トークンではなく、トークンを取る資格を入れる
  *
- * 台帳の IdP は Amazon Cognito (手元は代役の Floci。CAPTURE-185)。Cognito の access token は最長 1 日しか
+ * capture-ledger の IdP は Amazon Cognito (手元は代役の Floci。CAPTURE-185)。Cognito の access token は最長 1 日しか
  * もたないので、以前のように 30 日のトークンを 1 本入れて使い回す形は取れない。入れるのは app client の
  * ID と secret で、flow は段ごとに client credentials でトークンを取る (`windmill/f/waggle/` の `ledgerToken`)。
  *

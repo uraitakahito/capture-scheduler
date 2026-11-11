@@ -9,7 +9,7 @@ import { main } from "../windmill/f/waggle/index_level.js";
  * (`archives.indexed_at IS NULL`)。id の一覧をここで組み立てる形に変わったら、
  * 「何を索引すべきか」の判断が flow へ移ったということ。
  *
- * 検索は台帳の必須の部品 (CAPTURE-53) なので、**どの失敗も黙らせない** —— 以前は 404 を
+ * 検索は capture-ledger の必須の部品 (CAPTURE-53) なので、**どの失敗も黙らせない** —— 以前は 404 を
  * 「検索の無い配備」として飛ばしていたが、その配備はもう無い。
  */
 
@@ -83,14 +83,14 @@ describe("capture-ledger への頼み方", () => {
 
 describe("載らなかったら段を落とす", () => {
   it("載せられなかったアーカイブがあれば投げる（202 でも）", async () => {
-    // 1 本の失敗を、台帳は 202 のまま failed に数える。ここで黙ると、索引に 1 本も無いまま緑になる。
+    // 1 本の失敗を、capture-ledger は 202 のまま failed に数える。ここで黙ると、索引に 1 本も無いまま緑になる。
     responding(202, { pending: 2, indexed: 1, failed: 1, pages: 2 });
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     await expect(main("c-1")).rejects.toThrow(/索引に入らなかったアーカイブが 1 本/);
   });
 
   it("404 は投げる —— クロールが無いか、許可が無い", async () => {
-    // 以前は「検索の無い配備」として飛ばしていた。台帳は検索なしでは起動しなくなったので、
+    // 以前は「検索の無い配備」として飛ばしていた。capture-ledger は検索なしでは起動しなくなったので、
     // 404 はクロールが無いか、トークンの名前に can_submit が無いことしか意味しない。
     responding(404, { error: "not found" });
     await expect(main("c-1")).rejects.toThrow(/404.*can_submit/);

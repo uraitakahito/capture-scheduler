@@ -4,7 +4,7 @@
  * capture-ledger は host で動くので、ts-compile-service には compose が `127.0.0.1` に出したポートで
  * 届く (macOS 26 では host の node がコンテナの subnet に TCP を張れない)。**200 は「何かが答えた」で
  * あって「ts-compile が答えた」ではない** —— 同じ番号を別のスタックが持っていることがある
- * (2026-09-20 に、台帳の fixtures の代わりに BrowserHive の e2e の fixtures が 18080 で答えた)。
+ * (2026-09-20 に、capture-ledger の fixtures の代わりに BrowserHive の e2e の fixtures が 18080 で答えた)。
  * だから `/healthz` の形 (`typescript` と `hostTypes`) まで見る。
  */
 import { HOST_TS_COMPILE } from "../env.js";

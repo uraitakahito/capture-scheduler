@@ -82,7 +82,7 @@ describe("main が secret_archive を BrowserHive の要求へ運ぶ", () => {
     });
   });
 
-  it("古い台帳から null で届けば、secretArchive は送らない（全部を隠す側に倒れる）", async () => {
+  it("古い capture-ledger から null で届けば、secretArchive は送らない（全部を隠す側に倒れる）", async () => {
     const bodies = answering();
     await run(null);
     expect(bodies[0]).toHaveProperty("secrets");

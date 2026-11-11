@@ -1,5 +1,5 @@
 /**
- * 台帳から取り出した WACZ を開いて、中の全 member を文字として読む。
+ * capture-ledger から取り出した WACZ を開いて、中の全 member を文字として読む。
  *
  * 「値が記録に残っていない」を言うには、datapackage.json だけでは足りない —— 値が漏れうるのは WARC の本文
  * (スクリプトが通信に載せれば残る)・索引・pages.jsonl・runtime.js のどれでもある。だから member を全部開く。

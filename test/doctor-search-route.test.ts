@@ -2,8 +2,8 @@
  * capture-ledger の全文検索が働いているかの読み分け。
  *
  * flow の資格のトークンで引くので、働いていれば 200。名乗らずに引いていた頃は 401 を ✓ にしていたが、
- * それでは OpenSearch が止まっていても ✓ だった (台帳は名乗りを見てから OpenSearch に訊く)。404 を ✓ に
- * すると、検索の無い台帳の上で flow の索引の段が毎回落ちるのを、doctor が見逃す (CAPTURE-53 から、
+ * それでは OpenSearch が止まっていても ✓ だった (capture-ledger は名乗りを見てから OpenSearch に訊く)。404 を ✓ に
+ * すると、検索の無い capture-ledger の上で flow の索引の段が毎回落ちるのを、doctor が見逃す (CAPTURE-53 から、
  * 索引の段は 404 を飛ばさない)。
  */
 import { describe, expect, it } from "vitest";
@@ -35,7 +35,7 @@ describe("readSearchRoute", () => {
     expect(need(verdict)).toContain("401");
   });
 
-  it("404 なら、台帳に検索のエンドポイントが無いと言い、OPENSEARCH_URL を名指す", () => {
+  it("404 なら、capture-ledger に検索のエンドポイントが無いと言い、OPENSEARCH_URL を名指す", () => {
     const verdict = readSearchRoute({
       status: 404,
       body: '{"message":"Route GET:/api/search?q=x not found"}',

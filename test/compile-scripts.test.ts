@@ -63,7 +63,7 @@ describe("compile_scripts", () => {
     nextAnswer = { status: 200, body: compiled };
     const out = await main([script("autoscroll", "ts")], { query: "個人情報" });
     expect(out).toEqual(compiled);
-    // 送ったのは台帳のスクリプトそのものと、変数の名前だけ。値は送らない
+    // 送ったのは登録済みのスクリプトそのものと、変数の名前だけ。値は送らない
     expect(received).toEqual({
       scripts: [script("autoscroll", "ts")],
       variableNames: ["query"],
@@ -112,7 +112,9 @@ describe("compile_scripts", () => {
 
   it("409 (hash 違い) と 400 (形の違反) も投げる", () => {
     expect(() =>
-      readAnswer(409, "SourceHashMismatch", { message: "x: sha256 が台帳の約束と違う" }),
+      readAnswer(409, "SourceHashMismatch", {
+        message: "x: sha256 が capture-ledger の約束と違う",
+      }),
     ).toThrow(/compile 409 SourceHashMismatch/);
     expect(() =>
       readAnswer(400, "ValidationException", {
@@ -121,9 +123,9 @@ describe("compile_scripts", () => {
     ).toThrow(/compile 400 ValidationException: .*\/scripts\/0\/id/);
   });
 
-  it("診断が多くても、文は件数と最初の 5 件だけ —— 台帳の reason（2,000 字）に収まる", () => {
+  it("診断が多くても、文は件数と最初の 5 件だけ —— capture-ledger の reason（2,000 字）に収まる", () => {
     // 束ねた JS をそのまま貼ると、診断は数百件になる（async.js で 708 件）。全部を JSON で載せると
-    // 9 万字になり、台帳の /failed が 400 で断って、クロールが running のまま残る
+    // 9 万字になり、capture-ledger の /failed が 400 で断って、クロールが running のまま残る
     const diagnostics = Array.from({ length: 708 }, (_, i) => ({
       file: "inline-big.ts",
       line: i + 1,
