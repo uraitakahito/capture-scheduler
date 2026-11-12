@@ -220,6 +220,10 @@ const RETRYABLE: ReadonlySet<string> = new Set<ErrorType>(["connection", "timeou
  *
  * flow は `skip_failures: false` なので、ここで throw すれば段ごと失敗し、
  * capture-ledger が `crawls` を `failed` で締める。
+ *
+ * **投げるのはホストの 1 件目だけ。** 撮った後に投げると、Windmill の再試行がホストを 1 件目から
+ * 撮り直す (`captureHost`)。2 件目より後で届かなくなったら、撮れた結果と、残りの「撮り直さない」
+ * failed を返す。
  */
 export class ServerUnavailable extends Error {}
 
@@ -684,12 +688,28 @@ export const captureHost = async (
     // #endregion pacing
 
     log(`${String(index + 1)}/${String(urls.length)} ${url}`);
-    // **server が居ないなら、次を試しても同じ答えしか返らない。** `ServerUnavailable` は
-    // ここを素通りして段ごと落とす。1 ページの失敗は `captureOne` が自分で
-    // `failed` にして返すので、ここで拾うものは無い。
-    results.push(
-      await captureOne(endpoints, url, index, crawlId, capture, perHostDelayMs, retry, log),
-    );
+    // **server が居ないなら、次を試しても同じ答えしか返らない。** 1 ページの失敗は
+    // `captureOne` が自分で `failed` にして返すので、ここで拾うのは `ServerUnavailable` だけ。
+    try {
+      results.push(
+        await captureOne(endpoints, url, index, crawlId, capture, perHostDelayMs, retry, log),
+      );
+    } catch (err) {
+      // **1 件目なら段ごと落とす。** まだ何も撮っていないので、Windmill の再試行で撮り直しても
+      // 何も重ならない。全部が届かないまま落ちれば、capture-ledger がクロールを failed で締める。
+      if (!(err instanceof ServerUnavailable) || index === 0) throw err;
+      // **撮った後には投げない。** 投げると Windmill の再試行 (crawl_level の flow の retry) が
+      // このホストを 1 件目から撮り直し、相手に同じページの 2 回目が届く。前の成果物は保管庫に
+      // 残るのに、報告には入らない (CAPTURE-180)。撮れた結果はそのまま返し、残りは撮り直さない
+      // failed にする —— 届かないままなら、次の段の 1 件目がここで段ごと落とす。
+      const reason = `BrowserHive に届かない (撮り直さない): ${err.message}`;
+      log(`${url} から後の ${String(urls.length - index)} 件を failed にする: ${err.message}`);
+      const finishedAt = new Date().toISOString();
+      for (const rest of urls.slice(index)) {
+        results.push({ url: rest, status: "failed", finishedAt, skipReason: reason });
+      }
+      break;
+    }
   }
 
   return results;

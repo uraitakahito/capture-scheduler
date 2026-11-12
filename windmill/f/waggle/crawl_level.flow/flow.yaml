@@ -121,9 +121,10 @@ value:
                 user_agent:
                   type: javascript
                   expr: flow_input.user_agent
-            # **BrowserHive が全部居ないときだけ** crawl_host は投げる (ServerUnavailable)。
-            # 1 ページの失敗は投げずに結果に載せるので、ここで再試行されるのは
-            # 「エンドポイントが 1 つも無い」状態だけ —— 再起動を待つぶんの間隔で 2 回。
+            # crawl_host が投げたら、再起動を待つぶんの間隔で 2 回再試行する (初回と合わせて計 3 回)。
+            # 再試行はホストを 1 件目から撮り直す。だから crawl_host が投げるのは、まだ何も撮っていないとき
+            # だけ —— ホストの 1 件目で BrowserHive が全部居ない (ServerUnavailable) か、引数が欠けたか、
+            # 変数・シークレット・エンドポイントの一覧が読めないとき。1 ページの失敗と、撮った後に居なくなったときは結果に載せる。
             retry:
               constant:
                 attempts: 2

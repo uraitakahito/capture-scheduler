@@ -120,9 +120,26 @@ server that is already capturing refuses with `429 Busy`.
 Picking a free server is therefore `crawl_host`'s job. It reads the list from
 `u/admin/browserhive_endpoints`, tries them in turn — a busy one means "next",
 an unreachable one is skipped for the rest of that call — and when every one is
-busy it waits half a second to a second and a half and goes round again. Only
-when none of them is reachable does it throw `ServerUnavailable`, which fails
-the level.
+busy it waits half a second to a second and a half and goes round again. When
+none of them is reachable it throws `ServerUnavailable`.
+
+**Only the host's first page fails the whole level.** When `crawl_host` throws,
+the flow retries that step twice, 30 seconds apart (three runs in all), and a
+retry captures the host again from its first page. Throwing after a capture
+would send the site a second request for the same page, and the earlier
+artifact would stay in the store without ever being reported. So if BrowserHive
+becomes unreachable after the first page, it returns what it captured and marks
+the rest `failed` with "BrowserHive に届かない (撮り直さない)" (unreachable, not
+captured again). If BrowserHive is still down, the next level's first page
+fails the level. The retry also applies when it throws over a missing argument or
+because it cannot read the variables, the secrets or the endpoint list (all of
+these happen before any capture).
+
+**Unreachable does not mean the request never arrived.** A connection that
+drops after it was made, before the answer, also counts as unreachable, and the
+same page is captured again on the next endpoint. If the first endpoint had
+finished, the site sees a second request (a deadline is not passed on to the
+next endpoint).
 
 Two consequences:
 
