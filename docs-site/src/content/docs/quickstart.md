@@ -245,7 +245,7 @@ fix means one ✗.
 ```
 
 **smoke** captures one page, and only when doctor is all ✓. It takes the production path —
-asks capture-ledger's `POST /api/crawls` with a token from the flow's own app client, lets the Windmill flow capture,
+asks capture-ledger's `POST /api/crawls` with a token from the flow's own app client and a key of its own (`Idempotency-Key`), lets the Windmill flow capture,
 waits for the level report — then fetches the archive the ledger recorded through a signed URL
 and checks that it starts with `PK` (a WACZ is a zip). The ledger marks the crawl `succeeded` at the
 level report, before the flow's replay bundle and index steps run, so smoke then waits for the level's

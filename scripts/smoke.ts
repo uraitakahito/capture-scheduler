@@ -25,6 +25,7 @@
  *   --close-running    409 のとき、走っている 1 本を締めてから撮る。**明示したときだけ**
  *                      —— 他人の走行中のクロールを黙って締めない
  */
+import { randomUUID } from "node:crypto";
 import { parseArgs } from "node:util";
 
 import { guardEnv, windmillFetch, windmillUrl, windmillWorkspace } from "./env.js";
@@ -219,10 +220,16 @@ const close = async (crawlId: string, reason: string, jobId: string | undefined)
   );
 };
 
+/**
+ * 始める要求の鍵 (`Idempotency-Key`。CAPTURE-180)。**この smoke の 1 本に 1 つ** —— 409 で走行中の行を締めてから
+ * 送り直すときも同じ鍵。capture-ledger は 409 の答えを覚えないので、同じ鍵の 2 回目で始まる。
+ */
+const startKey = randomUUID();
+
 const start = async (): Promise<{ status: number | undefined; body: string }> =>
   ledger("/api/crawls", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", "idempotency-key": startKey },
     body: JSON.stringify({ seeds: [url], maxDepth: 0 }),
   });
 

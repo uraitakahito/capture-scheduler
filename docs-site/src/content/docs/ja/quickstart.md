@@ -241,7 +241,7 @@ capture-ledger の中に在り、古い checkout の `windmill:push` が戻す�
 ```
 
 **smoke** は、doctor が全部 ✓ のときだけ 1 本撮る。本番と同じ道 —— capture-ledger の
-`POST /api/crawls` に flow と同じ app client で取ったトークンで頼み、Windmill の flow に撮らせ、段の報告を待つ ——
+`POST /api/crawls` に flow と同じ app client で取ったトークンと、1 本ごとの鍵（`Idempotency-Key`）を付けて頼み、Windmill の flow に撮らせ、段の報告を待つ ——
 を通し、capture-ledger に載った archive を署名付き URL で取り出して、先頭が `PK`（WACZ は zip）であることまで
 見る。capture-ledger は段の報告の時点でクロールを succeeded にし、flow の合本の段と索引の段はその後に
 走るので、smoke は段の run の終わりを待つ。合本の段の答え（書けた・検められなかった WACZ が 0 本）を
