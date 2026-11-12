@@ -151,6 +151,10 @@ value:
           depth:
             type: javascript
             expr: flow_input.depth
+          # 段の鍵 (CAPTURE-180)。capture-ledger が決めて渡した物を、そのまま Idempotency-Key で返す
+          level_key:
+            type: javascript
+            expr: flow_input.level_key
           results:
             type: javascript
             expr: |-
@@ -162,6 +166,14 @@ value:
           compiled:
             type: javascript
             expr: results.compile
+      # **報告は再試行してよい** (CAPTURE-180)。capture-ledger は同じ段の鍵の 2 回目に最初の答えを返し、数も次の段も
+      # 重ねない。応答が切れた・capture-ledger が起こし直していた、で段ごと落とすと、撮った段がまるごと failed で締まる。
+      # 30 秒の間隔で 5 回 (計 2 分半) —— 報告中の期限 (2 分) より長くして、途中で capture-ledger が落ちた報告を
+      # 期限の後に取り直せるようにする。報告中の 409 も投げて、ここで待つ。
+      retry:
+        constant:
+          attempts: 5
+          seconds: 30
     # **合本を書かせる。** 報告の後なので、この段で capture-ledger に載った WACZ も入る。index より前に置くのは、
     # 合本が OpenSearch に頼らないから。capture-ledger が 200 で返す失敗では投げない (replay_bundle_level.ts) ——
     # ここで投げると index が飛び、failure_module がクロールを failed で締める。depth は capture-ledger が
@@ -201,6 +213,15 @@ value:
         crawl_id:
           type: javascript
           expr: flow_input.crawl_id
+        # 落ちた段と段の鍵 (CAPTURE-180)。capture-ledger は一番新しい段の鍵のときだけ締める ——
+        # 報告の後の合本・索引の段で落ちた flow や、手で流し直した古い段の flow が、次の段を撮っている
+        # クロールを締めない
+        depth:
+          type: javascript
+          expr: flow_input.depth
+        level_key:
+          type: javascript
+          expr: flow_input.level_key
         error:
           type: javascript
           expr: error
@@ -211,6 +232,7 @@ schema:
   order:
     - crawl_id
     - depth
+    - level_key
     - frontier
     - per_host_delay_ms
     - host_parallelism
@@ -225,6 +247,9 @@ schema:
       type: integer
       description: この段の深さ。起点が 0
       minimum: 0
+    level_key:
+      type: string
+      description: 段の鍵 (capture-ledger が段ごとに決めた Windmill の job の id)。段の報告と fail_crawl がそのまま返す
     frontier:
       type: array
       description: この段で取る URL
@@ -327,7 +352,7 @@ schema:
       type: string
       description: 頼まれた User-Agent。打った字のままで、{chrome} は BrowserHive が解く。空なら browser の字のまま撮る
       default: ""
-  # capture-ledger が送るのは crawl_id / depth / frontier / 間隔 / 並列度 /
+  # capture-ledger が送るのは crawl_id / depth / level_key / frontier / 間隔 / 並列度 /
   # capture_formats / signing / scripts / variables / secrets / secret_archive / user_agent と、受け取り先を
   # 出している配備では artifact_sink。並列度は plan_level が BrowserHive のエンドポイントの数で頭打ちにしてから for-loop に渡る。
   # schema に無い入力を capture-ledger が送っても、Windmill は既定で引数を schema に照らさないので断らない (frontier の
@@ -345,6 +370,8 @@ schema:
   required:
     - crawl_id
     - depth
+    # 段の鍵が無いと、capture-ledger は段の報告を 400 で断る (CAPTURE-180)
+    - level_key
     - frontier
     # **形式と署名とスクリプトは必須。** 既定値は webhook 起動では埋まらないので、
     # 省略できる形にすると「渡し忘れ」が黙って別の形式で走ることになる。

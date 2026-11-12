@@ -154,6 +154,11 @@ Resources は空のまま —— この repo はそこに何も置かない（v0
 [Windmill CE](/windmill-ce/) を見ること）。webhook からの実行には届かないので、
 flow の script は設定を変数から読む（[リンクを辿る](/crawl/)）。
 
+**段の flow を、終わった run の引数のまま流し直さない。** 引数に段の鍵（`level_key`）が入っているので、
+capture-ledger は同じ段の報告の 2 回目として最初の答えを返し、記録も次の段も変えない —— 撮り直した分は保管庫に
+残るが、記録には入らない。落ちたのが一番新しい段なら、その failure_module はクロールを締める。Run の画面の
+「この段からやり直す」（restart）は Community Edition には無い（[リンクを辿る](/crawl/#段の鍵)）。
+
 ## 変数の一覧 —— どの script が何を入れるか
 
 `windmill:push` が入れるのは **git にあるものだけ**（script・flow）。

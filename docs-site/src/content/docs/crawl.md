@@ -31,6 +31,33 @@ The reason is cut to the ledger's limit of 2,000 characters: above it the ledger
 report, and the crawl would stay `running` and block every crawl after it. A script that does
 not type-check never reaches a page.
 
+## Level keys
+
+capture-ledger picks a **level key** (the Windmill job id) for each level and passes it as the
+webhook's `?job_id=` and as the flow argument `level_key` (CAPTURE-180). The flow hands it back
+unchanged.
+
+- **`report_level`** puts it in the level report's `Idempotency-Key`. capture-ledger answers a
+  second report of the same level with the first answer, and adds neither counts nor a second next
+  level. So the report step **retries five times, 30 seconds apart** (two and a half minutes). If a
+  dropped response or a restarting capture-ledger failed the whole level, a level that was captured
+  would close as `failed`. A 409 while capture-ledger is still handling the report (a 2-minute lease)
+  is thrown too, and waited out here. The lease is shorter than the retries, so a report that
+  capture-ledger dropped half-way can be taken over.
+- **`fail_crawl`** (the failure_module) sends the failed level's `depth` and `levelKey`.
+  capture-ledger closes only for the newest level's key and answers `{"closed": false}` otherwise, so
+  a flow that failed in the replay bundle or index step after its report, or an older level's flow
+  run again by hand, does not close a crawl that is capturing its next level. On a 5xx or no
+  connection it tries three times inside the step, 5 seconds apart (whether a `retry` on the
+  failure_module works is not checked, so it is not relied on).
+- The same level report arrives twice after the report step's retries, when the flow is run again
+  by hand with the same arguments, and when Windmill reruns a job whose worker stopped. Windmill's
+  "restart from this step" (`jobs/restart`) is not available in the Community Edition (enterprise
+  version only; checked on 2026-11-12).
+
+A report from an older flow that does not carry `level_key` is refused with 400 by a capture-ledger
+that requires level keys. Upgrade the flow and capture-ledger together.
+
 `replay_bundle_level` also runs after the report. It sends the level's `depth` to capture-ledger's
 `POST /api/crawls/:id/replay-bundle`, and capture-ledger writes the crawl's **replay bundle** as a new
 revision to the store, under `org/<organization>/crawls/<crawl>/r<revision>/`: a `replay.json` listing
@@ -44,8 +71,8 @@ A replay bundle is derived from what was captured and can be rebuilt
 (`pnpm run replay-bundle:rebuild --crawl <id>` in capture-ledger), so **the step does not throw on
 anything the ledger answers with 200**: the store refused the write (`error`), a WACZ could not be
 inspected (`failed` above 0, picked up by the next replay bundle), or there was no WACZ to include yet
-(`rev: null`). It writes one log line and returns. Throwing would skip the index step and make `fail_crawl` close the crawl as `failed` while its
-next level may already be running. It throws only when the ledger does not answer 200 — 400 (the body),
+(`rev: null`). It writes one log line and returns. Throwing would skip the index step and make `fail_crawl` close the crawl as `failed` (if its
+next level is already running, capture-ledger does not close it: the failure is not the newest level's; see "Level keys" below). It throws only when the ledger does not answer 200 — 400 (the body),
 401 (the token), 404 (no such crawl, no crawl permission for the token's `sub`, or a capture-ledger too
 old to have the endpoint), 5xx — or answers in the wrong shape.
 

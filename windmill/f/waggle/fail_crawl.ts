@@ -92,34 +92,73 @@ export const clip = (text: string, max = REASON_MAX): string => {
   return `${text.slice(0, keep)}…（${String(text.length - keep)} 字を省いた）`;
 };
 
-export async function main(crawl_id: string, error: unknown): Promise<Result> {
+/** 5xx と繋がらないときの、この段の中の試み (初回を含む)。failure_module の再試行は確かめていないので頼らない。 */
+export const CLOSE_ATTEMPTS = 3;
+/** 試みの間 (ms)。 */
+export const CLOSE_RETRY_MS = 5_000;
+
+/**
+ * 締める要求を送る。5xx と繋がらないときは、間を空けて `CLOSE_ATTEMPTS` 回まで試す (起こし直している capture-ledger)。
+ * 4xx は試し直しても同じ答え (トークン・許可・本文の形) なので 1 回で止める。**投げない。**
+ *
+ * `main` から切り出してあるのは試験のため (`main` は Windmill の変数を読むので単体では回せない)。`main` の引数に
+ * 試験の部品を足すと、Windmill はそれを flow の入力として schema に載せる。
+ */
+export const sendClose = async (
+  send: () => Promise<Response>,
+  sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+): Promise<Result> => {
+  let problem = "";
+  for (let attempt = 1; attempt <= CLOSE_ATTEMPTS; attempt += 1) {
+    try {
+      const res = await send();
+      if (res.ok) {
+        const { closed } = (await res.json()) as { closed: boolean };
+        console.log(
+          closed
+            ? "締めました"
+            : "締めませんでした（既に終わっていた・一番新しい段の失敗ではなかった）",
+        );
+        return { closed };
+      }
+      const body = await res.text();
+      problem = `→ ${String(res.status)} ${body.slice(0, 200)}`;
+      if (res.status < 500) break;
+    } catch (err) {
+      // capture-ledger に届かない (起こし直している途中など)
+      problem = err instanceof Error ? err.message : String(err);
+    }
+    if (attempt < CLOSE_ATTEMPTS) {
+      console.log(`締められませんでした (${String(attempt)} 回目): ${problem}。試し直します`);
+      await sleep(CLOSE_RETRY_MS);
+    }
+  }
+  // **それでもこの段は緑で終える。** flow はどのみち既に失敗していて、その赤が履歴に残る。
+  console.log(`締められませんでした: ${problem}`);
+  return { closed: false, problem };
+};
+
+export async function main(
+  crawl_id: string,
+  /** 落ちた段の深さ (CAPTURE-180)。capture-ledger は一番新しい段のときだけ締める */
+  depth: number,
+  /** 落ちた段の鍵 (flow の引数で届いた物をそのまま) */
+  level_key: string,
+  error: unknown,
+): Promise<Result> {
   // **設定は変数から読む。** Windmill は schema の既定値を UI からの実行にしか
   // 埋めない —— webhook で起こすと引数は素通りになる (`crawl_host.ts` に詳しい)。
   const waggle_url = await wmill.getVariable("u/admin/waggle_api_url");
   const token = await ledgerToken();
 
   const reason = clip(describe(error));
-  console.log(`クロール ${crawl_id} を締めます: ${reason}`);
-
-  try {
-    const res = await fetch(`${waggle_url}/api/crawls/${crawl_id}/failed`, {
+  console.log(`クロール ${crawl_id} の段 ${String(depth)} を締めます: ${reason}`);
+  return sendClose(() =>
+    fetch(`${waggle_url}/api/crawls/${crawl_id}/failed`, {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify({ reason }),
-    });
-    if (!res.ok) {
-      const body = await res.text();
-      const problem = `POST /api/crawls/${crawl_id}/failed → ${String(res.status)} ${body.slice(0, 200)}`;
-      console.log(`締められませんでした: ${problem}`);
-      return { closed: false, problem };
-    }
-    const { closed } = (await res.json()) as { closed: boolean };
-    console.log(closed ? "締めました" : "締めるものがありませんでした（既に終わっていた）");
-    return { closed };
-  } catch (err) {
-    // capture-ledger に届かないこともある。**それでもこの段は緑で終える。**
-    const problem = err instanceof Error ? err.message : String(err);
-    console.log(`締められませんでした: ${problem}`);
-    return { closed: false, problem };
-  }
+      // 段と段の鍵を付ける。古い段の flow の失敗なら、capture-ledger は締めずに {closed: false} で答える
+      body: JSON.stringify({ reason, depth, levelKey: level_key }),
+    }),
+  );
 }
