@@ -21,14 +21,15 @@ schema:
       type: number
       description: ""
       default: null
+    error:
+      type: object
+      description: Windmill が渡す誤りの中身
+      default: null
     level_key:
       type: string
       description: ""
       default: null
       originalType: string
-    error:
-      description: Windmill が渡す誤りの中身
-      default: null
   required:
     - crawl_id
     - depth
