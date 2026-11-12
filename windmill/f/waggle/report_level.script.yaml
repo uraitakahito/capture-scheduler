@@ -47,6 +47,11 @@ schema:
       type: number
       description: ""
       default: null
+    level_key:
+      type: string
+      description: ""
+      default: null
+      originalType: string
     results:
       type: array
       description: ""
@@ -103,5 +108,6 @@ schema:
   required:
     - crawl_id
     - depth
+    - level_key
     - results
     - compiled

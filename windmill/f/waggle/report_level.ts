@@ -100,6 +100,12 @@ export interface CompiledLevel {
 export async function main(
   crawl_id: string,
   depth: number,
+  /**
+   * 段の鍵 (CAPTURE-180)。capture-ledger が段ごとに決めた Windmill の job の id で、flow の引数で届く。
+   * `Idempotency-Key` で返すと、capture-ledger は同じ段の報告の 2 回目 (この段の再試行・同じ引数で流し直した flow・
+   * worker が止まった後の Windmill のやり直し) に最初の答えを返し、数も次の段も重ねない。
+   */
+  level_key: string,
   results: PageResult[],
   compiled: CompiledLevel,
 ): Promise<LevelOutcome> {
@@ -111,7 +117,11 @@ export async function main(
 
   const res = await fetch(`${waggle_url}/api/crawls/${crawl_id}/pages`, {
     method: "POST",
-    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+      "idempotency-key": level_key,
+    },
     body: JSON.stringify({
       depth,
       results,
@@ -134,7 +144,10 @@ export async function main(
         : res.status === 404
           ? " —— トークンの sub (Windmill の app client の ID) に、その組織のクロールの許可がありますか" +
             " (capture-ledger: pnpm run idp:grant)"
-          : "";
+          : res.status === 409
+            ? // 報告中 (前の試みが処理している) なら、この段の再試行 (30 秒の間隔で 5 回) が待つ
+              " —— 同じ段の報告を capture-ledger が処理中か、段の鍵が違う (flow と capture-ledger の版が揃っているか)"
+            : "";
     throw new Error(
       `POST /api/crawls/${crawl_id}/pages → ${String(res.status)} ${body.slice(0, 300)}${hint}`,
     );

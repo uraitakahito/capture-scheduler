@@ -29,6 +29,26 @@ flow は `fail_crawl` へ落ち、クロールは診断の件数と最初の 5 �
 reason は capture-ledger の上限の 2,000 字に切る。超えると capture-ledger が報告を断り、クロールは running のまま残って、
 後のクロールを全部塞ぐ。型が通らないスクリプトはページに届かない。
 
+## 段の鍵
+
+capture-ledger は段ごとに **段の鍵**（Windmill の job の id）を決め、webhook の `?job_id=` と flow の引数 `level_key` で
+渡す（CAPTURE-180）。flow は鍵をそのまま返す。
+
+- **`report_level`** は段の報告の `Idempotency-Key` に付ける。capture-ledger は同じ段の 2 回目に最初の答えを返し、数も
+  次の段も重ねない。だから report の段は **30 秒の間隔で 5 回再試行する**（計 2 分半）。応答が切れた・capture-ledger が
+  起こし直していた、で段ごと落とすと、撮った段がまるごと `failed` で締まる。capture-ledger が報告を処理している間（期限 2 分）
+  の 409 も投げて、ここで待つ。期限は再試行より短いので、途中で capture-ledger が落ちた報告も取り直せる。
+- **`fail_crawl`**（failure_module）は落ちた段の `depth` と `levelKey` を送る。capture-ledger は一番新しい段の鍵のときだけ
+  締め、ほかは `{"closed": false}`。報告の後の合本・索引の段で落ちた flow や、手で流し直した古い段の flow が、次の段を
+  撮っているクロールを締めない。5xx と繋がらないときは、この段の中で 5 秒空けて 3 回まで試す（failure_module の
+  `retry` が効くかは確かめていないので頼らない）。
+- 同じ段の報告が 2 回届くのは、報告の再試行のほか、同じ引数で flow を手で流し直したときと、worker が止まった後に
+  Windmill が job を自動でやり直したとき。Windmill の「この段からやり直す」（`jobs/restart`）は Community Edition
+  では使えない（enterprise version だけ。2026-11-12 に確かめた）。
+
+`level_key` を運ばない古い flow から報告すると、capture-ledger（段の鍵を求める版）は 400 で断る。flow と capture-ledger は
+揃えて上げる。
+
 `replay_bundle_level` も報告の後に走る。段の深さ（`depth`）を capture-ledger の `POST /api/crawls/:id/replay-bundle`
 に送ると、capture-ledger がクロールの**合本**を新しい版として保管庫の `org/<組織>/crawls/<クロール>/r<版>/` に書く
 —— そのクロールのそれまでの WACZ を全部並べた `replay.json` と、その頁の行の `pages.json` の組。replay は
@@ -39,7 +59,8 @@ OpenSearch に頼らないから —— 索引の段が落ちても合本は書�
 合本は撮った物から作る派生物で、作り直せる（capture-ledger の `pnpm run replay-bundle:rebuild --crawl <id>`）。
 だから**この段は、capture-ledger が 200 で答えたものでは投げない** —— 保管庫に書けなかった（`error`）、検められなかった
 WACZ がある（`failed` が 1 以上。次の合本が拾い直す）、入れる WACZ がまだ無い（`rev: null`）。1 行のログに書いて
-返す。投げると索引の段が飛び、`fail_crawl` がクロールを `failed` で締める（次の段が既に走っていても）。投げるのは、
+返す。投げると索引の段が飛び、`fail_crawl` がクロールを `failed` で締める（次の段が既に走っていれば、capture-ledger は
+一番新しい段の失敗ではないので締めない。下の「段の鍵」）。投げるのは、
 capture-ledger が 200 で答えなかったとき（400 は本文の形、401 はトークン、404 はクロールが無いか、トークンの `sub` にクロールの
 許可が無いか、capture-ledger が古くエンドポイントが無い、5xx）と、答えの形が違うときだけ。
 

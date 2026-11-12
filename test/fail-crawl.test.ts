@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { clip, describe as describeError, REASON_MAX } from "../windmill/f/waggle/fail_crawl.js";
+import {
+  clip,
+  CLOSE_ATTEMPTS,
+  describe as describeError,
+  REASON_MAX,
+  sendClose,
+} from "../windmill/f/waggle/fail_crawl.js";
 
 /**
  * 落ちた段を capture-ledger に伝える経路。
@@ -56,5 +62,61 @@ describe("capture-ledger の reason の上限に収める", () => {
   it("2,000 字ちょうどまでは触らない", () => {
     const edge = "y".repeat(REASON_MAX);
     expect(clip(edge)).toBe(edge);
+  });
+});
+
+/**
+ * 締める要求の送り方 (CAPTURE-180)。capture-ledger を起こし直している間 (5xx・繋がらない) に落ちた段でも、
+ * 行を running のまま残さない。4xx は試し直しても同じ答えなので 1 回で止める。
+ */
+describe("締める要求を送る", () => {
+  const noSleep = () => Promise.resolve();
+  const answer = (status: number, body: unknown) =>
+    new Response(typeof body === "string" ? body : JSON.stringify(body), { status });
+
+  it("5xx と繋がらないときは、間を空けて 3 回まで試す", async () => {
+    const answers = [
+      () => Promise.reject(new TypeError("fetch failed")),
+      () => Promise.resolve(answer(503, "starting")),
+      () => Promise.resolve(answer(200, { closed: true })),
+    ];
+    let n = 0;
+    const slept: number[] = [];
+    const result = await sendClose(
+      () => answers[n++]!(),
+      (ms) => {
+        slept.push(ms);
+        return Promise.resolve();
+      },
+    );
+    expect(result).toEqual({ closed: true });
+    expect(n).toBe(3);
+    expect(slept).toHaveLength(2);
+  });
+
+  it("3 回とも届かなければ、投げずに closed: false と理由を返す", async () => {
+    let n = 0;
+    const result = await sendClose(() => {
+      n += 1;
+      return Promise.reject(new TypeError("fetch failed"));
+    }, noSleep);
+    expect(n).toBe(CLOSE_ATTEMPTS);
+    expect(result).toEqual({ closed: false, problem: "fetch failed" });
+  });
+
+  it("4xx は 1 回で止める（トークン・許可・本文の形は試し直しても同じ）", async () => {
+    let n = 0;
+    const result = await sendClose(() => {
+      n += 1;
+      return Promise.resolve(answer(401, "unauthorized"));
+    }, noSleep);
+    expect(n).toBe(1);
+    expect(result.closed).toBe(false);
+  });
+
+  it("古い段の失敗で capture-ledger が締めなかった答え（closed: false）も、そのまま返す", async () => {
+    await expect(
+      sendClose(() => Promise.resolve(answer(200, { closed: false })), noSleep),
+    ).resolves.toEqual({ closed: false });
   });
 });

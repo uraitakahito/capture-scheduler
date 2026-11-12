@@ -17,9 +17,20 @@ schema:
       description: ""
       default: null
       originalType: string
+    depth:
+      type: number
+      description: ""
+      default: null
+    level_key:
+      type: string
+      description: ""
+      default: null
+      originalType: string
     error:
       description: Windmill が渡す誤りの中身
       default: null
   required:
     - crawl_id
+    - depth
+    - level_key
     - error
