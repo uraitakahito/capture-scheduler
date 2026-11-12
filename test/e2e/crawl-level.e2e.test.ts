@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it, expect, beforeAll } from "vitest";
-import { mintToken } from "./helpers/stack.js";
+import { mintToken, startKey } from "./helpers/stack.js";
 
 /**
  * クロール 1 本を、**production と同じ経路**で通す。
@@ -84,7 +84,7 @@ const json = async (res: Response): Promise<Record<string, unknown>> =>
 const startCrawl = async (body: Record<string, unknown>): Promise<string> => {
   const res = await fetch(`${WAGGLE}/api/crawls`, {
     method: "POST",
-    headers: { ...auth(), "content-type": "application/json" },
+    headers: { ...auth(), ...startKey(), "content-type": "application/json" },
     body: JSON.stringify(body),
   });
   const text = await res.text();
@@ -190,7 +190,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
 
     const started = await fetch(`${WAGGLE}/api/crawls`, {
       method: "POST",
-      headers: { ...auth(), "content-type": "application/json" },
+      headers: { ...auth(), ...startKey(), "content-type": "application/json" },
       body: JSON.stringify({
         seeds: [`${FIXTURES}/links/hub`],
         maxDepth: 1,
@@ -380,7 +380,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
 
     const started = await fetch(`${WAGGLE}/api/crawls`, {
       method: "POST",
-      headers: { ...auth(), "content-type": "application/json" },
+      headers: { ...auth(), ...startKey(), "content-type": "application/json" },
       // 起点は 1 枚、辿らない。届いた要求はこの 1 枚のぶんだけになる。
       body: JSON.stringify({
         seeds: [`${FIXTURES}/responsive-images`],
@@ -469,7 +469,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
 
     const started = await fetch(`${WAGGLE}/api/crawls`, {
       method: "POST",
-      headers: { ...auth(), "content-type": "application/json" },
+      headers: { ...auth(), ...startKey(), "content-type": "application/json" },
       body: JSON.stringify({
         seeds: [`${FIXTURES}/responsive-images`],
         maxDepth: 0,
@@ -514,7 +514,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
 
     const started = await fetch(`${WAGGLE}/api/crawls`, {
       method: "POST",
-      headers: { ...auth(), "content-type": "application/json" },
+      headers: { ...auth(), ...startKey(), "content-type": "application/json" },
       body: JSON.stringify({ seeds: [`${FIXTURES}/responsive-images`], maxDepth: 0 }),
     });
     const startedBody = await started.text();
@@ -569,7 +569,7 @@ describe("クロールが flow を通って索引まで終わる", () => {
     try {
       const started = await fetch(`${WAGGLE}/api/crawls`, {
         method: "POST",
-        headers: { ...auth(), "content-type": "application/json" },
+        headers: { ...auth(), ...startKey(), "content-type": "application/json" },
         body: JSON.stringify({ seeds: [`${FIXTURES}/responsive-images`], maxDepth: 0 }),
       });
       const startedBody = await started.text();
@@ -830,7 +830,7 @@ describe("規則の並びで辿る", () => {
   it("前の規則に覆われた規則で頼むと、400 で名指されてクロールは立たない", async () => {
     const res = await fetch(`${WAGGLE}/api/crawls`, {
       method: "POST",
-      headers: { ...auth(), "content-type": "application/json" },
+      headers: { ...auth(), ...startKey(), "content-type": "application/json" },
       body: JSON.stringify({
         seeds: [`${FIXTURES}/links/rules`],
         rules: [{ follow: "any" }, { skip: "skipped.invalid" }],

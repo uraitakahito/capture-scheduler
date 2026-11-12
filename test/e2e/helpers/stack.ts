@@ -7,6 +7,7 @@
  * バイナリ (node) がコンテナの subnet へ TCP を張れず、DNS 名は引けるのに `EHOSTUNREACH` になる (実測 2026-09-20)。
  */
 import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect } from "vitest";
@@ -73,6 +74,12 @@ export const resetFixtures = async (): Promise<void> => {
   await fetch(`${FIXTURES_HOST}/__reset`, { method: "POST" });
 };
 
+/**
+ * `POST /api/crawls` の鍵 (`Idempotency-Key`)。capture-ledger は鍵を必ず求め、同じ鍵には最初の答えを返す
+ * (CAPTURE-180)。**1 回の始めるごとに新しい鍵** —— 使い回すと、2 本目のつもりの要求が 1 本目の答えになる。
+ */
+export const startKey = (): Record<string, string> => ({ "idempotency-key": randomUUID() });
+
 /** capture-ledger の API を、採ったトークンで。 */
 export const ledger = (token: string) => {
   const auth = { authorization: `Bearer ${token}` };
@@ -81,7 +88,7 @@ export const ledger = (token: string) => {
   const post = async (body: Record<string, unknown>): Promise<{ status: number; text: string }> => {
     const res = await fetch(`${WAGGLE}/api/crawls`, {
       method: "POST",
-      headers: { ...auth, "content-type": "application/json" },
+      headers: { ...auth, ...startKey(), "content-type": "application/json" },
       body: JSON.stringify(body),
     });
     return { status: res.status, text: await res.text() };
