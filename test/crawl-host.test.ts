@@ -81,6 +81,8 @@ const fakeEndpoint = (
     responses?: Reply[];
     busyTimes?: number;
     down?: boolean;
+    /** この回数だけ答えた後は、常に届かない (途中で落ちたエンドポイント)。 */
+    downAfter?: number;
     error?: Error;
     refuse?: Answer;
     failOn?: string[];
@@ -91,6 +93,7 @@ const fakeEndpoint = (
   const responses = options.responses ?? [{}];
   let busyLeft = options.busyTimes ?? 0;
   let n = 0;
+  let answered = 0;
   return {
     target,
     capture: (req: unknown) => {
@@ -98,6 +101,10 @@ const fakeEndpoint = (
       options.calls?.push({ target, url, at: Date.now() });
       options.seen?.push(req);
       if (options.down === true) return Promise.reject(new TypeError("fetch failed"));
+      if (options.downAfter !== undefined && answered >= options.downAfter) {
+        return Promise.reject(new TypeError("fetch failed"));
+      }
+      answered += 1;
       if (busyLeft > 0) {
         busyLeft -= 1;
         return Promise.resolve({
@@ -388,6 +395,43 @@ describe("エンドポイントを選ぶ", () => {
     const a = fakeEndpoint("bh-1", { down: true });
     const b = fakeEndpoint("bh-2", { down: true });
     await expect(run([a, b], ["https://site.test/a"])).rejects.toThrow(ServerUnavailable);
+  });
+
+  /**
+   * **撮った後には投げない (CAPTURE-180)。** 投げると Windmill の再試行がこのホストを 1 件目から
+   * 撮り直し、相手に同じページの 2 回目が届く。前の成果物は保管庫に残るのに報告に入らない。
+   */
+  it("撮った後に全部居なくなったら、投げずに撮れた結果と残りの failed を返す", async () => {
+    const calls: Call[] = [];
+    const a = fakeEndpoint("bh-1", { downAfter: 1, calls });
+    const results = await run([a], ["a", "b", "c"]);
+
+    expect(results.map((r) => [r.url, r.status])).toEqual([
+      ["a", "captured"],
+      ["b", "failed"],
+      ["c", "failed"],
+    ]);
+    expect(results[1]!.skipReason).toContain("撮り直さない");
+    expect(results[1]!.skipReason).toContain("bh-1");
+    // 残りは投げ直さない —— 届かないエンドポイントに c を投げていない。
+    expect(calls.map((c) => c.url)).toEqual(["a", "b"]);
+    // 撮っていない結果に taskId は無い (capture-ledger の拾い直しの対象にしない)。
+    expect(results[2]!.taskId).toBeUndefined();
+  });
+
+  it("1 件目から全部居なければ、今どおり段ごと落とす", async () => {
+    // まだ何も撮っていないので、Windmill の再試行で撮り直しても重ならない。
+    const a = fakeEndpoint("bh-1", { downAfter: 0 });
+    await expect(run([a], ["a", "b"])).rejects.toThrow(ServerUnavailable);
+  });
+
+  it("途中で 1 つだけ居なくなっても、残りのエンドポイントで続ける", async () => {
+    const calls: Call[] = [];
+    const a = fakeEndpoint("bh-1", { downAfter: 1, calls });
+    const b = fakeEndpoint("bh-2", { calls });
+    const results = await run([a, b], ["a", "b", "c"]);
+
+    expect(results.map((r) => r.status)).toEqual(["captured", "captured", "captured"]);
   });
 
   it("居ないエンドポイントの名前を誤りに載せる", async () => {
