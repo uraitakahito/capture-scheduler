@@ -46,8 +46,8 @@ stay open.
 
 ## The unit tests need nothing
 
-`windmill-client` is already a dev dependency and `plan_level.ts` imports only
-`robots-parser`, so the scripts import into vitest directly. IO is stubbed:
+The scripts import `windmill-client`, and `plan_level.ts` alone also imports
+`robots-parser`. Both are dev dependencies, so the scripts import into vitest directly. IO is stubbed:
 `vi.stubGlobal("fetch", …)` and `vi.mock("windmill-client", …)`.
 
 One unit test reads `flow.yaml` itself (`crawl-level-flow.test.ts`): every argument of `crawl_host` (its
@@ -57,8 +57,9 @@ flow's input. It sees the shape only — whether Windmill delivers the value is 
 that what the flow hands it (`secret_archive`) reaches the BrowserHive request.
 
 `captureHost` is exported from `crawl_host.ts` so the pacing loop can be driven
-with a fake client — `call()` only does `client[method](req, cb)`, so the fake is
-a plain object. Its `retry` argument — how long to wait when every BrowserHive
+with a fake endpoint — `captureHost` takes the BrowserHive endpoints (`Endpoint`) as an
+argument, and `Endpoint.capture` only returns an answer (`Answer`), so the fake is
+a plain object holding a name (`target`) and one function. Its `retry` argument — how long to wait when every BrowserHive
 is busy — exists so tests run on **real timers at millisecond scale**; fake
 timers were tried against capture-style sleeps elsewhere in this workspace and
 cost a round trip.
