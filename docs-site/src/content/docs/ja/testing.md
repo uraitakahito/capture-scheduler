@@ -45,8 +45,8 @@ doctor の点検は、同じ場所を `CAPTURE_LEDGER_DIR` から読む。
 
 ## 単体は何も要らない
 
-`windmill-client` は既に devDependency で、`plan_level.ts` が import するのは
-`robots-parser` だけ。だから script はそのまま vitest に読み込める。IO は差し替える:
+script が import するのは `windmill-client` で、`plan_level.ts` だけが `robots-parser` も import する。
+どちらも devDependency なので、script はそのまま vitest に読み込める。IO は差し替える:
 `vi.stubGlobal("fetch", …)` と `vi.mock("windmill-client", …)`。
 
 `flow.yaml` そのものを読む単体が 1 本ある（`crawl-level-flow.test.ts`）。`crawl_host` の引数（`.script.yaml` の schema）は
@@ -54,9 +54,9 @@ doctor の点検は、同じ場所を `CAPTURE_LEDGER_DIR` から読む。
 いまも e2e の問い。`crawl-host-main.test.ts` は `windmill-client` と `fetch` を差し替えて `crawl_host` の `main` そのものを
 呼び、flow から渡された物（`secret_archive`）が BrowserHive の要求まで届くかを見る。
 
-`captureHost` を `crawl_host.ts` から export してあるのは、間隔のループを偽の client で
-回すため —— `call()` は `client[method](req, cb)` を呼ぶだけなので、偽物はただの
-オブジェクトで足りる。`retry`（全 BrowserHive が busy のときの待ち幅）を引数にして
+`captureHost` を `crawl_host.ts` から export してあるのは、間隔のループを偽のエンドポイントで
+回すため —— `captureHost` は BrowserHive のエンドポイント（`Endpoint`）を引数で受け、`Endpoint.capture` は
+答え（`Answer`）を返すだけなので、偽物は名前（`target`）と関数 1 つを持つオブジェクトで足りる。`retry`（全 BrowserHive が busy のときの待ち幅）を引数にして
 あるのは、**実タイマーの ms スケール**で書くため。fake timer は、この workspace の
 別の場所で capture 系の sleep に対して試して一往復溶かしている。
 

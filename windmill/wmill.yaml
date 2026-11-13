@@ -14,7 +14,7 @@ includeUsers: false
 includeGroups: false
 includeSettings: false
 # 変数は同期しない。**秘密が git に落ちるため。**
-# `u/admin/waggle_token` などの変数は scripts/capture-ledger-token.ts が API 経由で入れる (`pnpm run windmill:capture-ledger-token`)。
+# `u/admin/ledger_client` などの `u/admin/*` の変数は scripts/capture-ledger-token.ts が API 経由で入れる (`pnpm run windmill:capture-ledger-token`)。
 includeKey: false
 skipVariables: true
 skipResources: true
