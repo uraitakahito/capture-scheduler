@@ -16,7 +16,8 @@ Windmill は capture-ledger のスタックの 2 つを使う。OpenFGA には�
 
 **§4 のスクリプトを忘れないこと。** BrowserHive は走らせるものの顔ぶれを持たないので、
 `scripts` 表が空だと、クロールはページの中で何も走らせない —— スクロールも遅延読み込みも
-起きないまま、成功したアーカイブが出る。下の `doctor` の**スクリプト**がそれを言う。
+起きないまま、成功したアーカイブが出る（`recordRandom` を頼んだクロールの頁には BrowserHive 自身の控えるスクリプトが
+入るが、乱数を控えるだけでスクロールはしない）。下の `doctor` の**スクリプト**がそれを言う。
 
 ```sh
 curl -s -o /dev/null -w '%{http_code}\n' -H 'authorization: Bearer dev-key' http://127.0.0.1:8090/stores

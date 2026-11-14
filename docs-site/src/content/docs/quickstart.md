@@ -15,7 +15,8 @@ Its `pnpm run dev:up` does §3 onwards in one go, so §1 and §2 are the only on
 
 **Do not skip the scripts in §4.** BrowserHive holds no roster of its own, so an empty `scripts`
 table means a crawl runs nothing inside the page — no scrolling, no lazy loading — and still
-produces a successful archive. The スクリプト (scripts) check in `doctor` below says so.
+produces a successful archive (a crawl that asks for `recordRandom` gets BrowserHive's own recorder in the page,
+which records random values and scrolls nothing). The スクリプト (scripts) check in `doctor` below says so.
 
 ```sh
 curl -s -o /dev/null -w '%{http_code}\n' -H 'authorization: Bearer dev-key' http://127.0.0.1:8090/stores

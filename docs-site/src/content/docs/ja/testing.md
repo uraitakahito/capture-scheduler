@@ -65,7 +65,7 @@ script が import するのは `windmill-client` で、`plan_level.ts` だけが
 どの試験も、Windmill の実行のエンドポイント（HTTP の method と path の組）ではなく **capture-ledger の API** でクロールを始める —— 目的が
 「capture-ledger が実際に送る引数」を運ぶことだから: `crawl_id` / `depth` / `frontier` /
 `per_host_delay_ms` / `host_parallelism` / `capture_formats` / `signing` / `scripts` / `variables` /
-`secrets` / `secret_archive` / `user_agent` と、受け取り先を出している配備では `artifact_sink` で、**`respect_robots` は入っていない**。
+`secrets` / `secret_archive` / `user_agent` / `record_random` と、受け取り先を出している配備では `artifact_sink` で、**`respect_robots` は入っていない**。
 
 最初の試験が見ているのは 5 つ:
 
@@ -145,6 +145,11 @@ e2e のほうは capture-fixtures が禁じられたページを受け取った�
 - **形が合わないときは成功のまま、項目が残る。** `safeParse` と `__bh.log.error` のスクリプトで、クロールは succeeded、
   ページのログの error の行に項目の名前が在る。
 - **受けない `import` の形は、compile の段でクロールごと落ちる。** `import { z as zod }` で failed、`error` に `BH0003`。
+- **頁の JS が受け取った乱数は、頼んだときだけ控える**（`random-record.e2e.test.ts`。BrowserHive v31.1.0 以上と
+  capture-fixtures v0.36.0 以上が要る）。起点は capture-fixtures の `/random/pick`（`Math.random` を 1 度引く）。
+  `recordRandom: true` なら BrowserHive WACZ に `random/values.jsonl` が在り、`browserhive:capture.random` は `recorded: true`
+  で乱数の行の数が `draws` と同じ、crawl_host の段の run の引数に `record_random: true` が在る。`false` なら `recorded` は
+  `false` で `skipped: "not-requested"`、`random/` は無い。
 
 ### 定期の回
 
