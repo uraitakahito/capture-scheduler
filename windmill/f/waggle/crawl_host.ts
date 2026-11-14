@@ -118,6 +118,12 @@ export interface CaptureSettings {
    * それは 1 ページではなくクロールの全部の取り込みに当たる。
    */
   secretArchive?: Record<string, "keep">;
+  /**
+   * 頁の JS が受け取った乱数 (`Math.random`・`crypto.getRandomValues`・`crypto.randomUUID`) を控えるか
+   * (BrowserHive v31.1.0 の `recordRandom`)。控えは BrowserHive WACZ の `random/values.jsonl` に入る。
+   * 真のときだけ鍵を送る —— 偽は省いたのと同じで、それより前の BrowserHive は知らない欄を 400 で断る。
+   */
+  recordRandom?: boolean;
 }
 
 /**
@@ -502,6 +508,19 @@ export const askedUserAgent = (value: string | null | undefined): string => {
 };
 
 /**
+ * 乱数を控えるかを読む。capture-ledger は**必ず真偽を送る** (頼まれていなければ `false`)。`null` は flow か capture-ledger の
+ * 取り違えで、黙って偽と読むと、頼んだ控えが無いまま取り込みが成功する。**export は試験のため。**
+ */
+export const askedRecordRandom = (value: boolean | null | undefined): boolean => {
+  if (typeof value !== "boolean") {
+    throw new Error(
+      "record_random が届いていない (flow.yaml の input_transforms と capture-ledger の版を確かめる)",
+    );
+  }
+  return value;
+};
+
+/**
  * スクリプトのシークレットを置くフォルダ。**この外の path は解かない。** path を組むのは capture-ledger で、
  * capture-ledger も同じ線で断る (二重の検査) —— ここまで外の path が届いたなら、運ぶ途中で入れ替わったか
  * capture-ledger が壊れたかのどちらかで、黙って読んでよい物ではない。doctor の `SECRETS_FOLDER_NAME`
@@ -573,6 +592,8 @@ const captureOne = async (
     ...(capture.userAgent === undefined || capture.userAgent === ""
       ? {}
       : { userAgent: capture.userAgent }),
+    // 乱数を控えるか。真のときだけ送る (偽なら鍵ごと省く。v31.1.0 より前の BrowserHive は知らない欄を 400 で断る)。
+    ...(capture.recordRandom === true ? { recordRandom: true } : {}),
   };
 
   for (let attempt = 1; ; attempt += 1) {
@@ -764,8 +785,14 @@ export async function main(
    * 要求には、解いたシークレットに在る名前だけを載せる (`keptSecrets`)。
    */
   secret_archive?: Record<string, "keep"> | null,
+  /**
+   * 頁の JS が受け取った乱数を控えるか。capture-ledger が**必ず送る** (頼まれていなければ `false`)。真偽でなければ
+   * (`null` を含む) 取り違えなので投げる (`askedRecordRandom`)。
+   */
+  record_random?: boolean | null,
 ): Promise<PageResult[]> {
   const userAgent = askedUserAgent(user_agent);
+  const recordRandom = askedRecordRandom(record_random);
   // **設定は変数から読む。引数では受けない。**
   // Windmill は schema の既定値を UI からの実行にしか埋めない —— webhook で起こすと
   // 引数は素通りで、宛先が undefined のまま落ちる (実測)。capture-ledger は自分が
@@ -801,6 +828,7 @@ export async function main(
       secrets: resolved,
       secretArchive: kept,
       userAgent,
+      recordRandom,
     },
     per_host_delay_ms,
     initial_delay_ms,

@@ -69,7 +69,7 @@ cost a round trip.
 Each test starts a crawl through capture-ledger's API — **not** Windmill's run endpoint —
 because the point is to carry the arguments capture-ledger actually sends:
 `crawl_id`, `depth`, `frontier`, `per_host_delay_ms`, `host_parallelism`,
-`capture_formats`, `signing`, `scripts`, `variables`, `secrets`, `secret_archive`, `user_agent`, and `artifact_sink` where
+`capture_formats`, `signing`, `scripts`, `variables`, `secrets`, `secret_archive`, `user_agent`, `record_random`, and `artifact_sink` where
 capture-ledger serves the sink. **`respect_robots` is not among them.**
 
 The first one asserts five things:
@@ -169,6 +169,12 @@ log, which counts every request by its full URL, query string included.
   `__bh.log.error`, the crawl succeeds and the page log's error line has the field's name.
 - **An `import` in a form that is not accepted fails the crawl at compile**: `import { z as zod }`
   ends failed with `BH0003` in `error`.
+- **The random values the page's JavaScript receives are recorded only when asked** (`random-record.e2e.test.ts`;
+  needs BrowserHive v31.1.0 or later and capture-fixtures v0.36.0 or later). The seed is capture-fixtures'
+  `/random/pick`, which draws once with `Math.random`. With `recordRandom: true` the BrowserHive WACZ has
+  `random/values.jsonl`, `browserhive:capture.random` is `recorded: true` with as many draw lines as `draws`, and the
+  crawl_host step's run arguments carry `record_random: true`. With `false`, `recorded` is `false` with
+  `skipped: "not-requested"` and there is no `random/` entry.
 
 ### Scheduled runs
 

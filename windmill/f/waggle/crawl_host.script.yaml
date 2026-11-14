@@ -54,6 +54,10 @@ schema:
       type: number
       description: ""
       default: null
+    record_random:
+      type: boolean
+      description: ""
+      default: null
     scripts:
       type: array
       description: ""

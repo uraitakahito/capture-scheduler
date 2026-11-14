@@ -766,6 +766,32 @@ describe("頼まれた User-Agent", () => {
   });
 });
 
+describe("乱数の控え (recordRandom)", () => {
+  const formats = { png: false, webp: false, html: false, links: false, mhtml: false, wacz: true };
+  const sendWith = async (recordRandom: boolean) => {
+    const seen: unknown[] = [];
+    await captureHost(
+      [fakeEndpoint("bh-1", { seen })],
+      "m",
+      ["a"],
+      "c1",
+      { formats, signing: false, scripts: [], recordRandom },
+      0,
+      0,
+      FAST,
+    );
+    return seen[0] as { recordRandom?: unknown };
+  };
+
+  it("頼まれたら要求に recordRandom: true を載せる", async () => {
+    expect((await sendWith(true)).recordRandom).toBe(true);
+  });
+
+  it("頼まれなければ鍵ごと送らない（v31.1.0 より前の BrowserHive は知らない欄を 400 で断る）", async () => {
+    expect(await sendWith(false)).not.toHaveProperty("recordRandom");
+  });
+});
+
 describe("クロールごとの値", () => {
   const formats = { png: false, webp: false, html: false, links: false, mhtml: false, wacz: true };
   const sendWith = async (extra: {

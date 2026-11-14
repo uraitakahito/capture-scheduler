@@ -121,6 +121,11 @@ value:
                 user_agent:
                   type: javascript
                   expr: flow_input.user_agent
+                # 頁の JS が受け取った乱数を控えるか (BrowserHive の recordRandom)。capture-ledger は必ず真偽を送る
+                # (頼まれていなければ false)。ここを書き忘れると null で届き、crawl_host が投げる。
+                record_random:
+                  type: javascript
+                  expr: flow_input.record_random
             # crawl_host が投げたら、再起動を待つぶんの間隔で 2 回再試行する (初回と合わせて計 3 回)。
             # 再試行はホストを 1 件目から撮り直す。だから crawl_host が投げるのは、まだ何も撮っていないとき
             # だけ —— ホストの 1 件目で BrowserHive が全部居ない (ServerUnavailable) か、引数が欠けたか、
@@ -352,8 +357,13 @@ schema:
       type: string
       description: 頼まれた User-Agent。打った字のままで、{chrome} は BrowserHive が解く。空なら browser の字のまま撮る
       default: ""
+    record_random:
+      # 頁の JS が受け取った乱数を控えるか。capture-ledger がクロールの頼みから固定し、**必ず送る** (頼まれていなければ false)。
+      type: boolean
+      description: 頁の JS が受け取った乱数 (Math.random・crypto.getRandomValues・crypto.randomUUID) を控えるか。真なら BrowserHive が値を変えずに BrowserHive WACZ の random/values.jsonl に控える
+      default: false
   # capture-ledger が送るのは crawl_id / depth / level_key / frontier / 間隔 / 並列度 /
-  # capture_formats / signing / scripts / variables / secrets / secret_archive / user_agent と、受け取り先を
+  # capture_formats / signing / scripts / variables / secrets / secret_archive / user_agent / record_random と、受け取り先を
   # 出している配備では artifact_sink。並列度は plan_level が BrowserHive のエンドポイントの数で頭打ちにしてから for-loop に渡る。
   # schema に無い入力を capture-ledger が送っても、Windmill は既定で引数を schema に照らさないので断らない (frontier の
   # 要素の lastFinishedAt も、ここに書いていないのに plan_level まで届いている)。

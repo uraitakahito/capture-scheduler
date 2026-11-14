@@ -59,6 +59,17 @@ describe("flow が crawl_host の引数を運ぶ", () => {
     });
     expect(flow.schema.properties).toHaveProperty("secret_archive");
   });
+
+  it("record_random は flow の入力をそのまま運び、flow の schema に真偽で在る（既定は false）", () => {
+    expect(crawlHostStep()?.value.input_transforms?.["record_random"]).toEqual({
+      type: "javascript",
+      expr: "flow_input.record_random",
+    });
+    expect(flow.schema.properties["record_random"]).toMatchObject({
+      type: "boolean",
+      default: false,
+    });
+  });
 });
 
 /**

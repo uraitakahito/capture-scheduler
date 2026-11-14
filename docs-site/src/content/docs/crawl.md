@@ -196,8 +196,9 @@ runs**, so a webhook run gets nothing — the BrowserHive target arrived
 
 What does arrive as arguments is what capture-ledger decides for that crawl and always
 sends: the URLs, the delay, `capture_formats` / `signing`, **`scripts`** — the
-TypeScript to run inside each page — and **`variables` / `secrets` / `secret_archive`**, the per-crawl values
-([the section below](#per-crawl-values--variables-and-secrets)). The ledger keeps it as written (its `sha256` is over the
+TypeScript to run inside each page — **`variables` / `secrets` / `secret_archive`**, the per-crawl values
+([the section below](#per-crawl-values--variables-and-secrets)), and **`record_random`**, whether BrowserHive records the
+random values the page's JavaScript receives ([Per-crawl random recording](#per-crawl-random-recording)). The ledger keeps it as written (its `sha256` is over the
 TypeScript bytes); `compile_scripts` turns it into JavaScript and re-hashes it, and BrowserHive
 checks the JavaScript's hash. The two hashes meet at that one step. `report_level` then carries
 the JavaScript hash, with the compiler version and the host-types tag the service answered
@@ -211,7 +212,9 @@ like a registered one.
 
 `scripts` is required for the same reason `capture_formats` is. BrowserHive v11.0.0
 holds no roster of its own: send nothing and nothing runs inside the page, and the
-capture still succeeds and still produces an archive. A forgotten argument would be a
+capture still succeeds and still produces an archive. The one script this flow can add is BrowserHive's own: with
+`record_random`, BrowserHive puts its recorder into the page before the page's JavaScript, and the values the page
+receives are left unchanged. A forgotten argument would be a
 crawl that never scrolled, indistinguishable from one that did. This flow only carries
 them — what runs, in what order, and in which of BrowserHive's two injection points
 (`behavior` after load, `preload` before navigation) is decided by
@@ -253,6 +256,19 @@ value without Headless, and leaves the key out when it is empty. `crawl_host` th
 not arrive, because a crawl that silently kept the browser's value would still succeed. `plan_level` uses it to
 read robots.txt rules: text containing `BrowserHive` is matched under that name (its group first, then
 `*`); otherwise under `*`. The request that fetches robots.txt does not change.
+
+## Per-crawl random recording
+
+A crawl can ask BrowserHive to record the values the page's JavaScript receives from `Math.random`,
+`crypto.getRandomValues` and `crypto.randomUUID` (`recordRandom` in BrowserHive v31.1.0). capture-ledger always sends
+it as `record_random`, `false` when none was asked for. **The flow only carries it**: `crawl_host` puts
+`recordRandom: true` in the request when it is true and leaves the key out when it is false — BrowserHive before
+v31.1.0 refuses a field it does not know with 400. `crawl_host` throws when the input is not a boolean (`null`
+included), because a crawl that silently recorded nothing would still succeed. When asked, BrowserHive writes the values
+to `random/values.jsonl` in the BrowserHive WACZ and summarises them in `browserhive:capture.random` of
+`datapackage.json` (`recorded: true`); otherwise `recorded` is `false` with `skipped: "not-requested"` and there is no
+`random/` entry ([BrowserHive WACZ Profile 1.26.0](https://uraitakahito.github.io/browserhive-specs/wacz-profile/1.26.0/#random)).
+BrowserHive refuses `recordRandom` without `captureFormats.wacz` (400), since the values go only into the WACZ.
 
 ## Per-crawl values — variables and secrets
 
