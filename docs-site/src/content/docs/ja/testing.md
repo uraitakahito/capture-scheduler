@@ -112,18 +112,22 @@ e2e のほうは capture-fixtures が禁じられたページを受け取った�
   1 本が通ることを見る。v0.24.2 までは診断を全部載せたので capture-ledger が断り、クロールは running のまま残った。
 - **クロールごとの変数が頁に届く。** `POST /api/crawls` の `variables` で渡した値を、その場の TS が `defineParams` で
   読んで `/plain-html?var=<値>` を取りに行く。同じ値が capture-ledger の `GET /api/crawls/:id` の
-  `variables` と、WACZ の `datapackage.json` の `settings.variables` に在る。
+  `variables` と、取り込みの WACZ の `datapackage.json` の `browserhive:capture.settings.variables` に在る。
+  その WACZ は [BrowserHive WACZ Profile](https://uraitakahito.github.io/browserhive-specs/wacz-profile/1.25.0/ja/)
+  に適合する WACZ（BrowserHive WACZ）。
 - **必須の変数を渡さなければ、始める前に断る。** `400 missing variables` で、`diagnostics` に `BH0001`。クロールの行は
   立たず、capture-fixtures に要求は届かない。宣言の形に合わない値（`.min(1)` に空の字）は `400 invalid variables`。
 - **シークレットが頁に届き、記録には残らない。** 試験が `f/waggle_secrets/e2e_probe` に無作為の値を置き、その場の
   TS が `__bh.secrets.e2e_probe` の長さだけを `/plain-html?len=<長さ>` で送る。値そのものは WACZ の全 member・
   capture-ledger の答え・Windmill の run の引数のどこにも無く、`settings.secrets` に名前だけ在る。対照は、同じ値を変数で
   渡した取り込み —— そちらでは同じ探し方で WACZ に見つかる。
-- **隠すシークレットは、通信に載せても WACZ に残らない**（BrowserHive v29.0.0）。その場の TS が値を
+- **隠すシークレットは、通信に載せても BrowserHive WACZ に残らない**（BrowserHive v29.0.0）。その場の TS が値を
   `/echo/text?v=<値>` で送り、capture-fixtures は値を HTML で返す。値は無作為で、`%`・HTML・JSON で綴りが変わる字と、
-  乱数の 12 字（16 進）を持つ。証人は要求ログで、値がサイトに届いたことを乱数の字で確かめる。WACZ の全 member に、値の
-  綴りも乱数の字も無く（16 進の字はどの符号化でも残るので、綴りの一覧が見落とした形も見つかる）、capture-ledger の `archive` は
-  `null`、`settings.secretArchive` は `{}`、WARC には `BrowserHive-Redacted` と `/echo/text?v=***` が在る。
+  乱数の 12 字（16 進）を持つ。証人は要求ログで、値がサイトに届いたことを乱数の字で確かめる。BrowserHive WACZ の
+  全 member に、値の綴りも乱数の字も無く（16 進の字はどの符号化でも残るので、綴りの一覧が見落とした形も見つかる）、
+  capture-ledger の `archive` は `null`、`settings.secretArchive` は `{}`、
+  [BrowserHive WARC](https://uraitakahito.github.io/browserhive-warc-spec/1.4.0/ja/) には `BrowserHive-Redacted` と
+  `/echo/text?v=***` が在る。
 - **keep と宣言したシークレットは、capture-ledger → flow → crawl_host → BrowserHive と運ばれ、WARC に値のまま残る**（上の対照）。
   同じ送り方で、宣言に `archive: "keep"` と書く。capture-ledger の `archive` は `"keep"`、crawl_host の段の run の引数に
   `secret_archive` が在り、`settings.secretArchive` に名前が在り、乱数の字が WARC に見つかる。flow が `secret_archive` を
@@ -136,7 +140,8 @@ e2e のほうは capture-fixtures が禁じられたページを受け取った�
   `page.evaluate` の同期の間は CDP が eval を許し、CSP に当たらないから。
 - **BrowserHive が Zod を読むスクリプトの終わりを待つ。** `await` で 1.5 秒待つスクリプトの後で、ページのログの
   `script … finished after N ms` の N が 1,500 以上。関数で包んだ JS は完了値が Promise でなくなり、数 ms で終わった形になる。
-- **走った JS が記録に残る。** WACZ の `behaviors/custom.jsonl` の `source` に `// zod <版> (MIT)` が在り、`import` は無い。
+- **走った JS が記録に残る。** BrowserHive WACZ の `behaviors/custom.jsonl` の `source` に `// zod <版> (MIT)` が在り、
+  `import` は無い。
 - **形が合わないときは成功のまま、項目が残る。** `safeParse` と `__bh.log.error` のスクリプトで、クロールは succeeded、
   ページのログの error の行に項目の名前が在る。
 - **受けない `import` の形は、compile の段でクロールごと落ちる。** `import { z as zod }` で failed、`error` に `BH0003`。

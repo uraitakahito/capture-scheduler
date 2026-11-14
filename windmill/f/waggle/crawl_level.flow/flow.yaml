@@ -335,7 +335,7 @@ schema:
       # 届き、crawl_host が getVariable で解いて BrowserHive にだけ渡す。flow の入力にも run の履歴にも
       # 値は現れない。BrowserHive (v29.0.0 から) は値を WARC でも既定で隠す (secret_archive に在る物だけ残す)。
       type: object
-      description: クロールごとのシークレット (名前 → Windmill の変数の path)。crawl_host が解き、スクリプトが __bh.secrets で読む。値は capture-ledger にも run の引数にも無く、WARC では既定で *** に置き換わる
+      description: クロールごとのシークレット (名前 → Windmill の変数の path)。crawl_host が解き、スクリプトが __bh.secrets で読む。値は capture-ledger にも run の引数にも無く、BrowserHive WARC では既定で *** に置き換わる
       additionalProperties:
         type: string
     secret_archive:

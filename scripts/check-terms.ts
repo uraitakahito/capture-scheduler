@@ -1,5 +1,5 @@
 /**
- * クロールの語を、旧い言い方で書いていないかを見張る。規則は下の RULES の 11 個。
+ * クロールの語を、旧い言い方で書いていないかを見張る。規則は下の RULES の 12 個。
  *
  * ## なぜ要るのか
  *
@@ -34,6 +34,10 @@
  *   1 字の語から意味ごとに替えた。同じ字が 1 つの文の中でも別の物を指していた。切り口・入口・出口・窓口は別の語なので
  *   外してから、残った字を全部見る。「注入口」は「入口」を含むので先に止める（capture-workbench・capture-ledger・
  *   browserhive も見張っている）
+ * - **BrowserHive WACZ Profile に適合する WACZ は「BrowserHive WACZ」、中の WARC は「BrowserHive WARC」と書く。**
+ *   2026-11 に（Jira CAPTURE-341）、BrowserHive が足した物（`browserhive:capture`・`behaviors/`・写しの行・
+ *   シークレットの置き換え）に頼る文の呼び名を決めた。「BrowserHive の WACZ」「BrowserHive's WARC」は作り手を言うだけで、
+ *   Profile に適合するかを言わない。仕様の名前（「BrowserHive の WACZ Profile」）は見ない
  *
  * 書き手（人と Claude）は長くこの形で書いてきたので、見張らなければ戻ってくる。
  *
@@ -58,6 +62,7 @@
  *   スクリプトの置き場は「登録済みのスクリプト」、DB に入ったことは「capture-ledger に載る」。2 字がシステム・DB の行・
  *   置き場を兼ね、帳簿の語なのに「台帳が 400 で断る」と動く主語になっていた（capture-ledger・capture-workbench・
  *   browserhive も見張っている）
+ * - 「BrowserHive の WACZ」「BrowserHive's WARC」: 形の並び（OLD_FORMAT_OWNER）。後ろに Profile が続く形は見ない
  *
  * ## 見ないもの
  *
@@ -102,6 +107,12 @@ const OLD_SUITE =
 /** replayweb-server の旧い名前の形。語の replay は禁じない（上の注記）。 */
 const OLD_REPLAY_NAMES =
   /uraitakahito[/:]replay(?![\w-])|\.upstream\/replay(?![\w-])|\breplayKeyUrl\b|\breplayProblem\b|\breplayOrigin\b|\breplay の \/wacz\/|スタックの replay\b/u;
+
+/**
+ * 作り手だけを言う WACZ・WARC の形（CAPTURE-341）。仕様の名前（BrowserHive の WACZ Profile）は当てない。
+ * 足すときは、「BrowserHive WACZ」「BrowserHive WACZ Profile」に当たらないことを確かめる。
+ */
+const OLD_FORMAT_OWNER = /BrowserHive\s*(の|'s)\s*WA(RC|CZ)(?!\s*Profile)/u;
 
 const RULES: { find: (line: string) => boolean; say: string }[] = [
   {
@@ -151,6 +162,12 @@ const RULES: { find: (line: string) => boolean; say: string }[] = [
     say:
       "「台帳」が残っています。システムは capture-ledger、置き場は「登録済みのスクリプト」（登録する・登録されていない）、" +
       "DB に入ったことは「capture-ledger に載る」と書きます（CAPTURE-186）。",
+  },
+  {
+    find: (line) => OLD_FORMAT_OWNER.test(line),
+    say:
+      "「BrowserHive の WACZ」「BrowserHive's WARC」の形が残っています。BrowserHive WACZ Profile に適合する WACZ は" +
+      "「BrowserHive WACZ」（英 a BrowserHive WACZ）、中の WARC は「BrowserHive WARC」と書きます（CAPTURE-341）。",
   },
 ];
 

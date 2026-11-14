@@ -30,8 +30,9 @@ import {
  *
  *   - **頁の中に届いたか** —— その場の TS が印を capture-fixtures に送る。相手のリクエストログで見る
  *   - **capture-ledger の行** —— `GET /api/crawls/:id` の `variables` (値) と `secrets` (名前と path と `archive`)
- *   - **WACZ** —— `datapackage.json` の `settings.variables` (値) と `settings.secrets` (名前だけ)。シークレットの値は
- *     **全 member のどこにも無い**。同じ探し方で、変数として渡した値は見つかる (対照)
+ *   - **BrowserHive WACZ** —— `datapackage.json` の `browserhive:capture.settings.variables` (値) と
+ *     `browserhive:capture.settings.secrets` (名前だけ)。シークレットの値は **全 member のどこにも無い**。
+ *     同じ探し方で、変数として渡した値は見つかる (対照)
  *
  * シークレットを通信に載せた場面も見る (BrowserHive v29.0.0 は WARC の中でも値を隠す)。宣言に `archive: "keep"` と
  * 書いた物だけが、capture-ledger → flow の `secret_archive` → crawl_host → BrowserHive の `secretArchive` と運ばれて WARC に

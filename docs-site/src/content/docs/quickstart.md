@@ -254,7 +254,9 @@ does not throw on those failures, so a green run does not prove it — and reads
 replay bundle the ledger points to through replayweb-server's `/wacz/` (`127.0.0.1:8899`, the capture-ledger
 stack's replayweb-server), checking that this archive is among its `resources`. Then it checks the index step's
 answer (no archive left out, at least one indexed). Last, it searches the
-ledger for the tag and checks that this archive's hits are at the stages the WACZ's page list
+ledger for the tag and checks that this archive's hits are at the stages the page list of the
+BrowserHive WACZ (a WACZ that conforms to the
+[BrowserHive WACZ Profile](https://uraitakahito.github.io/browserhive-specs/wacz-profile/1.25.0/))
 predicts: the snapshot stages when the page list has snapshot entries, otherwise the one entry of the
 document (`page`):
 
