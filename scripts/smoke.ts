@@ -13,7 +13,7 @@
  * (`smoke/read-replay-bundle.ts`)。合本の段は capture-ledger の 200 の失敗では投げない (クロールを止めないため) ので、
  * run が緑でも合本が書けたとは限らない。続けて索引の段の答え (載らなかった 0 本・載せた 1 本以上) を照らす。
  * 既定の頁 (capture-fixtures の印付きの頁。印は撮るたびに変える) なら、その印で capture-ledger の検索を引き、
- * この回の archive の当たりの時点が、WACZ のページ一覧から予想した時点と同じかまで照らす
+ * この回の archive の当たりの時点が、BrowserHive WACZ のページ一覧から予想した時点と同じかまで照らす
  * (`smoke/read-search.ts`)。URL を渡したときは、検索は照らさない (その頁で当たる語が分からない)。
  *
  * 撮れなかったら、落ちた段と直し方を言う (`smoke/read-crawl.ts`)。**自分が始めたクロールは
@@ -561,7 +561,7 @@ say(
 if (target === undefined) {
   say("検索", "URL を渡したので照らさない (照らすのは既定の印付きの頁のとき)");
 } else {
-  // 当たるはずの時点は、その WACZ のページ一覧から決める (写しの行があれば写しの時点だけ)。
+  // 当たるはずの時点は、その BrowserHive WACZ のページ一覧から決める (写しの行があれば写しの時点だけ)。
   const pagesJsonl =
     signed.url === undefined
       ? undefined

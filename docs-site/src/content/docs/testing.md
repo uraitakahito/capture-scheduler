@@ -124,7 +124,10 @@ log, which counts every request by its full URL, query string included.
 - **A per-crawl variable reaches the page.** The value sent as `variables` on `POST /api/crawls` is
   read by an inline script through `defineParams` and fetched as
   `/plain-html?var=<value>`. The same value appears in the ledger's `GET /api/crawls/:id` under
-  `variables` and in the WACZ's `datapackage.json` under `settings.variables`.
+  `variables` and in the `datapackage.json` of the capture's WACZ under
+  `browserhive:capture.settings.variables`. That WACZ conforms to the
+  [BrowserHive WACZ Profile](https://uraitakahito.github.io/browserhive-specs/wacz-profile/1.25.0/)
+  (a BrowserHive WACZ).
 - **A required variable left out is refused before the crawl starts.** `400 missing variables` with
   `BH0001` in `diagnostics`; no crawl row is created and capture-fixtures receives nothing. A value that
   does not fit the declaration (an empty string for `.min(1)`) is `400 invalid variables`.
@@ -134,13 +137,15 @@ log, which counts every request by its full URL, query string included.
   answers, or the arguments of the Windmill runs; `settings.secrets` carries the name only. The
   control is a capture that sends the same value as a variable — the same search finds it in that
   WACZ.
-- **A hidden secret sent over the network leaves no trace in the WACZ** (BrowserHive v29.0.0). The inline
-  script sends the value as `/echo/text?v=<value>`, and capture-fixtures sends it back in HTML. The value is
-  random, has characters that change under `%`, HTML and JSON encoding, and carries a random 12-character
-  hex nonce. The witness is the request log: the nonce shows the value reached the site. Neither the value's
-  spellings nor the nonce is in any WACZ member (hex survives every encoding, so a form the list of
-  spellings missed is still caught); the ledger's `archive` is `null`, `settings.secretArchive` is `{}`, and
-  the WARC has `BrowserHive-Redacted` and `/echo/text?v=***`.
+- **A hidden secret sent over the network leaves no trace in the BrowserHive WACZ** (BrowserHive
+  v29.0.0). The inline script sends the value as `/echo/text?v=<value>`, and capture-fixtures sends it
+  back in HTML. The value is random, has characters that change under `%`, HTML and JSON encoding, and
+  carries a random 12-character hex nonce. The witness is the request log: the nonce shows the value
+  reached the site. Neither the value's spellings nor the nonce is in any member of the BrowserHive
+  WACZ (hex survives every encoding, so a form the list of spellings missed is still caught); the
+  ledger's `archive` is `null`, `settings.secretArchive` is `{}`, and the
+  [BrowserHive WARC](https://uraitakahito.github.io/browserhive-warc-spec/1.4.0/) has
+  `BrowserHive-Redacted` and `/echo/text?v=***`.
 - **A secret declared `keep` travels ledger → flow → crawl_host → BrowserHive and stays in the WARC as it
   was** — the control for the one above. Same sending, with `archive: "keep"` in the declaration: the ledger's
   `archive` is `"keep"`, the crawl_host step's run arguments carry `secret_archive`, `settings.secretArchive`
@@ -158,8 +163,8 @@ log, which counts every request by its full URL, query string included.
 - **BrowserHive waits for a script that reads Zod to finish.** After a script that awaits 1.5 seconds,
   N in the page log's `script … finished after N ms` is at least 1,500. JavaScript wrapped in a
   function loses the Promise as its completion value and looks finished within milliseconds.
-- **The JavaScript that ran stays on record.** The `source` in the WACZ's `behaviors/custom.jsonl`
-  has `// zod <version> (MIT)` and no `import`.
+- **The JavaScript that ran stays on record.** The `source` in the BrowserHive WACZ's
+  `behaviors/custom.jsonl` has `// zod <version> (MIT)` and no `import`.
 - **A value of the wrong shape leaves the crawl succeeded and names the field.** With `safeParse` and
   `__bh.log.error`, the crawl succeeds and the page log's error line has the field's name.
 - **An `import` in a form that is not accepted fails the crawl at compile**: `import { z as zod }`

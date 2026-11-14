@@ -249,7 +249,8 @@ capture-ledger の中に在り、古い checkout の `windmill:push` が戻す�
 合本の `replay.json` を replayweb-server の `/wacz/`（`127.0.0.1:8899`。capture-ledger のスタックの replayweb-server）から
 読んで、この回の archive が `resources` に在るかを見る。続けて索引の段の答え（載らなかった 0 本・
 載せた 1 本以上）を照らす。最後に、印で capture-ledger の検索を引き、この回の archive の当たりの時点が、
-WACZ のページ一覧から予想した時点（写しの行があれば写しの時点、無ければ文書の行の 1 件 `page`）と
+BrowserHive WACZ（[BrowserHive WACZ Profile](https://uraitakahito.github.io/browserhive-specs/wacz-profile/1.25.0/ja/)
+に適合する WACZ）のページ一覧から予想した時点（写しの行があれば写しの時点、無ければ文書の行の 1 件 `page`）と
 同じかを照らす:
 
 ```

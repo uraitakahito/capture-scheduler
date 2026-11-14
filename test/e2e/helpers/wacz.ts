@@ -30,7 +30,7 @@ export const datapackageOf = (members: WaczMembers): Record<string, unknown> => 
 };
 
 /**
- * BrowserHive が書く `settings` (profile の #settings)。datapackage.json の最上位ではなく、producer の名前空間
+ * BrowserHive が書く `settings` (WACZ Profile の #settings)。datapackage.json の最上位ではなく、producer の名前空間
  * `browserhive:capture` の下に在る (v22.0.0 の実物で確かめた。`conformsTo` もそこ)。
  */
 export const settingsOf = (members: WaczMembers): Record<string, unknown> => {

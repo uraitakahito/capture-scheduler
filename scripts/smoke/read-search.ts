@@ -5,7 +5,7 @@
  * 見ただけでは、索引が載ったかは分からない —— smoke は段の run の終わりを待ち、索引の段の答え
  * (`pending・indexed・failed・pages`) を読み、撮った頁の語で capture-ledger の検索を引いて、当たった時点を照らす。
  *
- * **当たるはずの時点は、その WACZ のページ一覧から決める。** BrowserHive v25.0.0 から、ページ一覧の
+ * **当たるはずの時点は、その BrowserHive WACZ のページ一覧から決める。** BrowserHive v25.0.0 から、ページ一覧の
  * 1 行目は取り込んだ文書の行 (stage が無い) で、写しがあればその後に時点ごとの行が並ぶ。capture-ledger
  * (v0.70.0 から) は、写しの行があれば写しの時点だけを索引に入れ、文書の行は入れない
  * (文書の行は after-behaviors の写しとほぼ同じ文なので、入れると同じ語が 1 本で 2 回当たる)。写しの行が
@@ -122,7 +122,7 @@ export const readIndexFailure = (message: string): string | undefined => {
 };
 
 /**
- * WACZ の `pages/pages.jsonl` から、索引に載るはずの時点。写しの行 (stage を持つ行) があればその時点を
+ * BrowserHive WACZ の `pages/pages.jsonl` から、索引に載るはずの時点。写しの行 (stage を持つ行) があればその時点を
  * 一覧の順に、無ければ文書の行の 1 件 (`page`)。見出しの行 (url を持たない) は数えない。
  */
 export const expectedStages = (pagesJsonl: string): string[] => {
@@ -192,11 +192,11 @@ export const compareSearchHits = (
   if (found.includes("page") && !want.includes("page")) {
     return {
       evidence: `検索の当たりに文書の行 (page) がある: ${found.join("・")} (ページ一覧から予想した時点は ${want.join("・")})`,
-      fix: "capture-ledger が、写しの行がある WACZ の文書の行を索引に入れている —— capture-ledger が v0.70.0 より古い",
+      fix: "capture-ledger が、写しの行がある BrowserHive WACZ の文書の行を索引に入れている —— capture-ledger が v0.70.0 より古い",
     };
   }
   return {
     evidence: `検索の当たりの時点が ${found.join("・")} で、ページ一覧から予想した ${want.join("・")} と違う`,
-    fix: "capture-ledger の索引の作り方 (src/search/document.ts の pagesToIndex) と、この WACZ の pages/pages.jsonl を見比べる",
+    fix: "capture-ledger の索引の作り方 (src/search/document.ts の pagesToIndex) と、この BrowserHive WACZ の pages/pages.jsonl を見比べる",
   };
 };
