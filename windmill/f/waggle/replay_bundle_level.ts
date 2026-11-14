@@ -2,7 +2,7 @@
  * クロールの合本を、この段で記録に載ったぶんまで含めて書き直すよう capture-ledger に頼む (CAPTURE-57)。
  *
  * 合本は、そのクロールの WACZ を全部並べた `replay.json` と、その頁の行の `pages.json` の組。capture-ledger が
- * 保管庫の `org/<組織>/crawls/<クロール>/r<版>/` に書き、replay はそれを 1 つのアーカイブとして開く —— どの WACZ の
+ * 保管庫の `org/<組織>/crawls/<クロール>/r<版>/` に書き、replayweb-server と capture-player はそれを 1 つのアーカイブとして開く —— どの WACZ の
  * 頁へもリンクで行ける。版は書くたびに capture-ledger が払い出し、書いた版は書き換えない。
  *
  * ## ここに判断は無い

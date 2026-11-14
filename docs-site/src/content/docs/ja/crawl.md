@@ -17,7 +17,7 @@ for-each             ホストごとに並列（parallelism = host_parallelism�
   ↓
 report_level         capture-ledger に報告し、次の段があるかを受け取る
   ↓
-replay_bundle_level  クロールの合本（replay が 1 つのアーカイブとして開く）を書き直すよう capture-ledger に頼む
+replay_bundle_level  クロールの合本（replayweb-server と capture-player が 1 つのアーカイブとして開く）を書き直すよう capture-ledger に頼む
   ↓
 index_level          記録に載ったぶんを索引に載せるよう capture-ledger に頼む
 ```
@@ -51,8 +51,8 @@ capture-ledger は段ごとに **段の鍵**（Windmill の job の id）を決�
 
 `replay_bundle_level` も報告の後に走る。段の深さ（`depth`）を capture-ledger の `POST /api/crawls/:id/replay-bundle`
 に送ると、capture-ledger がクロールの**合本**を新しい版として保管庫の `org/<組織>/crawls/<クロール>/r<版>/` に書く
-—— そのクロールのそれまでの WACZ を全部並べた `replay.json` と、その頁の行の `pages.json` の組。replay は
-`replay.json` を 1 つのアーカイブとして開くので、ある WACZ の頁から別の WACZ の頁へリンクで行ける。どの WACZ を
+—— そのクロールのそれまでの WACZ を全部並べた `replay.json` と、その頁の行の `pages.json` の組。replayweb-server と
+capture-player は `replay.json` を 1 つのアーカイブとして開くので、ある WACZ の頁から別の WACZ の頁へリンクで行ける。どの WACZ を
 入れるかと版の番号は capture-ledger が決め、`depth` は記録されるだけ。`index_level` より前に置くのは、合本が
 OpenSearch に頼らないから —— 索引の段が落ちても合本は書かれる。
 

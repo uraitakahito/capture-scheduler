@@ -96,7 +96,7 @@ export interface CaptureSettings {
   artifactSink?: { url: string; token: string };
   /**
    * クロールごとの変数 (名前 → 値)。**capture-ledger がクロールの頼みから固定して渡す。**
-   * 値は BrowserHive が記録に残す (datapackage.json の `settings.variables`)。この層は中身を見ない。
+   * 値は BrowserHive が記録に残す (BrowserHive WACZ の datapackage.json の `browserhive:capture.settings.variables`)。この層は中身を見ない。
    */
   variables?: Record<string, string>;
   /**
@@ -107,7 +107,7 @@ export interface CaptureSettings {
   /**
    * クロールごとのシークレット (名前 → **解いた後の値**)。解くのは `main` —— capture-ledger が渡すのは
    * Windmill の変数の path で、`resolveSecrets` が `f/waggle_secrets/` の下だけを `getVariable` で読む。
-   * BrowserHive は `settings.secrets` に名前だけを残し、v29.0.0 からは、スクリプトが通信に載せた値もサイトが返した値も
+   * BrowserHive は datapackage.json の `browserhive:capture.settings.secrets` に名前だけを残し、v29.0.0 からは、スクリプトが通信に載せた値もサイトが返した値も
    * WARC の中で `***` に置き換える (`secretArchive` に名前の在る物だけ、通信の記録に値のまま残す)。
    * ここでも log にも `PageResult` にも出さない —— 値が在るのは BrowserHive への要求の本文だけ。
    */

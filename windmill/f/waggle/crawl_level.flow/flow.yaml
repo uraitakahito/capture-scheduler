@@ -13,8 +13,8 @@ description: |
     - ホスト内は逐次 + 間隔     (crawl_host)
 
   報告のあとに 2 段足してある。合本を書かせる段 (replay_bundle) と、索引に載せる段 (index)。
-  合本は、そのクロールの WACZ を全部並べた replay.json と頁の行の pages.json の組で、replay が
-  1 つのアーカイブとして開く。合本を先に置くのは、合本が OpenSearch に頼らないから —— 索引が
+  合本は、そのクロールの WACZ を全部並べた replay.json と頁の行の pages.json の組で、replayweb-server と
+  capture-player が 1 つのアーカイブとして開く。合本を先に置くのは、合本が OpenSearch に頼らないから —— 索引が
   落ちても合本は書かれる。合本の段は、capture-ledger が 200 で返す失敗 (保管庫に書けない など) では投げない。
   投げると索引の段が飛び、クロールが failed で締められる。何を入れ・何を載せるかを選ぶのは
   capture-ledger で、ここが渡すのは crawl_id と段の深さだけ —— 判断を、単体試験の無い場所に置かないため。

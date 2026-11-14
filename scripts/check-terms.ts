@@ -1,5 +1,5 @@
 /**
- * クロールの語を、旧い言い方で書いていないかを見張る。規則は下の RULES の 12 個。
+ * クロールの語を、旧い言い方で書いていないかを見張る。規則は下の RULES の 13 個。
  *
  * ## なぜ要るのか
  *
@@ -28,7 +28,8 @@
  *   動いている識別子（`crawler-storage`・Windmill の workspace の id）とも同じ字になる（capture-ledger も見張っている）
  * - **7080 番の Web アプリは「capture-workbench」、文で短く書くときは「workbench」と書く。** 2026-11 に「dashboard」から
  *   そろえた（repo の改名に合わせて）。この repo に Grafana の dashboard は無いので、語を全部見る（capture-ledger も同じ）
- * - **WACZ を開くビューアは「replayweb-server」と書く。** 2026-11 に「replay」から替えた（repo の改名に合わせて）
+ * - **WACZ を開くビューアは「replayweb-server」と書く。** 2026-11 に「replay」から替えた（repo の改名に合わせて）。
+ *   合本を開くのは replayweb-server と capture-player の 2 つ（CAPTURE-102）なので、開く物を言う文は 2 つを名指す（CAPTURE-380）
  * - **HTTP の method と path の組と BrowserHive の宛先 URL 1 本は「エンドポイント」、待ち受けの番号は「ポート」、
  *   スクリプトを差し込む時は「phase」、成果物を PUT する先は「受け取り先」と書く。** 2026-11 に（Jira CAPTURE-184）、
  *   1 字の語から意味ごとに替えた。同じ字が 1 つの文の中でも別の物を指していた。切り口・入口・出口・窓口は別の語なので
@@ -56,8 +57,8 @@
  * - 「crawler」: 一式の意味の形の並び（OLD_SUITE。capture-ledger と同じ並び）。`crawler-storage`・`/w/crawler/`・
  *   `workspace crawler`・試験の入力値・ふつうの名詞は見ない
  * - 「dashboard」: 全部（大文字小文字を問わない）
- * - 「replay」: 旧い名前の形の並びだけ（OLD_REPLAY_NAMES）。語の replay は合本の形式（replay.json）と ReplayWeb.page の振る舞いの文に
- *   残るので見ない
+ * - 「replay」: 旧い名前の形の並び（OLD_REPLAY_NAMES）と、ビューアを主語にした裸の形（BARE_REPLAY_VIEWER）だけ。
+ *   語の replay は合本の形式（replay.json）と ReplayWeb.page の振る舞いの文に残るので見ない
  * - 「台帳」: 全部。2026-11 に（Jira CAPTURE-186）意味ごとに書き分けた。capture-ledger というシステムは capture-ledger、
  *   スクリプトの置き場は「登録済みのスクリプト」、DB に入ったことは「capture-ledger に載る」。2 字がシステム・DB の行・
  *   置き場を兼ね、帳簿の語なのに「台帳が 400 で断る」と動く主語になっていた（capture-ledger・capture-workbench・
@@ -109,6 +110,14 @@ const OLD_REPLAY_NAMES =
   /uraitakahito[/:]replay(?![\w-])|\.upstream\/replay(?![\w-])|\breplayKeyUrl\b|\breplayProblem\b|\breplayOrigin\b|\breplay の \/wacz\/|スタックの replay\b/u;
 
 /**
+ * ビューアを主語にした裸の「replay」（CAPTURE-380）。「replay が開く」「replay opens」と書くと、どのビューアか分からない。
+ * 合本の形式（`replay.json`・replay bundle・`replay_bundle_level`）と ReplayWeb.page には当てない（小文字の replay の直後に
+ * 空白と助詞・動詞が来る形だけ）。
+ */
+const BARE_REPLAY_VIEWER =
+  /\breplay (が|は|を開|で開)|\breplay (opens|reads|loads|shows|serves)\b/u;
+
+/**
  * 作り手だけを言う WACZ・WARC の形（CAPTURE-341）。仕様の名前（BrowserHive の WACZ Profile）は当てない。
  * 足すときは、「BrowserHive WACZ」「BrowserHive WACZ Profile」に当たらないことを確かめる。
  */
@@ -150,6 +159,10 @@ const RULES: { find: (line: string) => boolean; say: string }[] = [
   {
     find: (line) => OLD_REPLAY_NAMES.test(line),
     say: "replay の旧い名前が残っています。WACZ を開くビューアは「replayweb-server」、capture-ledger の中の path は `.upstream/replayweb-server` と書きます。",
+  },
+  {
+    find: (line) => BARE_REPLAY_VIEWER.test(line),
+    say: "ビューアを指す裸の「replay」が残っています。合本や WACZ を開く物は「replayweb-server と capture-player」のように名指します（CAPTURE-380）。",
   },
   {
     find: (line) => line.includes("注入口") || line.replace(NOT_KUCHI, "").includes("口"),
