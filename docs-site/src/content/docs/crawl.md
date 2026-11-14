@@ -17,7 +17,7 @@ for-each             parallel across hosts (parallelism = host_parallelism)
   ↓
 report_level         report to capture-ledger, receive the next level
   ↓
-replay_bundle_level  ask capture-ledger to rewrite the crawl's replay bundle, which replay opens as one archive
+replay_bundle_level  ask capture-ledger to rewrite the crawl's replay bundle, which replayweb-server and capture-player open as one archive
   ↓
 index_level          ask capture-ledger to index what landed in the ledger
 ```
@@ -61,8 +61,8 @@ that requires level keys. Upgrade the flow and capture-ledger together.
 `replay_bundle_level` also runs after the report. It sends the level's `depth` to capture-ledger's
 `POST /api/crawls/:id/replay-bundle`, and capture-ledger writes the crawl's **replay bundle** as a new
 revision to the store, under `org/<organization>/crawls/<crawl>/r<revision>/`: a `replay.json` listing
-every WACZ of the crawl so far and a `pages.json` of their pages. replay opens the `replay.json` as one
-archive, so a link from a page in one WACZ leads to a page in another. Which WACZ files go in, and the
+every WACZ of the crawl so far and a `pages.json` of their pages. replayweb-server and capture-player open the
+`replay.json` as one archive, so a link from a page in one WACZ leads to a page in another. Which WACZ files go in, and the
 revision number, are capture-ledger's to decide; `depth` is only recorded. The step comes before
 `index_level` because the replay bundle does not depend on OpenSearch — a failing index step does not
 stop it.
