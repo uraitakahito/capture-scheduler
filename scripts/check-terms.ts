@@ -28,8 +28,9 @@
  *   動いている識別子（`crawler-storage`・Windmill の workspace の id）とも同じ字になる（capture-ledger も見張っている）
  * - **7080 番の Web アプリは「capture-workbench」、文で短く書くときは「workbench」と書く。** 2026-11 に「dashboard」から
  *   そろえた（repo の改名に合わせて）。この repo に Grafana の dashboard は無いので、語を全部見る（capture-ledger も同じ）
- * - **WACZ を開くビューアは「replayweb-server」と書く。** 2026-11 に「replay」から替えた（repo の改名に合わせて）。
- *   合本を開くのは replayweb-server と capture-player の 2 つ（CAPTURE-102）なので、開く物を言う文は 2 つを名指す（CAPTURE-380）
+ * - **WACZ を開くビューアは「replayweb-player」と書く。** 2026-11 に「replay」から replayweb-server へ、同じ月の CAPTURE-465 で
+ *   replayweb-player へ替えた（repo の改名に合わせて。兄弟の capture-player と語尾を揃えた）。
+ *   合本を開くのは replayweb-player と capture-player の 2 つ（CAPTURE-102）なので、開く物を言う文は 2 つを名指す（CAPTURE-380）
  * - **HTTP の method と path の組と BrowserHive の宛先 URL 1 本は「エンドポイント」、待ち受けの番号は「ポート」、
  *   スクリプトを差し込む時は「phase」、成果物を PUT する先は「受け取り先」と書く。** 2026-11 に（Jira CAPTURE-184）、
  *   1 字の語から意味ごとに替えた。同じ字が 1 つの文の中でも別の物を指していた。切り口・入口・出口・窓口は別の語なので
@@ -105,9 +106,9 @@ const OLD_INLINE =
 const OLD_SUITE =
   /(?<!workspace )\bcrawler ?(の|で|が|を|全体)|\bcrawler repo(s|sitory|sitories)\b|\ball of crawler\b|\b[Tt]he crawler's development\b/u;
 
-/** replayweb-server の旧い名前の形。語の replay は禁じない（上の注記）。 */
+/** replayweb-player の旧い名前の形（replay と、2026-11 の CAPTURE-465 までの replayweb-server）。語の replay は禁じない（上の注記）。 */
 const OLD_REPLAY_NAMES =
-  /uraitakahito[/:]replay(?![\w-])|\.upstream\/replay(?![\w-])|\breplayKeyUrl\b|\breplayProblem\b|\breplayOrigin\b|\breplay の \/wacz\/|スタックの replay\b/u;
+  /uraitakahito[/:]replay(?![\w-])|\.upstream\/replay(?![\w-])|\breplayKeyUrl\b|\breplayProblem\b|\breplayOrigin\b|\breplay の \/wacz\/|スタックの replay\b|\breplayweb[-_]server\b|REPLAYWEB_SERVER|\breplaywebServer/u;
 
 /**
  * ビューアを主語にした裸の「replay」（CAPTURE-380）。「replay が開く」「replay opens」と書くと、どのビューアか分からない。
@@ -158,11 +159,11 @@ const RULES: { find: (line: string) => boolean; say: string }[] = [
   },
   {
     find: (line) => OLD_REPLAY_NAMES.test(line),
-    say: "replay の旧い名前が残っています。WACZ を開くビューアは「replayweb-server」、capture-ledger の中の path は `.upstream/replayweb-server` と書きます。",
+    say: "replay の旧い名前が残っています。WACZ を開くビューアは「replayweb-player」、capture-ledger の中の path は `.upstream/replayweb-player` と書きます。",
   },
   {
     find: (line) => BARE_REPLAY_VIEWER.test(line),
-    say: "ビューアを指す裸の「replay」が残っています。合本や WACZ を開く物は「replayweb-server と capture-player」のように名指します（CAPTURE-380）。",
+    say: "ビューアを指す裸の「replay」が残っています。合本や WACZ を開く物は「replayweb-player と capture-player」のように名指します（CAPTURE-380）。",
   },
   {
     find: (line) => line.includes("注入口") || line.replace(NOT_KUCHI, "").includes("口"),

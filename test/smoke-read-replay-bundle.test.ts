@@ -1,5 +1,5 @@
 /**
- * smoke が、撮った 1 本が合本に入り、replayweb-server から読めるところまでを読む読み分け (CAPTURE-57)。
+ * smoke が、撮った 1 本が合本に入り、replayweb-player から読めるところまでを読む読み分け (CAPTURE-57)。
  *
  * 合本の段は capture-ledger が 200 で返す失敗では投げない (クロールを止めないため) ので、run が緑でも合本が書けたとは
  * 限らない —— 段の答えの error・failed・rev の null を、smoke が止める理由として読むかを見る。
@@ -145,8 +145,8 @@ describe("capture-ledger が指す合本", () => {
   });
 });
 
-describe("replayweb-server から読む replay.json", () => {
-  const URL_ = replayJsonKeyUrl("http://replayweb-server.test:8899", KEY);
+describe("replayweb-player から読む replay.json", () => {
+  const URL_ = replayJsonKeyUrl("http://replayweb-player.test:8899", KEY);
   const ARCHIVE = "org/acme/2026-11/task 1_crawl.wacz";
   const replayJson = (paths: string[]): string =>
     JSON.stringify({
@@ -156,8 +156,8 @@ describe("replayweb-server から読む replay.json", () => {
     });
 
   it("/wacz/ の後ろの鍵は区切りごとに符号にする", () => {
-    expect(replayJsonKeyUrl("http://replayweb-server.test:8899", "org/a b/r1/replay.json")).toBe(
-      "http://replayweb-server.test:8899/wacz/org/a%20b/r1/replay.json",
+    expect(replayJsonKeyUrl("http://replayweb-player.test:8899", "org/a b/r1/replay.json")).toBe(
+      "http://replayweb-player.test:8899/wacz/org/a%20b/r1/replay.json",
     );
   });
 
@@ -189,7 +189,7 @@ describe("replayweb-server から読む replay.json", () => {
     expect(readReplayJson(URL_, 200, "{}", ARCHIVE)?.evidence).toContain("resources が無い");
   });
 
-  it("404 は保管庫に無い、502 は replayweb-server が保管庫に届かない、届かなければ replayweb-server を立ち上げる", () => {
+  it("404 は保管庫に無い、502 は replayweb-player が保管庫に届かない、届かなければ replayweb-player を立ち上げる", () => {
     expect(readReplayJson(URL_, 404, "", ARCHIVE)?.fix).toContain("S3_BUCKET_URL");
     expect(readReplayJson(URL_, 502, "", ARCHIVE)?.fix).toContain("保管庫に届かない");
     expect(readReplayJson(URL_, undefined, "", ARCHIVE)?.fix).toContain("pnpm run stack:up");
