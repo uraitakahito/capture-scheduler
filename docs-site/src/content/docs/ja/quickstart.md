@@ -148,9 +148,12 @@ capture-ledger の `.dev/idp.env` を読み（既定は `../capture-ledger`。�
 変数 `u/admin/ledger_client` に書く。入れるのは client で、トークンではない。前の版が入れていた長く
 もつトークン `u/admin/waggle_token` は消す。
 
-API の宛先（`u/admin/waggle_api_url`）は、`CAPTURE_LEDGER_API_URL` を書かなければ default
-ネットワークの gateway から組みます（`container network inspect default`）。network を作り直すと
-変わるので、そのときは `windmill:capture-ledger-token` をやり直します。Floci のプールが作り直されたときは、
+API の宛先（`u/admin/waggle_api_url`）は、`CAPTURE_LEDGER_API_URL` を書かなければ、Windmill の
+worker が実際に持つ gateway から組みます（`container inspect windmill-worker.capture-scheduler` の
+`status.networks[].ipv4Gateway`）。default ネットワークの記録（`container network inspect default`）は
+読みません —— 実際に配られた番地と食い違うことがあるからです（2026-11-23 には記録が `192.168.65.1`、
+コンテナに配られていたのは `192.168.64.1`）。番地が替わると `pnpm run doctor` の container→api が
+「宛先が古い」と言うので、そのときは `windmill:capture-ledger-token` をやり直します。Floci のプールが作り直されたときは、
 `dev:up --from idp` がやり直します（[トークンの経路](#トークンの経路)）。
 
 スクリプトが `catalog.json` の `params` で `kind: secret` と宣言した名前は、人が Windmill の変数
@@ -299,6 +302,8 @@ capture-ledger が返すのは、その版から）。
 | doctor の can_submit が ✗「トークンが通らない」／smoke の原因が `… /pages → 401`                                                                | Floci のプールが作り直され、API か Windmill の変数が古いプールのまま                                     | capture-ledger で `pnpm run dev:up --from idp`                                                                       |
 | doctor の jwt が ✗「ヘッダで名乗る設定で動いている」（起動ログの最後の行は `crawl level reports: blocked`）                                     | capture-ledger の API が JWT を受けない（`CAPTURE_LEDGER_OIDC_ISSUER` が効いていない）                   | capture-ledger で `pnpm run dev:up --from idp`（`idp:bootstrap` が行を書き、API を起こし直す）                       |
 | doctor の container→api が ✗「API が 127.0.0.1 で待っている」／smoke の原因が `Unable to connect`                                               | 段の報告がコンテナから API に届かない（`CAPTURE_LEDGER_API_HOST=0.0.0.0` が効いていない）                | capture-ledger で `pnpm run connect` を打ち、API を起こし直す                                                        |
+| doctor の container→api が ✗「変数の宛先 … が、worker の今の gateway の … と違う」／smoke の原因が `Unable to connect`                          | コンテナに配られる番地が替わり、Windmill の変数が古い番地のまま                                          | `pnpm run windmill:capture-ledger-token`（capture-ledger からなら `pnpm run dev:up --from token`）                   |
+| doctor の container→api が ✗「… worker の今の gateway と合っているが、5 秒で答えない」                                                          | 宛先は正しいが、host の 7070 の API が答えない                                                           | capture-ledger の API のログを見る。止まっていれば capture-ledger で `pnpm run dev:up --from api`                    |
 | smoke が 409「走行中のクロールがある: …」                                                                                                       | 前の 1 本が running のまま                                                                               | 終わるのを待つか `pnpm run smoke --close-running`                                                                    |
 
 ## トークンの経路

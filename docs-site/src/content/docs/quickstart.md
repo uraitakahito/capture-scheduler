@@ -151,9 +151,13 @@ argument, or set `CAPTURE_LEDGER_DIR`), checks that it can get a token with the 
 client, and writes the secret variable `u/admin/ledger_client`. It stores the client, not a token.
 It also deletes `u/admin/waggle_token`, the long-lived token earlier versions stored.
 
-The API address (`u/admin/waggle_api_url`) comes from the gateway of the `default` network
-(`container network inspect default`) unless `CAPTURE_LEDGER_API_URL` is set. It changes when the
-network is recreated; re-run `windmill:capture-ledger-token` then. When Floci's pool is recreated,
+The API address (`u/admin/waggle_api_url`) comes from the gateway the Windmill worker actually
+has (`status.networks[].ipv4Gateway` of `container inspect windmill-worker.capture-scheduler`)
+unless `CAPTURE_LEDGER_API_URL` is set. The record of the `default` network
+(`container network inspect default`) is not read: it can disagree with the addresses actually
+handed out (on 2026-11-23 the record said `192.168.65.1` while containers got `192.168.64.1`).
+When the address moves, the container→api line of `pnpm run doctor` says the address is stale;
+re-run `windmill:capture-ledger-token` then. When Floci's pool is recreated,
 `dev:up --from idp` re-runs it for you ([How the token gets there](#how-the-token-gets-there)).
 
 Names a script declares as `kind: secret` in the `params` of its `catalog.json` are placed by a
@@ -306,6 +310,8 @@ Every row was produced for real and checked (2026-09-19).
 | doctor: can_submit ✗ "トークンが通らない" / smoke: `… /pages → 401`                                                                                  | Floci's pool was recreated, and the API or Windmill's variable still has the old one                               | `pnpm run dev:up --from idp` in capture-ledger                                                                              |
 | doctor: jwt ✗ "ヘッダで名乗る設定で動いている" (the startup log's last line says `crawl level reports: blocked`)                                     | capture-ledger's API does not accept JWTs (`CAPTURE_LEDGER_OIDC_ISSUER` is not in effect)                          | `pnpm run dev:up --from idp` in capture-ledger (`idp:bootstrap` writes the lines, then the API restarts)                    |
 | doctor: container→api ✗ "API が 127.0.0.1 で待っている" / smoke: `Unable to connect`                                                                 | level reports cannot reach the API from a container (`CAPTURE_LEDGER_API_HOST=0.0.0.0` is not in effect)           | run `pnpm run connect` in capture-ledger and restart the API                                                                |
+| doctor: container→api ✗ "変数の宛先 … が、worker の今の gateway の … と違う" / smoke: `Unable to connect`                                            | containers were handed a different address, and Windmill's variable still has the old one                          | `pnpm run windmill:capture-ledger-token` (from capture-ledger: `pnpm run dev:up --from token`)                              |
+| doctor: container→api ✗ "… worker の今の gateway と合っているが、5 秒で答えない"                                                                     | the address is right, but the API on the host's 7070 does not answer                                               | read capture-ledger's API log; if it is down, `pnpm run dev:up --from api` in capture-ledger                                |
 | smoke: 409 "走行中のクロールがある: …"                                                                                                               | an earlier crawl is still `running`                                                                                | wait for it, or `pnpm run smoke --close-running`                                                                            |
 
 ## How the token gets there

@@ -28,6 +28,7 @@ import {
   repoRoot,
   windmillUrl,
   windmillWorkspace,
+  WORKER_CONTAINER,
 } from "../env.js";
 import {
   LEDGER_CLIENT_VAR,
@@ -73,7 +74,7 @@ export const API = "http://127.0.0.1:7070";
 /** capture-ledger の開発のスタックの OpenFGA。鍵はクイックスタートの前提と同じ。 */
 const OPENFGA = "http://127.0.0.1:8090";
 /** flow が走るコンテナ。段の報告も BrowserHive への呼び出しもここから出る。 */
-const WORKER = "windmill-worker.capture-scheduler";
+const WORKER = WORKER_CONTAINER;
 /** e2e の試験が名乗る名前 (`test/e2e/crawl-level.e2e.test.ts` と同じ既定)。 */
 const E2E_SUBJECT = optional("E2E_SUBJECT", "e2e");
 
@@ -388,12 +389,13 @@ const variablesSet = async (): Promise<Verdict> => {
   );
 };
 
-/** いまの gateway から組んだ宛先。`container network inspect` が失敗すれば undefined。 */
+/**
+ * いま書くはずの宛先 (`ledgerApiUrl`)。既定は worker が実際に持つ gateway から組む。
+ * `container inspect` が失敗すれば undefined。
+ */
 const expectedApiUrl = async (): Promise<string | undefined> => {
   try {
-    const { stdout } = await exec("container", ["network", "inspect", "default"], {
-      encoding: "utf8",
-    });
+    const { stdout } = await exec("container", ["inspect", WORKER], { encoding: "utf8" });
     return ledgerApiUrl(() => stdout);
   } catch {
     return undefined;

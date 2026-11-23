@@ -80,9 +80,11 @@ export const readBrowserhiveProbes = (
 /**
  * 段の報告の宛先 (変数 `u/admin/waggle_api_url`) の `/healthz`。
  *
- * **届かないときは、変数の宛先をいまの gateway と比べる。** 同じなのに refused なら、
+ * **届かないときは、変数の宛先を worker の今の gateway と比べる。** 同じなのに refused なら、
  * gateway のポートで待っているものが無い —— host からは答える API が 127.0.0.1 で待っている。
- * 違うなら、network を作り直して宛先が古くなった。この 2 つは curl の答えだけでは分けられない。
+ * 違うなら、ネットワークの番地が替わって宛先が古くなった。この 2 つは curl の答えだけでは分けられない。
+ * 比べる相手はネットワークの記録でなく worker の実際の gateway —— 2026-11-23 は記録も変数も古い 65.1 で、
+ * 比べても「同じ」に見え、「5 秒で答えない」としか言えなかった。
  */
 export const readContainerApi = ({
   url,
@@ -91,7 +93,7 @@ export const readContainerApi = ({
 }: {
   url: string;
   answer: CurlAnswer;
-  /** いまの gateway から組んだ宛先 (`ledgerApiUrl`)。組めなければ undefined。 */
+  /** いま書くはずの宛先 (`ledgerApiUrl`。既定は worker の今の gateway から)。組めなければ undefined。 */
   expected: string | undefined;
 }): Verdict => {
   if (answer.rc === 0 && answer.http === "200") return { ok: true };
@@ -99,8 +101,8 @@ export const readContainerApi = ({
     return {
       ok: false,
       need:
-        `変数の宛先 ${url} が、いまの gateway の ${expected} と違う (network を作り直した) → ` +
-        "pnpm run windmill:capture-ledger-token",
+        `変数の宛先 ${url} が、worker の今の gateway の ${expected} と違う (ネットワークの番地が替わった) → ` +
+        "pnpm run windmill:capture-ledger-token (capture-ledger からなら pnpm run dev:up --from token)",
     };
   }
   if (answer.rc === 7) {
@@ -112,7 +114,15 @@ export const readContainerApi = ({
         "capture-ledger で pnpm run connect を打ち (windmill:bootstrap が引き渡した行を .env.local に写す)、API を起こし直す",
     };
   }
-  if (answer.rc === 28) return { ok: false, need: `worker から ${url} が 5 秒で答えない` };
+  if (answer.rc === 28) {
+    if (expected === undefined) return { ok: false, need: `worker から ${url} が 5 秒で答えない` };
+    return {
+      ok: false,
+      need:
+        `宛先 ${url} は worker の今の gateway と合っているが、5 秒で答えない —— ` +
+        "Mac の 7070 の API が詰まっているか、Mac の受け側が断っている",
+    };
+  }
   if (answer.rc === 6) return { ok: false, need: `worker から ${url} の名前が引けない` };
   return {
     ok: false,

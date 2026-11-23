@@ -158,10 +158,10 @@ const main = async () => {
     true,
   );
   const retired = await retireVariable(windmillToken, RETIRED_TOKEN_VAR);
-  // 1 度だけ決める。既定は default ネットワークの gateway を訊く (`env.ts` の `ledgerApiUrl`)。
+  // 1 度だけ決める。既定は worker の今の gateway を訊く (`env.ts` の `ledgerApiUrl`)。
   const apiUrl = ledgerApiUrl();
   const apiUrlFrom =
-    optional("CAPTURE_LEDGER_API_URL", "") === "" ? " —— default ネットワークの gateway から" : "";
+    optional("CAPTURE_LEDGER_API_URL", "") === "" ? " —— worker の今の gateway から" : "";
   const urlAction = await upsertVariable(windmillToken, URL_PATH, apiUrl, false);
   const endpointsAction = await upsertVariable(
     windmillToken,

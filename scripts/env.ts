@@ -140,42 +140,59 @@ export const ledgerEnv = ({
 ];
 
 /**
- * `container network inspect default` の出力から、default ネットワークの gateway を取り出す。
+ * flow を走らせ、capture-ledger の API を呼ぶ当のコンテナ。doctor もこの中から確かめる。
+ */
+export const WORKER_CONTAINER = "windmill-worker.capture-scheduler";
+
+interface InspectedAttachment {
+  network?: unknown;
+  ipv4Gateway?: unknown;
+}
+
+/**
+ * `container inspect <worker>` の出力から、worker が実際に持つ gateway (コンテナから見た Mac) を
+ * 取り出す。ネットワーク `default` に付いた行を選び、無ければ先頭の行。
+ *
+ * **ネットワークの記録 (`container network inspect default`) は読まない。** 2026-11-23 のこの Mac では、
+ * 記録は `192.168.65.1` と言い、コンテナに実際に配られていたのは `192.168.64.1` だった —— ネットワークを
+ * 受け持つプロセスが起き直ると、記録と違う subnet が配られることがある。flow が使うのは worker の
+ * 番地なので、その番地を読む。
  *
  * **読めなければ投げる。** 以前の決め打ち (`192.168.64.1`) のような既定値へは黙って
  * 落とさない —— 外れた宛先は、ずっと後の「段の報告が ConnectionRefused」でしか分からない。
  */
-export const parseGateway = (json: string): string => {
+export const parseWorkerGateway = (json: string): string => {
   let gateway: unknown;
   try {
-    const parsed = JSON.parse(json) as { status?: { ipv4Gateway?: unknown } }[];
-    gateway = parsed[0]?.status?.ipv4Gateway;
+    const parsed = JSON.parse(json) as { status?: { networks?: InspectedAttachment[] } }[];
+    const networks = parsed[0]?.status?.networks ?? [];
+    gateway = (networks.find((n) => n.network === "default") ?? networks[0])?.ipv4Gateway;
   } catch {
     // 読めない出力も、下で同じように名指しして投げる。
   }
   if (typeof gateway !== "string" || !/^\d{1,3}(?:\.\d{1,3}){3}$/.test(gateway)) {
     throw new Error(
-      "default ネットワークの gateway を読めません (container network inspect default の " +
-        "status.ipv4Gateway)。CAPTURE_LEDGER_API_URL を .env に書いてください",
+      `${WORKER_CONTAINER} の gateway を読めません (container inspect の status.networks[].ipv4Gateway)。` +
+        "CAPTURE_LEDGER_API_URL を .env に書いてください",
     );
   }
   return gateway;
 };
 
 /** 既定の問い合わせ。試験は `ledgerApiUrl` の引数で差し替える。 */
-const inspectDefaultNetwork = (): string =>
-  execFileSync("container", ["network", "inspect", "default"], { encoding: "utf8" });
+export const inspectWorker = (): string =>
+  execFileSync("container", ["inspect", WORKER_CONTAINER], { encoding: "utf8" });
 
 /**
  * **コンテナから見た** capture-ledger API の URL。Windmill の変数 `u/admin/waggle_api_url` に
  * 入り、flow の段の報告がここへ届く。
  *
- * 書いていなければ default ネットワークの gateway から組む。以前は `192.168.64.1` を
- * 決め打ちしていたが、gateway は network を作り直すと変わる (2026-09-19 のこの Mac は
- * `192.168.66.1` で、`.64` は別の network が使っていた)。外れると報告が届かず、クロールは
- * `running` のまま残って、以後の起動を全部 409 で塞ぐ。
+ * 書いていなければ、worker が実際に持つ gateway から組む (`parseWorkerGateway`)。以前は
+ * `192.168.64.1` を決め打ちし、その後はネットワークの記録 (`container network inspect default`) を
+ * 読んでいたが、どちらも実際の番地と食い違った (2026-09-19 と 2026-11-23)。外れると報告が
+ * 届かず、クロールは `running` のまま残って、以後の起動を全部 409 で塞ぐ。
  */
-export const ledgerApiUrl = (inspect: () => string = inspectDefaultNetwork): string => {
+export const ledgerApiUrl = (inspect: () => string = inspectWorker): string => {
   const explicit = optional("CAPTURE_LEDGER_API_URL", "");
   if (explicit !== "") return explicit;
   let json: string;
@@ -183,11 +200,12 @@ export const ledgerApiUrl = (inspect: () => string = inspectDefaultNetwork): str
     json = inspect();
   } catch (err) {
     throw new Error(
-      `container network inspect default が失敗しました (${err instanceof Error ? err.message : String(err)})。` +
-        "CAPTURE_LEDGER_API_URL を .env に書いてください",
+      `container inspect ${WORKER_CONTAINER} が失敗しました (${err instanceof Error ? err.message : String(err)})。` +
+        "worker が居なければ、この repo で container-compose up -d。" +
+        "それでも読めなければ CAPTURE_LEDGER_API_URL を .env に書いてください",
     );
   }
-  return `http://${parseGateway(json)}:7070`;
+  return `http://${parseWorkerGateway(json)}:7070`;
 };
 
 /**
