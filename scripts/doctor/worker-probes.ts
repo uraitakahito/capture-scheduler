@@ -14,7 +14,7 @@
  *   答えない                           000 28  (--max-time の切れ)。**止めた直後の数秒もこれ** ——
  *                                              名前が消えるまでは、残った名前の先が答えない
  *
- * 入出力を持たない。curl を走らせるのは `checks.ts`。
+ * curl も container も走らせない（問い合わせは引数で受ける。走らせるのは `checks.ts`）。読むのは env の上書き 1 つだけ。
  */
 import { ledgerApiUrl, optional } from "../env.js";
 import type { Verdict } from "./run.js";

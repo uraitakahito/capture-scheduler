@@ -238,7 +238,7 @@ describe("expectedApiUrl（doctor の比べる相手）", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("doctor と dev:up の 15 段目は、同じ問い合わせ（container inspect <worker>）を使う", () => {
+  it("worker への問い合わせは container inspect <worker>", () => {
     expect([...WORKER_INSPECT_ARGS]).toEqual(["inspect", WORKER_CONTAINER]);
   });
 });
