@@ -23,12 +23,12 @@ import { promisify } from "node:util";
 
 import {
   HOST_TS_COMPILE,
-  ledgerApiUrl,
   optional,
   repoRoot,
   windmillUrl,
   windmillWorkspace,
   WORKER_CONTAINER,
+  WORKER_INSPECT_ARGS,
 } from "../env.js";
 import {
   LEDGER_CLIENT_VAR,
@@ -64,6 +64,7 @@ import {
 import {
   parseCurl,
   readBrowserhiveProbes,
+  expectedApiUrl,
   readContainerApi,
   readTsCompileProbe,
   type CurlAnswer,
@@ -389,18 +390,9 @@ const variablesSet = async (): Promise<Verdict> => {
   );
 };
 
-/**
- * いま書くはずの宛先 (`ledgerApiUrl`)。既定は worker が実際に持つ gateway から組む。
- * `container inspect` が失敗すれば undefined。
- */
-const expectedApiUrl = async (): Promise<string | undefined> => {
-  try {
-    const { stdout } = await exec("container", ["inspect", WORKER], { encoding: "utf8" });
-    return ledgerApiUrl(() => stdout);
-  } catch {
-    return undefined;
-  }
-};
+/** worker の `container inspect` の出力。doctor は点検を並べるので、非同期の exec で訊く。 */
+const inspectWorkerAsync = async (): Promise<string> =>
+  (await exec("container", [...WORKER_INSPECT_ARGS], { encoding: "utf8" })).stdout;
 
 /**
  * flow が段の報告を送る宛先 (変数 `u/admin/waggle_api_url`) に、worker の中から届くか。
@@ -413,7 +405,7 @@ const containerReachesApi = async (): Promise<Verdict> => {
   if (url === undefined) return unreadable("u/admin/waggle_api_url");
   const [answer, expected] = await Promise.all([
     curlInWorker(`${url}/healthz`, 5),
-    expectedApiUrl(),
+    expectedApiUrl(inspectWorkerAsync),
   ]);
   if ("error" in answer) return workerUnreachable(answer.error);
   return readContainerApi({ url, answer, expected });

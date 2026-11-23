@@ -178,9 +178,15 @@ describe("parseWorkerGateway", () => {
     expect(parseWorkerGateway(json)).toBe("192.168.66.1");
   });
 
+  it("止まった worker（実物の形 networks: [] と state: stopped）なら、決め打ちでなく compose を起こす手を言う", () => {
+    const json = '[{"status":{"networks":[],"state":"stopped"}}]';
+    expect(() => parseWorkerGateway(json)).toThrow(/state=stopped.*container-compose up -d/);
+    expect(() => parseWorkerGateway(json)).not.toThrow(/CAPTURE_LEDGER_API_URL/);
+  });
+
   it.each([
     ["空の配列", "[]"],
-    ["networks が無い", '[{"status":{"state":"stopped"}}]'],
+    ["networks が無い", '[{"status":{"state":"running"}}]'],
     ["networks が空", '[{"status":{"networks":[]}}]'],
     ["IPv4 でない", '[{"status":{"networks":[{"network":"default","ipv4Gateway":"fd89::1"}]}}]'],
     ["JSON でない", "container: command not found"],

@@ -144,6 +144,12 @@ export const ledgerEnv = ({
  */
 export const WORKER_CONTAINER = "windmill-worker.capture-scheduler";
 
+/**
+ * worker の番地を訊く `container` の引数。`inspectWorker`（同期。dev:up の 15 段目）と doctor（非同期。
+ * 点検を並べるので同期の exec を避ける）が同じ物を訊くよう、1 か所に置く。
+ */
+export const WORKER_INSPECT_ARGS = ["inspect", WORKER_CONTAINER] as const;
+
 interface InspectedAttachment {
   network?: unknown;
   ipv4Gateway?: unknown;
@@ -163,12 +169,23 @@ interface InspectedAttachment {
  */
 export const parseWorkerGateway = (json: string): string => {
   let gateway: unknown;
+  let state: unknown;
   try {
-    const parsed = JSON.parse(json) as { status?: { networks?: InspectedAttachment[] } }[];
+    const parsed = JSON.parse(json) as {
+      status?: { networks?: InspectedAttachment[]; state?: unknown };
+    }[];
+    state = parsed[0]?.status?.state;
     const networks = parsed[0]?.status?.networks ?? [];
     gateway = (networks.find((n) => n.network === "default") ?? networks[0])?.ipv4Gateway;
   } catch {
     // 読めない出力も、下で同じように名指しして投げる。
+  }
+  // 止まった worker の inspect は rc=0 で `networks: []` を返す（実物）。番地を .env に決め打ちさせる
+  // 文でなく、worker を起こす手を言う —— 決め打ちは今日の失敗（古い番地）の元になる。
+  if (typeof state === "string" && state !== "running") {
+    throw new Error(
+      `${WORKER_CONTAINER} が動いていない (state=${state}) → この repo で container-compose up -d`,
+    );
   }
   if (typeof gateway !== "string" || !/^\d{1,3}(?:\.\d{1,3}){3}$/.test(gateway)) {
     throw new Error(
@@ -181,7 +198,7 @@ export const parseWorkerGateway = (json: string): string => {
 
 /** 既定の問い合わせ。試験は `ledgerApiUrl` の引数で差し替える。 */
 export const inspectWorker = (): string =>
-  execFileSync("container", ["inspect", WORKER_CONTAINER], { encoding: "utf8" });
+  execFileSync("container", WORKER_INSPECT_ARGS, { encoding: "utf8" });
 
 /**
  * **コンテナから見た** capture-ledger API の URL。Windmill の変数 `u/admin/waggle_api_url` に
