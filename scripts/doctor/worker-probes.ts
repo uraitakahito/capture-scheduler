@@ -14,8 +14,9 @@
  *   答えない                           000 28  (--max-time の切れ)。**止めた直後の数秒もこれ** ——
  *                                              名前が消えるまでは、残った名前の先が答えない
  *
- * 入出力を持たない。curl を走らせるのは `checks.ts`。
+ * curl も container も走らせない（問い合わせは引数で受ける。走らせるのは `checks.ts`）。読むのは env の上書き 1 つだけ。
  */
+import { ledgerApiUrl, optional } from "../env.js";
 import type { Verdict } from "./run.js";
 
 export interface CurlAnswer {
@@ -78,11 +79,46 @@ export const readBrowserhiveProbes = (
 };
 
 /**
+ * いま書くはずの宛先と、その出どころ。`CAPTURE_LEDGER_API_URL` を書いていればその値（上書き）、
+ * 無ければ worker の今の gateway から組んだ値。出どころで doctor の言い方が変わる —— 上書きのときは
+ * gateway と比べていない。
+ */
+export interface ExpectedApi {
+  url: string;
+  from: "override" | "worker";
+}
+
+/**
+ * doctor の比べる相手。`inspect` は worker の `container inspect` の出力を返す（doctor は非同期の exec、
+ * 試験は fixture）。訊けない・読めないときは undefined —— 比べずに curl の答えだけで読む。
+ */
+export const expectedApiUrl = async (
+  inspect: () => Promise<string>,
+): Promise<ExpectedApi | undefined> => {
+  const explicit = optional("CAPTURE_LEDGER_API_URL", "");
+  if (explicit !== "") return { url: explicit, from: "override" };
+  try {
+    const json = await inspect();
+    return { url: ledgerApiUrl(() => json), from: "worker" };
+  } catch {
+    return undefined;
+  }
+};
+
+/** 比べる相手の言い方。 */
+const expectedLabel = (expected: ExpectedApi): string =>
+  expected.from === "override"
+    ? `CAPTURE_LEDGER_API_URL の ${expected.url}`
+    : `worker の今の gateway の ${expected.url}`;
+
+/**
  * 段の報告の宛先 (変数 `u/admin/waggle_api_url`) の `/healthz`。
  *
- * **届かないときは、変数の宛先をいまの gateway と比べる。** 同じなのに refused なら、
+ * **届かないときは、変数の宛先を worker の今の gateway と比べる。** 同じなのに refused なら、
  * gateway のポートで待っているものが無い —— host からは答える API が 127.0.0.1 で待っている。
- * 違うなら、network を作り直して宛先が古くなった。この 2 つは curl の答えだけでは分けられない。
+ * 違うなら、ネットワークの番地が替わって宛先が古くなった。この 2 つは curl の答えだけでは分けられない。
+ * 比べる相手はネットワークの記録でなく worker の実際の gateway —— 2026-11-23 は記録も変数も古い 65.1 で、
+ * 比べても「同じ」に見え、「5 秒で答えない」としか言えなかった。
  */
 export const readContainerApi = ({
   url,
@@ -91,16 +127,17 @@ export const readContainerApi = ({
 }: {
   url: string;
   answer: CurlAnswer;
-  /** いまの gateway から組んだ宛先 (`ledgerApiUrl`)。組めなければ undefined。 */
-  expected: string | undefined;
+  /** いま書くはずの宛先と出どころ (`expectedApiUrl`)。組めなければ undefined。 */
+  expected: ExpectedApi | undefined;
 }): Verdict => {
   if (answer.rc === 0 && answer.http === "200") return { ok: true };
-  if (expected !== undefined && expected !== url) {
+  if (expected !== undefined && expected.url !== url) {
     return {
       ok: false,
       need:
-        `変数の宛先 ${url} が、いまの gateway の ${expected} と違う (network を作り直した) → ` +
-        "pnpm run windmill:capture-ledger-token",
+        `変数の宛先 ${url} が、${expectedLabel(expected)} と違う` +
+        (expected.from === "worker" ? " (ネットワークの番地が替わった)" : "") +
+        " → pnpm run windmill:capture-ledger-token (capture-ledger からなら pnpm run dev:up --from token)",
     };
   }
   if (answer.rc === 7) {
@@ -112,7 +149,17 @@ export const readContainerApi = ({
         "capture-ledger で pnpm run connect を打ち (windmill:bootstrap が引き渡した行を .env.local に写す)、API を起こし直す",
     };
   }
-  if (answer.rc === 28) return { ok: false, need: `worker から ${url} が 5 秒で答えない` };
+  if (answer.rc === 28) {
+    if (expected === undefined) return { ok: false, need: `worker から ${url} が 5 秒で答えない` };
+    // 断られた (RST) なら rc=7 で、ここには来ない。API が止まっていても RST が返る。28 になるのは、
+    // パケットが黙って捨てられる (macOS のファイアウォールが node の受け付けを落とす) か、API が受けたまま詰まる時。
+    return {
+      ok: false,
+      need:
+        `宛先 ${url} は ${expected.from === "override" ? "CAPTURE_LEDGER_API_URL の値と" : "worker の今の gateway と"}合っているが、5 秒で答えない —— ` +
+        "API が詰まっているか、macOS のファイアウォールが落としている",
+    };
+  }
   if (answer.rc === 6) return { ok: false, need: `worker から ${url} の名前が引けない` };
   return {
     ok: false,

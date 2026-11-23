@@ -23,7 +23,7 @@ import {
   HOST_TS_COMPILE,
   ledgerEnv,
   optional,
-  parseGateway,
+  parseWorkerGateway,
   repoRoot,
   required,
 } from "../scripts/env.js";
@@ -141,26 +141,59 @@ describe("ledgerEnv", () => {
   });
 });
 
-/** 2026-09-19 のこの Mac の `container network inspect default` の出力（prettier で空白だけ整えた）。 */
-const INSPECT_DEFAULT = readFileSync(
-  join(repoRoot(), "test/fixtures/container-network-inspect-default.json"),
+/**
+ * 2026-11-23 のこの Mac の `container inspect windmill-worker.capture-scheduler` の出力から、
+ * `status.networks` と識別に要る所だけを残した物（MAC・IPv6 は例の値に替えた）。gateway は、
+ * ネットワークの記録（`container network inspect default` は 192.168.65.1 と言っていた）でなく、
+ * worker に実際に配られていた 192.168.64.1。
+ */
+const INSPECT_WORKER = readFileSync(
+  join(repoRoot(), "test/fixtures/container-inspect-worker.json"),
   "utf8",
 );
 
-describe("parseGateway", () => {
-  it("default ネットワークの gateway を取り出す（実際の出力で）", () => {
-    expect(parseGateway(INSPECT_DEFAULT)).toBe("192.168.66.1");
+describe("parseWorkerGateway", () => {
+  it("worker が実際に持つ gateway を取り出す（実際の出力で）", () => {
+    expect(parseWorkerGateway(INSPECT_WORKER)).toBe("192.168.64.1");
+  });
+
+  it("ネットワーク default に付いた行を選ぶ（先頭が別のネットワークでも）", () => {
+    const json = JSON.stringify([
+      {
+        status: {
+          networks: [
+            { network: "probe", ipv4Gateway: "192.168.66.1" },
+            { network: "default", ipv4Gateway: "192.168.64.1" },
+          ],
+        },
+      },
+    ]);
+    expect(parseWorkerGateway(json)).toBe("192.168.64.1");
+  });
+
+  it("default に付いた行が無ければ、先頭の行", () => {
+    const json = JSON.stringify([
+      { status: { networks: [{ network: "probe", ipv4Gateway: "192.168.66.1" }] } },
+    ]);
+    expect(parseWorkerGateway(json)).toBe("192.168.66.1");
+  });
+
+  it("止まった worker（実物の形 networks: [] と state: stopped）なら、決め打ちでなく compose を起こす手を言う", () => {
+    const json = '[{"status":{"networks":[],"state":"stopped"}}]';
+    expect(() => parseWorkerGateway(json)).toThrow(/state=stopped.*container-compose up -d/);
+    expect(() => parseWorkerGateway(json)).not.toThrow(/CAPTURE_LEDGER_API_URL/);
   });
 
   it.each([
     ["空の配列", "[]"],
-    ["status が無い", '[{"id":"default"}]'],
-    ["IPv4 でない", '[{"status":{"ipv4Gateway":"fd89::1"}}]'],
+    ["networks が無い", '[{"status":{"state":"running"}}]'],
+    ["networks が空", '[{"status":{"networks":[]}}]'],
+    ["IPv4 でない", '[{"status":{"networks":[{"network":"default","ipv4Gateway":"fd89::1"}]}}]'],
     ["JSON でない", "container: command not found"],
   ])(
     "読めなければ、決め打ちへ落とさず CAPTURE_LEDGER_API_URL を名指しして投げる（%s）",
     (_, json) => {
-      expect(() => parseGateway(json)).toThrow(/CAPTURE_LEDGER_API_URL/);
+      expect(() => parseWorkerGateway(json)).toThrow(/CAPTURE_LEDGER_API_URL/);
     },
   );
 });
@@ -176,21 +209,23 @@ describe("ledgerApiUrl", () => {
     else process.env[KEY_API_URL] = saved;
   });
 
-  it("書いてあれば、それを使う（network は訊かない）", () => {
+  it("書いてあれば、それを使う（worker は訊かない）", () => {
     process.env[KEY_API_URL] = "http://10.0.0.1:7070";
-    const inspect = vi.fn(() => INSPECT_DEFAULT);
+    const inspect = vi.fn(() => INSPECT_WORKER);
     expect(ledgerApiUrl(inspect)).toBe("http://10.0.0.1:7070");
     expect(inspect).not.toHaveBeenCalled();
   });
 
-  it("書いていなければ、default ネットワークの gateway から組む", () => {
-    expect(ledgerApiUrl(() => INSPECT_DEFAULT)).toBe("http://192.168.66.1:7070");
+  it("書いていなければ、worker が実際に持つ gateway から組む", () => {
+    expect(ledgerApiUrl(() => INSPECT_WORKER)).toBe("http://192.168.64.1:7070");
   });
 
-  it("network を訊けなければ、CAPTURE_LEDGER_API_URL を名指しして投げる", () => {
+  it("worker を訊けなければ、compose を起こす手と CAPTURE_LEDGER_API_URL を名指しして投げる", () => {
     const inspect = () => {
       throw new Error("spawnSync container ENOENT");
     };
-    expect(() => ledgerApiUrl(inspect)).toThrow(/ENOENT.*CAPTURE_LEDGER_API_URL/);
+    expect(() => ledgerApiUrl(inspect)).toThrow(
+      /ENOENT.*container-compose up -d.*CAPTURE_LEDGER_API_URL/,
+    );
   });
 });

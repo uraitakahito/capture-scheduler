@@ -168,7 +168,7 @@ capture-ledger は同じ段の報告の 2 回目として最初の答えを返�
 | 置き場                          | 中身                                                                                                                                                                                           | 入れる script                                                                    |
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | `u/admin/ledger_client`         | capture-ledger に名乗る flow の app client の JSON (secret)。`issuer`・`tokenUrl`（コンテナから見た宛先）・`hostTokenUrl`・`clientId`・`clientSecret`・`scope`。段ごとに、これでトークンを取る | `windmill:capture-ledger-token`。capture-ledger の `.dev/idp.env` から           |
-| `u/admin/waggle_api_url`        | capture-ledger API の宛先（既定は default ネットワークの gateway）                                                                                                                             | 同上                                                                             |
+| `u/admin/waggle_api_url`        | capture-ledger API の宛先（既定は worker が実際に持つ gateway）                                                                                                                                | 同上                                                                             |
 | `u/admin/browserhive_endpoints` | BrowserHive の URL の JSON 配列。BrowserHive 1 つに 1 要素（既定 `["http://browserhive-1.capture-ledger:50051","http://browserhive-2.capture-ledger:50051"]`）                                 | 同上                                                                             |
 | `u/admin/browserhive_tls_ca`    | `https://` のエンドポイントのための CA（空 = 平文の `http://`）                                                                                                                                | 同上                                                                             |
 | `u/admin/ts_compile_url`        | ts-compile-service の宛先（既定 `http://ts-compile.capture-scheduler:8080`）                                                                                                                   | 同上                                                                             |
@@ -200,12 +200,13 @@ capture-ledger 側の OpenFGA も同時に消えていたら、許可を書く�
 `connect` の後で向こうの `pnpm run dev:up --from idp` を打つ。IdP（identity provider）を用意し直し、API を
 起こし直し、許可を与え、`windmill:capture-ledger-token` をやり直す。
 
-**コンテナを作り直すと bridge の subnet が変わりうる。** `u/admin/waggle_api_url` に入るのは、
-`windmill:capture-ledger-token` を叩いた時点の default ネットワークの gateway なので、subnet が
-変わったらやり直す。外れていると report の段が届かずに落ち（`Unable to connect. Is the computer
+**コンテナに配られる番地は変わりうる。** `u/admin/waggle_api_url` に入るのは、
+`windmill:capture-ledger-token` を叩いた時点で worker が実際に持っていた gateway
+（`container inspect windmill-worker.capture-scheduler`）なので、番地が変わったらやり直す。
+default ネットワークの記録（`container network inspect default`）は実際と食い違うことがあり、読まない。外れていると report の段が届かずに落ち（`Unable to connect. Is the computer
 able to access the url?`）、クロールは `running` のまま残る。届いているかは `pnpm run doctor` の
 container→api が見る —— 変数の宛先の `/healthz` に、worker の中から問い合わせ、届かなければ
-宛先をいまの gateway と比べて、古いのか API が 127.0.0.1 で待っているのかを言う。最後に
+宛先を worker の今の gateway と比べて、古いのか API が 127.0.0.1 で待っているのかを言う。最後に
 `pnpm run doctor` が全部 ✓ になり、`pnpm run smoke` が「撮れた」と言えば、復旧は終わり。
 
 ## `f/waggle/` という名前

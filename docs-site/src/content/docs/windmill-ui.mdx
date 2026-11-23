@@ -190,7 +190,7 @@ push stays green while the flow dies on its first `getVariable`.
 | Path                            | Contents                                                                                                                                                                                       | Provisioned by                                                                             |
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | `u/admin/ledger_client`         | The flow's app client for capture-ledger, as JSON (secret): `issuer`, `tokenUrl` (as a container sees it), `hostTokenUrl`, `clientId`, `clientSecret`, `scope`. Each step gets a token with it | `windmill:capture-ledger-token`, from capture-ledger's `.dev/idp.env`                      |
-| `u/admin/waggle_api_url`        | Where the capture-ledger API is (default: the gateway of the `default` network)                                                                                                                | same                                                                                       |
+| `u/admin/waggle_api_url`        | Where the capture-ledger API is (default: the gateway the worker actually has)                                                                                                                 | same                                                                                       |
 | `u/admin/browserhive_endpoints` | JSON array of BrowserHive URLs, one per BrowserHive (default `["http://browserhive-1.capture-ledger:50051","http://browserhive-2.capture-ledger:50051"]`)                                      | same                                                                                       |
 | `u/admin/browserhive_tls_ca`    | CA for `https://` endpoints (empty = plaintext `http://`)                                                                                                                                      | same                                                                                       |
 | `u/admin/ts_compile_url`        | Where ts-compile-service is (default `http://ts-compile.capture-scheduler:8080`)                                                                                                               | same                                                                                       |
@@ -224,12 +224,13 @@ Amazon Cognito, is gone too (its container was recreated), run
 `pnpm run dev:up --from idp` there after `connect` in place of the last line: it sets the
 IdP (identity provider) up again, restarts the API, grants, and re-runs `windmill:capture-ledger-token`.
 
-**Recreating containers can change the bridge subnet.** `u/admin/waggle_api_url` holds the
-gateway of the `default` network as it was when `windmill:capture-ledger-token` ran, so re-run it
-when the subnet moves. A stale address makes the report step fail to connect (`Unable to
+**The address containers are handed can change.** `u/admin/waggle_api_url` holds the gateway
+the worker actually had (`container inspect windmill-worker.capture-scheduler`) when
+`windmill:capture-ledger-token` ran, so re-run it when the address moves. The record of the
+`default` network (`container network inspect default`) can disagree with reality and is not read. A stale address makes the report step fail to connect (`Unable to
 connect. Is the computer able to access the url?`), and the crawl stays `running`. Reachability
 is measured by the container→api line of `pnpm run doctor`, which asks the variable's `/healthz`
-from inside the worker and, when that fails, compares the address with the current gateway to
+from inside the worker and, when that fails, compares the address with the worker's current gateway to
 tell a stale address from an API listening on 127.0.0.1. When `pnpm run doctor` is all ✓ and
 `pnpm run smoke` says "撮れた" (captured), the recovery is done.
 

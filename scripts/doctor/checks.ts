@@ -23,11 +23,12 @@ import { promisify } from "node:util";
 
 import {
   HOST_TS_COMPILE,
-  ledgerApiUrl,
   optional,
   repoRoot,
   windmillUrl,
   windmillWorkspace,
+  WORKER_CONTAINER,
+  WORKER_INSPECT_ARGS,
 } from "../env.js";
 import {
   LEDGER_CLIENT_VAR,
@@ -63,6 +64,7 @@ import {
 import {
   parseCurl,
   readBrowserhiveProbes,
+  expectedApiUrl,
   readContainerApi,
   readTsCompileProbe,
   type CurlAnswer,
@@ -73,7 +75,7 @@ export const API = "http://127.0.0.1:7070";
 /** capture-ledger の開発のスタックの OpenFGA。鍵はクイックスタートの前提と同じ。 */
 const OPENFGA = "http://127.0.0.1:8090";
 /** flow が走るコンテナ。段の報告も BrowserHive への呼び出しもここから出る。 */
-const WORKER = "windmill-worker.capture-scheduler";
+const WORKER = WORKER_CONTAINER;
 /** e2e の試験が名乗る名前 (`test/e2e/crawl-level.e2e.test.ts` と同じ既定)。 */
 const E2E_SUBJECT = optional("E2E_SUBJECT", "e2e");
 
@@ -388,17 +390,9 @@ const variablesSet = async (): Promise<Verdict> => {
   );
 };
 
-/** いまの gateway から組んだ宛先。`container network inspect` が失敗すれば undefined。 */
-const expectedApiUrl = async (): Promise<string | undefined> => {
-  try {
-    const { stdout } = await exec("container", ["network", "inspect", "default"], {
-      encoding: "utf8",
-    });
-    return ledgerApiUrl(() => stdout);
-  } catch {
-    return undefined;
-  }
-};
+/** worker の `container inspect` の出力。doctor は点検を並べるので、非同期の exec で訊く。 */
+const inspectWorkerAsync = async (): Promise<string> =>
+  (await exec("container", [...WORKER_INSPECT_ARGS], { encoding: "utf8" })).stdout;
 
 /**
  * flow が段の報告を送る宛先 (変数 `u/admin/waggle_api_url`) に、worker の中から届くか。
@@ -411,7 +405,7 @@ const containerReachesApi = async (): Promise<Verdict> => {
   if (url === undefined) return unreadable("u/admin/waggle_api_url");
   const [answer, expected] = await Promise.all([
     curlInWorker(`${url}/healthz`, 5),
-    expectedApiUrl(),
+    expectedApiUrl(inspectWorkerAsync),
   ]);
   if ("error" in answer) return workerUnreachable(answer.error);
   return readContainerApi({ url, answer, expected });

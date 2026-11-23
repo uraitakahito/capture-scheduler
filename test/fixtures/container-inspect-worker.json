@@ -1,0 +1,21 @@
+[
+  {
+    "id": "windmill-worker.capture-scheduler",
+    "status": {
+      "networks": [
+        {
+          "hostname": "windmill-worker.capture-scheduler.",
+          "ipv4Address": "192.168.64.39/24",
+          "ipv4Gateway": "192.168.64.1",
+          "ipv6Address": "2001:db8::39/64",
+          "macAddress": "02:00:00:00:00:39",
+          "mtu": 1280,
+          "network": "default",
+          "variant": "reserved"
+        }
+      ],
+      "startedDate": "2026-11-23T09:04:14Z",
+      "state": "running"
+    }
+  }
+]
