@@ -44,6 +44,9 @@ API プロセスの中の周回が、期限の来た予定からクロールを�
 定期の回も、ほかのクロールと同じ形でこの repo に届く —— 同じ webhook、同じ flow、同じホストへの間隔。
 
 手で 1 本撮るのは、「新しいクロール」の画面か `pnpm run smoke`。
+`smoke` のクロールは、flow と同じ app client（`windmill`）の名前で残るので、capture-workbench の一覧では flow と見分けられない。
+AI の担当（Claude Code などの道具）がクロールを始めるときは、capture-ledger の
+`pnpm run crawl start <URL>`（AI の担当の app client `ai` で始める CLI）を使う。一覧に「ai」と席の名前で出る。
 
 ## どこに何があるか
 
