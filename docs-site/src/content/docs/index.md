@@ -47,6 +47,10 @@ A scheduled run reaches this repository like any other crawl: the same webhook, 
 same gap between pages of a host.
 
 To take one capture by hand, use the 新しいクロール (New crawl) view or `pnpm run smoke`.
+A `smoke` crawl is recorded under the same app client as the flow (`windmill`), so the capture-workbench
+list cannot tell it from the flow. When an AI agent (a tool such as Claude Code) starts a crawl, it uses
+`pnpm run crawl start <URL>` in capture-ledger (the CLI that
+starts crawls with the AI agent's app client `ai`); the list shows it as "ai" with the seat name.
 
 ## Where things are
 
