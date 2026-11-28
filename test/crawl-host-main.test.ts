@@ -103,7 +103,7 @@ describe("main が record_random を BrowserHive の要求へ運ぶ", () => {
     expect(bodies[0]).toMatchObject({ recordRandom: true });
   });
 
-  it("null や undefined で届けば投げる。flow か capture-ledger の取り違えで、黙って控えずに撮らせない", async () => {
+  it("null や undefined で届けば投げる。flow か capture-ledger の取り違えで、黙って乱数を記録せずに撮らせない", async () => {
     const bodies = answering();
     await expect(run({}, null)).rejects.toThrow(/record_random が届いていない/);
     await expect(run({}, undefined)).rejects.toThrow(/record_random が届いていない/);

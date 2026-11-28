@@ -212,7 +212,7 @@ Windmill は schema の既定値を **UI からの実行にしか埋めない**�
 引数で届くのは、そのクロールについて capture-ledger が決めて**必ず送る**もの —— URL と
 間隔、`capture_formats` / `signing`、**`scripts`**（ページの中で走らせる TypeScript）、そして
 **`variables` / `secrets` / `secret_archive`**（クロールごとの値。[下の節](#クロールごとの値--変数とシークレット)）、
-**`record_random`**（頁の JS が受け取った乱数を BrowserHive が控えるか。[クロールごとの乱数の控え](#クロールごとの乱数の控え)）。
+**`record_random`**（頁の JS が受け取った乱数を BrowserHive が記録するか。[クロールごとの乱数の記録](#クロールごとの乱数の記録)）。
 capture-ledger が持つのは書いたままの TS で、`sha256` はそのバイト列に打たれている。`compile_scripts` が
 JS にして hash を打ち直し、BrowserHive は JS の hash を照合する。2 つの hash はその 1 段で継がれる。
 `report_level` はその JS の hash を、サービスが名乗った compiler の版と受け皿の型の tag と一緒に
@@ -225,7 +225,7 @@ capture-ledger へ運ぶ（段の報告の `compiled`）。capture-ledger はそ
 `scripts` を必須にしてあるのは `capture_formats` と同じ理由。BrowserHive v11.0.0 は
 走らせるものの顔ぶれを持たないので、送らなければページの中では何も走らず、**それでも
 取り込みは成功してアーカイブも出る**。この flow が足しうるのは BrowserHive 自身のスクリプトだけで、`record_random` を
-頼むと、BrowserHive は控えるスクリプトを頁の JS より先に頁へ入れる（頁が受け取る値は変えない）。渡し忘れは「一度もスクロールしなかったクロール」に
+頼むと、BrowserHive は乱数を記録するスクリプトを頁の JS より先に頁へ入れる（頁が受け取る値は変えない）。渡し忘れは「一度もスクロールしなかったクロール」に
 なり、した側と見分けが付かない。この flow は運ぶだけで、何を・どの順で・どちらの phase
 （読み込み後の `behavior` か、遷移前の `preload` か）で走らせるかは capture-ledger が
 決める。
@@ -273,16 +273,16 @@ robots.txt の規則を照らすのに使う: 字に `BrowserHive` があれば�
 範囲が `seeds` の行が効くのは深さ 0 だけなので、そのホストの名乗りと、robots.txt を照らす名前は、深さ 0 では
 行の物、深さ 1 から先ではクロールの物になる。
 
-## クロールごとの乱数の控え
+## クロールごとの乱数の記録
 
 クロールごとに、頁の JS が `Math.random`・`crypto.getRandomValues`・`crypto.randomUUID` から受け取った値を BrowserHive に
-控えさせられる（BrowserHive v31.1.0 の `recordRandom`）。capture-ledger は `record_random` として必ず送り、頼まれていなければ
+記録させられる（BrowserHive v31.1.0 の `recordRandom`）。capture-ledger は `record_random` として必ず送り、頼まれていなければ
 `false` になる。**flow は運ぶだけ** —— `crawl_host` は真なら要求に `recordRandom: true` を載せ、偽なら鍵ごと送らない
 （v31.1.0 より前の BrowserHive は知らない欄を 400 で断る）。入力が真偽でなければ（`null` を含む）`crawl_host` は投げる。
-黙って控えずに撮っても、クロールは成功に見えるため。頼めば BrowserHive は値を BrowserHive WACZ の `random/values.jsonl` に
-控え、`datapackage.json` の `browserhive:capture.random` に要約を書く（`recorded: true`）。頼まなければ `recorded` は `false`
+黙って乱数を記録せずに撮っても、クロールは成功に見えるため。頼めば BrowserHive は値を BrowserHive WACZ の `random/values.jsonl` に
+記録し、`datapackage.json` の `browserhive:capture.random` に要約を書く（`recorded: true`）。頼まなければ `recorded` は `false`
 で `skipped: "not-requested"`、`random/` は無い（[BrowserHive WACZ Profile 1.26.0](https://uraitakahito.github.io/browserhive-specs/wacz-profile/1.26.0/ja/#random)）。
-`captureFormats.wacz` の無い要求で `recordRandom` を頼むと、BrowserHive は 400 で断る（控えの行き先は WACZ だけ）。
+`captureFormats.wacz` の無い要求で `recordRandom` を頼むと、BrowserHive は 400 で断る（乱数の記録の行き先は WACZ だけ）。
 
 ## クロールごとの値 —— 変数とシークレット
 

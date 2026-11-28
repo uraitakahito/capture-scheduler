@@ -119,8 +119,8 @@ export interface CaptureSettings {
    */
   secretArchive?: Record<string, "keep">;
   /**
-   * 頁の JS が受け取った乱数 (`Math.random`・`crypto.getRandomValues`・`crypto.randomUUID`) を控えるか
-   * (BrowserHive v31.1.0 の `recordRandom`)。控えは BrowserHive WACZ の `random/values.jsonl` に入る。
+   * 頁の JS が受け取った乱数 (`Math.random`・`crypto.getRandomValues`・`crypto.randomUUID`) を記録するか
+   * (BrowserHive v31.1.0 の `recordRandom`)。乱数の記録は BrowserHive WACZ の `random/values.jsonl` に入る。
    * 真のときだけ鍵を送る —— 偽は省いたのと同じで、それより前の BrowserHive は知らない欄を 400 で断る。
    */
   recordRandom?: boolean;
@@ -530,8 +530,8 @@ export const askedUserAgent = (value: string | null | undefined): string => {
 };
 
 /**
- * 乱数を控えるかを読む。capture-ledger は**必ず真偽を送る** (頼まれていなければ `false`)。`null` は flow か capture-ledger の
- * 取り違えで、黙って偽と読むと、頼んだ控えが無いまま取り込みが成功する。**export は試験のため。**
+ * 乱数を記録するかを読む。capture-ledger は**必ず真偽を送る** (頼まれていなければ `false`)。`null` は flow か capture-ledger の
+ * 取り違えで、黙って偽と読むと、頼んだ乱数の記録が無いまま取り込みが成功する。**export は試験のため。**
  */
 export const askedRecordRandom = (value: boolean | null | undefined): boolean => {
   if (typeof value !== "boolean") {
@@ -622,7 +622,7 @@ const captureOne = async (
     ...(capture.userAgent === undefined || capture.userAgent === ""
       ? {}
       : { userAgent: capture.userAgent }),
-    // 乱数を控えるか。真のときだけ送る (偽なら鍵ごと省く。v31.1.0 より前の BrowserHive は知らない欄を 400 で断る)。
+    // 乱数を記録するか。真のときだけ送る (偽なら鍵ごと省く。v31.1.0 より前の BrowserHive は知らない欄を 400 で断る)。
     ...(capture.recordRandom === true ? { recordRandom: true } : {}),
     // robots.txt を例外で外した頁の申告。そのまま渡す。WACZ を撮らない要求には付けない (BrowserHive は 400 で断る。
     // 申告の行き先は WACZ だけ)。外したことは、capture-ledger の頁の行にも残る (`report_level`)。
@@ -819,7 +819,7 @@ export async function main(
    */
   secret_archive?: Record<string, "keep"> | null,
   /**
-   * 頁の JS が受け取った乱数を控えるか。capture-ledger が**必ず送る** (頼まれていなければ `false`)。真偽でなければ
+   * 頁の JS が受け取った乱数を記録するか。capture-ledger が**必ず送る** (頼まれていなければ `false`)。真偽でなければ
    * (`null` を含む) 取り違えなので投げる (`askedRecordRandom`)。
    */
   record_random?: boolean | null,
