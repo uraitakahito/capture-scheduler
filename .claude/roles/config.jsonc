@@ -1,0 +1,44 @@
+// roster（uraitakahito/roster）の担当が push するときの設定。書いていない欄は既定のまま。
+{
+  // roster push が、push の前に流す確かめ（書き方は roster の docs-site の設定のページの「push の前の確かめ」）。
+  // CI（ci.yaml・site.yaml）の中で、通信に依らず手元で流せる物。
+  // 入れない物: audit（通信に依る）・release-version。ci.yaml の docker-compose.yml を読む node -e の 1 行は、scripts/check-ci-parity.ts の ONLY_IN_CI のとおり、script に切り出すまでは CI だけで見る。package.json の check は audit を含むので呼ばない。
+  // 要る用意（worktree を作ったら、roster push の前に）: pnpm install（docs-site も workspace の中）。無いと、コードに依らず確かめが落ちる。
+  // roster push は origin/main のこの欄を読むので、変えた一覧は merge の後から効く。
+  "push": {
+    "checks": [
+      {
+        "name": "format",
+        "run": ["pnpm", "run", "format:check"],
+      },
+      {
+        "name": "env",
+        "run": ["pnpm", "run", "check-env"],
+      },
+      {
+        "name": "terms",
+        "run": ["pnpm", "run", "check:terms"],
+      },
+      {
+        "name": "test-hosts",
+        "run": ["pnpm", "run", "check:test-hosts"],
+      },
+      {
+        "name": "typecheck",
+        "run": ["pnpm", "run", "typecheck"],
+      },
+      {
+        "name": "test",
+        "run": ["pnpm", "test"],
+      },
+      {
+        "name": "ci-parity",
+        "run": ["pnpm", "run", "check:ci-parity"],
+      },
+      {
+        "name": "site",
+        "run": ["pnpm", "run", "site:check"],
+      },
+    ],
+  },
+}
