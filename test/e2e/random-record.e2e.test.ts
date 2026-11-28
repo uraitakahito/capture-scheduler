@@ -13,10 +13,10 @@ import {
 import { datapackageOf, readWacz, textOf, type WaczMembers } from "./helpers/wacz.js";
 
 /**
- * **クロールごとの乱数の控え (`recordRandom`) が、capture-ledger → flow → crawl_host → BrowserHive と運ばれる**（CAPTURE-378）。
+ * **クロールごとの乱数の記録 (`recordRandom`) が、capture-ledger → flow → crawl_host → BrowserHive と運ばれる**（CAPTURE-378）。
  *
  * 単体で見えるのは「crawl_host が要求に載せる形」までで、flow が `record_random` を運ぶか (`flow.yaml` の input_transforms)、
- * BrowserHive が頁の JS の乱数を控えるかは、本物を通さないと言えない。判定は 2 か所で採る:
+ * BrowserHive が頁の JS の乱数を記録するかは、本物を通さないと言えない。判定は 2 か所で採る:
  *
  *   - **WACZ** —— `random/values.jsonl` の有無と、`datapackage.json` の `browserhive:capture.random`
  *     (BrowserHive WACZ Profile 1.26.0 の #random)
@@ -68,8 +68,8 @@ afterAll(async () => {
   await resetFixtures();
 });
 
-describe("クロールごとの乱数の控え", () => {
-  it("頼めば、頁の JS が引いた乱数が WACZ の random/values.jsonl に控えられる", async () => {
+describe("クロールごとの乱数の記録", () => {
+  it("頼めば、頁の JS が引いた乱数が WACZ の random/values.jsonl に記録される", async () => {
     await resetFixtures();
     const seed = `${FIXTURES}/random/pick`;
 
@@ -98,7 +98,7 @@ describe("クロールごとの乱数の控え", () => {
     expect(new Set(recordRandomArgOf(jobs)), "crawl_host に届いていない").toEqual(new Set([true]));
   });
 
-  it("頼まなければ控えず、WACZ は recorded: false・skipped: not-requested で random/ を持たない", async () => {
+  it("頼まなければ記録せず、WACZ は recorded: false・skipped: not-requested で random/ を持たない", async () => {
     await resetFixtures();
     const seed = `${FIXTURES}/random/pick`;
 

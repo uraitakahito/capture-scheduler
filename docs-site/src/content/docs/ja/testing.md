@@ -149,7 +149,7 @@ e2e のほうは capture-fixtures が禁じられたページを受け取った�
 - **形が合わないときは成功のまま、項目が残る。** `safeParse` と `__bh.log.error` のスクリプトで、クロールは succeeded、
   ページのログの error の行に項目の名前が在る。
 - **受けない `import` の形は、compile の段でクロールごと落ちる。** `import { z as zod }` で failed、`error` に `BH0003`。
-- **頁の JS が受け取った乱数は、頼んだときだけ控える**（`random-record.e2e.test.ts`。BrowserHive v31.1.0 以上と
+- **頁の JS が受け取った乱数は、頼んだときだけ記録する**（`random-record.e2e.test.ts`。BrowserHive v31.1.0 以上と
   capture-fixtures v0.36.0 以上が要る）。起点は capture-fixtures の `/random/pick`（`Math.random` を 1 度引く）。
   `recordRandom: true` なら BrowserHive WACZ に `random/values.jsonl` が在り、`browserhive:capture.random` は `recorded: true`
   で乱数の行の数が `draws` と同じ、crawl_host の段の run の引数に `record_random: true` が在る。`false` なら `recorded` は

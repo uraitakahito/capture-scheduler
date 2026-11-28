@@ -766,7 +766,7 @@ describe("頼まれた User-Agent", () => {
   });
 });
 
-describe("乱数の控え (recordRandom)", () => {
+describe("乱数の記録 (recordRandom)", () => {
   const formats = { png: false, webp: false, html: false, links: false, mhtml: false, wacz: true };
   const sendWith = async (recordRandom: boolean) => {
     const seen: unknown[] = [];

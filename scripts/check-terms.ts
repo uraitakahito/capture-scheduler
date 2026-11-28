@@ -1,5 +1,5 @@
 /**
- * クロールの語を、旧い言い方で書いていないかを見張る。規則は下の RULES の 13 個。
+ * クロールの語を、旧い言い方で書いていないかを見張る。規則は下の RULES の 14 個。
  *
  * ## なぜ要るのか
  *
@@ -65,6 +65,9 @@
  *   置き場を兼ね、帳簿の語なのに「台帳が 400 で断る」と動く主語になっていた（capture-ledger・capture-workbench・
  *   browserhive も見張っている）
  * - 「BrowserHive の WACZ」「BrowserHive's WARC」: 形の並び（OLD_FORMAT_OWNER）。後ろに Profile が続く形は見ない
+ * - 乱数の「控え」: 形の並び（OLD_RANDOM）。2026-11 に（t-azdk）、頁の JS が受け取った乱数を残すことを「乱数を記録する」、
+ *   残した物を「乱数の記録」と替えた。「控える」はふつう「やめておく」と読まれ、乱数を使わない設定に見えた。「控えめ」の
+ *   ような別の意味は見ない（capture-workbench・capture-ledger・browserhive も見張っている）
  *
  * ## 見ないもの
  *
@@ -123,6 +126,9 @@ const BARE_REPLAY_VIEWER =
  * 足すときは、「BrowserHive WACZ」「BrowserHive WACZ Profile」に当たらないことを確かめる。
  */
 const OLD_FORMAT_OWNER = /BrowserHive\s*(の|'s)\s*WA(RC|CZ)(?!\s*Profile)/u;
+/** 乱数を残す意味の「控え」（t-azdk）。乱数と並ぶ形と、乱数の字の無いよく戻る形だけ。控えめなどは当てない。 */
+const OLD_RANDOM =
+  /乱数\s*[をのは]\s*控え|控えた\s*乱数|控える\s*スクリプト|控え(?:た|なかった)\s*取り込み/u;
 
 const RULES: { find: (line: string) => boolean; say: string }[] = [
   {
@@ -182,6 +188,12 @@ const RULES: { find: (line: string) => boolean; say: string }[] = [
     say:
       "「BrowserHive の WACZ」「BrowserHive's WARC」の形が残っています。BrowserHive WACZ Profile に適合する WACZ は" +
       "「BrowserHive WACZ」（英 a BrowserHive WACZ）、中の WARC は「BrowserHive WARC」と書きます（CAPTURE-341）。",
+  },
+  {
+    find: (line) => OLD_RANDOM.test(line),
+    say:
+      "乱数の「控え」が残っています。頁の JS が受け取った乱数を残すことは「乱数を記録する」（記録した・記録しなかった）、" +
+      "残した物は「乱数の記録」と書きます（t-azdk）。",
   },
 ];
 

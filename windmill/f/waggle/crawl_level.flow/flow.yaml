@@ -133,7 +133,7 @@ value:
                 user_agent:
                   type: javascript
                   expr: flow_input.iter.value.userAgent
-                # 頁の JS が受け取った乱数を控えるか (BrowserHive の recordRandom)。capture-ledger は必ず真偽を送る
+                # 頁の JS が受け取った乱数を記録するか (BrowserHive の recordRandom)。capture-ledger は必ず真偽を送る
                 # (頼まれていなければ false)。ここを書き忘れると null で届き、crawl_host が投げる。
                 record_random:
                   type: javascript
@@ -379,9 +379,9 @@ schema:
       description: 頼まれた User-Agent。打った字のままで、{chrome} は BrowserHive が解く。空なら browser の字のまま撮る
       default: ""
     record_random:
-      # 頁の JS が受け取った乱数を控えるか。capture-ledger がクロールの頼みから固定し、**必ず送る** (頼まれていなければ false)。
+      # 頁の JS が受け取った乱数を記録するか。capture-ledger がクロールの頼みから固定し、**必ず送る** (頼まれていなければ false)。
       type: boolean
-      description: 頁の JS が受け取った乱数 (Math.random・crypto.getRandomValues・crypto.randomUUID) を控えるか。真なら BrowserHive が値を変えずに BrowserHive WACZ の random/values.jsonl に控える
+      description: 頁の JS が受け取った乱数 (Math.random・crypto.getRandomValues・crypto.randomUUID) を記録するか。真なら BrowserHive が値を変えずに BrowserHive WACZ の random/values.jsonl に記録する
       default: false
     robots_exemptions:
       # robots.txt の例外の行 (t-6bc6)。組織の admin が capture-ledger に登録した行のうち、このクロールのこの段に
