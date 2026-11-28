@@ -49,9 +49,12 @@ script が import するのは `windmill-client` で、`plan_level.ts` だけが
 どちらも devDependency なので、script はそのまま vitest に読み込める。IO は差し替える:
 `vi.stubGlobal("fetch", …)` と `vi.mock("windmill-client", …)`。
 
-`flow.yaml` そのものを読む単体が 1 本ある（`crawl-level-flow.test.ts`）。`crawl_host` の引数（`.script.yaml` の schema）は
-全部 `input_transforms` が運び、`secret_archive` は flow の入力から来ること。見るのは形だけで、Windmill が値を届けるかは
-いまも e2e の問い。`crawl-host-main.test.ts` は `windmill-client` と `fetch` を差し替えて `crawl_host` の `main` そのものを
+`flow.yaml` そのものを読む単体が 1 本ある（`crawl-level-flow.test.ts`）。`plan_level`・`crawl_host`・`report_level`・
+`fail_crawl` の引数（`.script.yaml` の schema）は全部、その段の `input_transforms` が運ぶこと（`fail_crawl` は
+failure_module）。値の出どころも押さえる —— `secret_archive`・`record_random`・`level_key`・`depth`・`robots_exemptions` は
+flow の入力から、ホストの `userAgent` と `robotsOverrides` は `plan_level` の束から、`overridden` は `plan_level` の結果から。
+`level_key` が必須であることと、report の段が 30 秒の間隔で 5 回再試行することも見る。見るのは形だけで、Windmill が値を
+届けるかはいまも e2e の問い。`crawl-host-main.test.ts` は `windmill-client` と `fetch` を差し替えて `crawl_host` の `main` そのものを
 呼び、flow から渡された物（`secret_archive`）が BrowserHive の要求まで届くかを見る。
 
 `captureHost` を `crawl_host.ts` から export してあるのは、間隔のループを偽のエンドポイントで
@@ -63,9 +66,10 @@ script が import するのは `windmill-client` で、`plan_level.ts` だけが
 ## e2e は本物のクロールを始める
 
 どの試験も、Windmill の実行のエンドポイント（HTTP の method と path の組）ではなく **capture-ledger の API** でクロールを始める —— 目的が
-「capture-ledger が実際に送る引数」を運ぶことだから: `crawl_id` / `depth` / `frontier` /
+「capture-ledger が実際に送る引数」を運ぶことだから: `crawl_id` / `depth` / `level_key` / `frontier` /
 `per_host_delay_ms` / `host_parallelism` / `capture_formats` / `signing` / `scripts` / `variables` /
-`secrets` / `secret_archive` / `user_agent` / `record_random` と、受け取り先を出している配備では `artifact_sink` で、**`respect_robots` は入っていない**。
+`secrets` / `secret_archive` / `user_agent` / `record_random` と、受け取り先を出している配備では `artifact_sink`、
+robots.txt の例外を知る capture-ledger では `robots_exemptions` で、**`respect_robots` は入っていない**。
 
 最初の試験が見ているのは 5 つ:
 
@@ -150,6 +154,23 @@ e2e のほうは capture-fixtures が禁じられたページを受け取った�
   `recordRandom: true` なら BrowserHive WACZ に `random/values.jsonl` が在り、`browserhive:capture.random` は `recorded: true`
   で乱数の行の数が `draws` と同じ、crawl_host の段の run の引数に `record_random: true` が在る。`false` なら `recorded` は
   `false` で `skipped: "not-requested"`、`random/` は無い。
+
+### robots.txt の例外
+
+`robots-exemptions.e2e.test.ts` は、capture-ledger の `POST /api/robots-exemptions` で行を登録し、capture-fixtures の
+`/exempt/hub` からクロールを始める。robots.txt が断る頁（`Disallow: /exempt/`）で、`/exempt/status/1`・
+`/exempt/status/2`・`/exempt/likes` に link を持つ（capture-fixtures v0.39.0 以上）。
+
+- **行が無ければ、起点は理由 `robots` で見送り**、capture-fixtures には届かない。
+- **hub の行（`/exempt/hub$`・`seeds`）と status の行（`/exempt/status/*`・`links`）を登録すると**、capture-fixtures に
+  届くのは hub と status の 2 枚で、`/exempt/likes` には届かない。`/exempt/` の下の要求はみな行の名乗りで届く。
+  capture-ledger の頁の行に行の番号（`robotsExemptionId`）が残り、hub の WACZ に `browserhive:capture.robotsOverride` が在る。
+- **2 つの行を取り消した後のクロールは、また起点を見送る。**
+
+**試験が名乗る主体は、組織の admin である要がある**（capture-ledger で `pnpm run fga:grant admin <e2e の利用者の sub> acme`）。
+行の登録と取り消しは人の admin だけで、クロールの許可だけでは 403 になる。capture-ledger が JWT で名乗る経路で動いて
+いることと、例外を知る capture-ledger と BrowserHive も要る。試験は作った行を取り消す。途中で落ちた回の行が次の登録を
+409 にしないよう、始める前に capture-fixtures のホストの効いている行も取り消す。
 
 ### 定期の回
 

@@ -12,7 +12,7 @@ plan_level           ホストで束ね、robots.txt を 1 ホスト 1 回引く
   ↓
 compile_scripts      TypeScript のスクリプトを型検査して JavaScript にする（ts-compile-service）
   ↓
-for-each             ホストごとに並列（parallelism = host_parallelism）
+for-each             ホストごとに並列（parallelism = min(host_parallelism, BrowserHive のエンドポイントの数)）
   crawl_host           1 ホスト内は逐次。完了 → 間隔 → 次
   ↓
 report_level         capture-ledger に報告し、次の段があるかを受け取る
@@ -121,6 +121,52 @@ subnet に届かないので、loopback に出す）。この宛先は、bootstr
 `test/plan-level.test.ts` に両側の試験があるのは、「robots があれば常に robots を採る」
 実装が片側の試験を通ってしまうから。
 
+2 つ目の `Math.max` は、[robots.txt の例外](#robotstxt-の例外)のための下限。この段で、robots.txt が断った頁を
+1 枚でも例外で撮るホストは、間隔を 2000ms より短くしない —— クロールの頼みがそれより短くても（API は 0 も
+受ける）。そういう頁の無いホストは、上で決めた間隔のまま。
+
+## robots.txt の例外
+
+組織の admin は、capture-ledger に **robots.txt の例外**を登録できる: ホスト・path の型・範囲（`seeds` か
+`links`）・そのホストで名乗る User-Agent。行に当たる頁は、robots.txt が断っていても撮る。**判じるのは今までどおり
+`plan_level` の 1 か所。** どの行がこのクロールのこの段に効きうるか（組織・期限・取り消し・人か機械か・残りの枚数）は
+capture-ledger が決め、flow の入力 `robots_exemptions` で渡す。行ごとに、この段で外してよい残りの枚数
+（`remaining`）と、WACZ に書く申告（`declaration`）が付く。例外を知らない capture-ledger は何も送らず、入力は
+`null` で届き、`plan_level` は今までどおりに動く。
+
+ホストごとに、この段で効く行は、`host` が同じで、`scope` が `links` か、深さ 0 の `seeds` の行（このために flow は
+`depth` を `plan_level` に渡す）。その上で:
+
+- **robots.txt は今までどおり取って読み、`Crawl-delay` も効く。** 行が外すのは、robots.txt が断った頁だけ。
+  断っていない頁には何も付けない。robots.txt を読めなかったホストの頁にも付けない。
+- **断られた頁は、URL が行の `pathPattern` に当たり、その行の枚数が残っていれば通す。** 型は robots-parser に
+  1 行の規則（`Disallow: <型>`）として読ませるので、`*` と末尾の `$` の意味は robots.txt と同じ。当たる行が
+  いくつも在れば、型の長い行、次に番号の若い行。残りの尽きた行は飛ばして、当たる次の行を見る。1 枚通すたびに、
+  その行の残りを 1 減らす。
+- **断られて、どの行にも当たらない頁は、今までどおり理由 `robots` で見送る。** 当たる行は在るが、どれも残りが
+  尽きている頁は `robots-exemption-limit` で見送る。
+- **そのホストは、行の名乗りで撮る** —— 断られていない頁も含めて。robots.txt もその名乗りで照らす
+  （[クロールごとの User-Agent](#クロールごとの-user-agent)）。
+- **例外で 1 枚でも撮ったホストの間隔は 2000ms 以上**（上の節）。
+
+`plan_level` は、使う前に行の形をもう一度検査する: path の型（`/` で始まる・空白と `#` の無い印字できる ASCII の
+1 行・256 字まで）、名乗り（`BrowserHive/<版>` と、任意の `(+https://…)`。browser やほかのクローラの名を含まない）、
+`remaining`（0 以上の整数）、`declaration`（object）。capture-ledger の登録の検査（`src/exemptions/validate.ts`）と
+同じ決まりで、2 度目の検査。通らない行は当てず、log に行の番号と訳を出す。1 つのホストに効く行の名乗りが
+2 種類在れば、そのホストの行はみな当てない —— capture-ledger は組織とホストごとに名乗りを 1 つに揃えているので、
+2 種類は壊れた入力。どの場合も、そのホストは robots.txt に従う側に倒れる。
+
+外した頁は 2 つの道で運ばれる。flow の式は運ぶだけ:
+
+- `plan_level` は `overridden`（`url` と `exemptionId`）を返す。`report_level` が受け取り、当たる結果に
+  `robotsExemptionId` を TypeScript の中で付ける。外した頁が無ければ、報告の本文は今までと 1 字も変わらない ——
+  古い capture-ledger は、知らない欄を 400 で断る。
+- `plan_level` はホストの束に `robotsOverrides`（URL → 申告）を載せる。`crawl_host` は、その頁の要求に申告を
+  `robotsOverride` としてそのまま付ける。**付けるのは `capture_formats` に `wacz` が在るときだけ** —— BrowserHive は
+  確かめずに WACZ の `datapackage.json` の `browserhive:capture.robotsOverride` に書き、WACZ を作らない要求に
+  付いていれば 400 で断る。WACZ が無くても、例外で外したことは capture-ledger の頁の行に残る。BrowserHive 自身は、
+  今も robots.txt を読まない。
+
 ## BrowserHive は browser 1 台にエンドポイント 1 つ
 
 BrowserHive は queue も pool も持たない。`POST /captures` は 1 往復で、走行中の server は
@@ -216,6 +262,16 @@ BrowserHive へ渡し、`{chrome}` を browser の字から Headless を外し�
 入力が届かないと `crawl_host` は投げる。黙って browser の字のまま撮っても、クロールは成功に見えるため。`plan_level` は
 robots.txt の規則を照らすのに使う: 字に `BrowserHive` があればその名前で（その組が先で、無ければ `*`）、無ければ
 `*` で照らす。robots.txt を取りに行く要求は変わらない。
+
+**名乗りはホストごとに `plan_level` が決める。** ホストの束が `userAgent` を持ち、flow はそれを `crawl_host` に渡す
+（クロールの `user_agent` を直には渡さない）。この段で [robots.txt の例外](#robotstxt-の例外)の行が効くホストでは、
+そのホストの頁はみな行の名乗りで撮り、クロールの字はそこでは使わない。robots.txt を照らす名前も、その名乗りから
+決まる（行の名乗りは `BrowserHive/<版>` の形なので `BrowserHive`）。ほかのホストでは、クロールの `user_agent`、
+届いたままを運ぶ: capture-ledger は必ず字を送り、`null`（capture-ledger か flow の書き忘れ）は、今までどおり
+`crawl_host` が投げる（頼んでいないのに browser の字のまま撮らない）。
+
+範囲が `seeds` の行が効くのは深さ 0 だけなので、そのホストの名乗りと、robots.txt を照らす名前は、深さ 0 では
+行の物、深さ 1 から先ではクロールの物になる。
 
 ## クロールごとの乱数の控え
 

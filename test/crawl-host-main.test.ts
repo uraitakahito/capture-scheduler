@@ -57,6 +57,7 @@ const FORMATS = { png: false, webp: false, html: false, links: true, mhtml: fals
 const run = (
   secretArchive: Record<string, "keep"> | null | undefined,
   recordRandom: boolean | null | undefined,
+  robotsOverrides?: Parameters<typeof main>[14],
 ) =>
   main(
     "c1",
@@ -73,6 +74,7 @@ const run = (
     "",
     secretArchive,
     recordRandom,
+    robotsOverrides,
   );
 
 describe("main が secret_archive を BrowserHive の要求へ運ぶ", () => {
@@ -106,5 +108,31 @@ describe("main が record_random を BrowserHive の要求へ運ぶ", () => {
     await expect(run({}, null)).rejects.toThrow(/record_random が届いていない/);
     await expect(run({}, undefined)).rejects.toThrow(/record_random が届いていない/);
     expect(bodies).toEqual([]);
+  });
+});
+
+describe("main が robots_overrides を BrowserHive の要求へ運ぶ", () => {
+  const DECLARATION = {
+    exemptionId: "7",
+    reason: "公開の告知を残す",
+    pathPattern: "/a",
+    scope: "seeds" as const,
+    grantedBy: "admin@acme",
+    grantedAt: "2026-11-28T00:00:00Z",
+    expiresAt: "2026-12-28T00:00:00Z",
+  };
+
+  it("flow から届いた申告を、その URL の要求の robotsOverride にそのまま載せる", async () => {
+    const bodies = answering();
+    await run({}, false, { "http://site.test/a": DECLARATION });
+    expect(bodies[0]).toMatchObject({ url: "http://site.test/a", robotsOverride: DECLARATION });
+  });
+
+  it("外した頁の無いホストでは null で届く（渡されない引数）。「無い」と読み、鍵ごと送らない", async () => {
+    for (const overrides of [null, undefined]) {
+      const bodies = answering();
+      await run({}, false, overrides);
+      expect(bodies[0]).not.toHaveProperty("robotsOverride");
+    }
   });
 });

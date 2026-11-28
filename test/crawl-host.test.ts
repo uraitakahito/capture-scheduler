@@ -792,6 +792,78 @@ describe("乱数の控え (recordRandom)", () => {
   });
 });
 
+/**
+ * robots.txt の例外 (t-6bc6)。`plan_level` が外した頁の申告を、その頁の要求にだけ `robotsOverride` として付ける。
+ * BrowserHive は確かめずに WACZ に書くので、WACZ を撮らない要求には付けない (付けると 400)。
+ */
+describe("robots.txt を例外で外した頁の申告 (robotsOverride)", () => {
+  const DECLARATION = {
+    exemptionId: "7",
+    reason: "公開の告知を残す",
+    pathPattern: "/exempt/status/*",
+    scope: "links" as const,
+    grantedBy: "admin@acme",
+    grantedAt: "2026-11-28T00:00:00Z",
+    expiresAt: "2026-12-28T00:00:00Z",
+  };
+  const EXEMPT = "http://m/exempt/status/1";
+  const OPEN = "http://m/open";
+
+  const sendWith = async (wacz: boolean, robotsOverrides?: Record<string, typeof DECLARATION>) => {
+    const seen: unknown[] = [];
+    await captureHost(
+      [fakeEndpoint("bh-1", { seen })],
+      "m",
+      [EXEMPT, OPEN],
+      "c1",
+      {
+        formats: { png: false, webp: false, html: true, links: false, mhtml: false, wacz },
+        signing: false,
+        scripts: [],
+        ...(robotsOverrides !== undefined && { robotsOverrides }),
+      },
+      0,
+      0,
+      FAST,
+    );
+    return seen as { url: string; robotsOverride?: unknown }[];
+  };
+
+  it("外した頁の要求にだけ、申告をそのまま付ける。map に無い URL には付けない", async () => {
+    const [exempt, open] = await sendWith(true, { [EXEMPT]: DECLARATION });
+    expect(exempt!.robotsOverride).toEqual(DECLARATION);
+    expect(open).not.toHaveProperty("robotsOverride");
+  });
+
+  it("WACZ を撮らない形式では付けない（BrowserHive は 400 で断る。書く先が無い）", async () => {
+    const [exempt, open] = await sendWith(false, { [EXEMPT]: DECLARATION });
+    expect(exempt).not.toHaveProperty("robotsOverride");
+    expect(open).not.toHaveProperty("robotsOverride");
+  });
+
+  it("申告が無ければ（渡されない・空）、鍵ごと送らない", async () => {
+    for (const overrides of [undefined, {}]) {
+      const [exempt] = await sendWith(true, overrides);
+      expect(exempt).not.toHaveProperty("robotsOverride");
+    }
+  });
+
+  it("URL が継いだ名前（constructor など）でも、申告として読まない", async () => {
+    const seen: unknown[] = [];
+    await captureHost(
+      [fakeEndpoint("bh-1", { seen })],
+      "m",
+      ["constructor"],
+      "c1",
+      { ...CAPTURE, robotsOverrides: {} },
+      0,
+      0,
+      FAST,
+    );
+    expect(seen[0]).not.toHaveProperty("robotsOverride");
+  });
+});
+
 describe("クロールごとの値", () => {
   const formats = { png: false, webp: false, html: false, links: false, mhtml: false, wacz: true };
   const sendWith = async (extra: {

@@ -79,6 +79,11 @@ export interface Decisions {
     samples: string[];
   }[];
   robots: { hostname: string; pages: number; samples: string[] }[];
+  /**
+   * robots.txt が断ったが、例外の行で外して撮った頁 (行とホスト名ごと)。例外を知る capture-ledger だけが返す ——
+   * 古い capture-ledger の答えには無い。
+   */
+  robotsOverridden?: { exemptionId: string; hostname: string; pages: number; samples: string[] }[];
 }
 
 /** 一覧の 1 行のうち、引き当てに要る欄。 */
@@ -160,6 +165,9 @@ export interface Rendered {
  * 規則ごとの数は、段ごとの別々の URL を足した物。**0 回の規則に印を付ける** —— 当たらない規則は、
  * 書いた人の意図が外れている合図。落とした物は、規則で落とした物と robots.txt で取らなかったページを
  * ホスト名ごとに並べる。
+ *
+ * robots.txt を例外で外して撮った頁は、落とした物とは別の見出しで出す (撮った物なので)。答えに無いか空なら、
+ * 見出しごと出さない。
  */
 export const renderCrawl = (detail: CrawlDetail, got: Decisions): Rendered => {
   const short = detail.crawlId.slice(0, 8);
@@ -210,6 +218,13 @@ export const renderCrawl = (detail: CrawlDetail, got: Decisions): Rendered => {
     })),
   ];
 
+  const overridden: Record<string, string | number>[] = (got.robotsOverridden ?? []).map((row) => ({
+    例外: `#${row.exemptionId}`,
+    ホスト名: row.hostname,
+    "URL の数": row.pages,
+    例: row.samples[0] ?? "",
+  }));
+
   return {
     render_all: [
       { markdown: heading },
@@ -219,6 +234,12 @@ export const renderCrawl = (detail: CrawlDetail, got: Decisions): Rendered => {
       dropped.length === 0
         ? { markdown: "落とした物はありません。" }
         : { "table-row-object": [["なぜ", "ホスト名", "段", "URL の数", "例"], ...dropped] },
+      ...(overridden.length === 0
+        ? []
+        : [
+            { markdown: "#### robots.txt を例外で外して撮った物（例外の行・ホスト名ごと）" },
+            { "table-row-object": [["例外", "ホスト名", "URL の数", "例"], ...overridden] },
+          ]),
     ],
   };
 };

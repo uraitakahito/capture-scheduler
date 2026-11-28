@@ -1,7 +1,8 @@
 summary: クロール 1 本で、規則がリンクをどう決めたかを読む
 description: |
   capture-ledger の GET /api/crawls/:id/decisions を引き、規則ごとの数と、
-  落とした物 (規則と robots.txt・ホスト名ごと) を表に描く。
+  落とした物 (規則と robots.txt・ホスト名ごと) を表に描く。robots.txt を例外で外して撮った物が
+  在れば、別の表に描く。
 
   クロールの通り道には居ない。走らせても何も変わらない。run の中身は 30 日で消えるが、
   capture-ledger の行はクロールがある限り残るので、走らせ直せばよい。
