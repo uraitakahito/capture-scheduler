@@ -50,9 +50,13 @@ The scripts import `windmill-client`, and `plan_level.ts` alone also imports
 `robots-parser`. Both are dev dependencies, so the scripts import into vitest directly. IO is stubbed:
 `vi.stubGlobal("fetch", …)` and `vi.mock("windmill-client", …)`.
 
-One unit test reads `flow.yaml` itself (`crawl-level-flow.test.ts`): every argument of `crawl_host` (its
-`.script.yaml` schema) must be carried by an `input_transforms` entry, and `secret_archive` must come from the
-flow's input. It sees the shape only — whether Windmill delivers the value is still the e2e's question.
+One unit test reads `flow.yaml` itself (`crawl-level-flow.test.ts`): every argument of `plan_level`,
+`crawl_host`, `report_level` and `fail_crawl` (their `.script.yaml` schemas) must be carried by an
+`input_transforms` entry of its step (`fail_crawl` is the failure_module). It also pins where values come
+from — `secret_archive`, `record_random`, `level_key`, `depth` and `robots_exemptions` from the flow's input, the
+host's `userAgent` and `robotsOverrides` from `plan_level`'s group, `overridden` from `plan_level`'s result —
+that `level_key` is required, and that the report step retries five times, 30 seconds apart. It sees the
+shape only — whether Windmill delivers the value is still the e2e's question.
 `crawl-host-main.test.ts` calls `crawl_host`'s `main` itself, with `windmill-client` and `fetch` stubbed, to see
 that what the flow hands it (`secret_archive`) reaches the BrowserHive request.
 
@@ -68,9 +72,10 @@ cost a round trip.
 
 Each test starts a crawl through capture-ledger's API — **not** Windmill's run endpoint —
 because the point is to carry the arguments capture-ledger actually sends:
-`crawl_id`, `depth`, `frontier`, `per_host_delay_ms`, `host_parallelism`,
-`capture_formats`, `signing`, `scripts`, `variables`, `secrets`, `secret_archive`, `user_agent`, `record_random`, and `artifact_sink` where
-capture-ledger serves the sink. **`respect_robots` is not among them.**
+`crawl_id`, `depth`, `level_key`, `frontier`, `per_host_delay_ms`, `host_parallelism`,
+`capture_formats`, `signing`, `scripts`, `variables`, `secrets`, `secret_archive`, `user_agent`, `record_random`,
+`artifact_sink` where capture-ledger serves the sink, and `robots_exemptions` from a capture-ledger that knows
+robots.txt exemptions. **`respect_robots` is not among them.**
 
 The first one asserts five things:
 
@@ -175,6 +180,26 @@ log, which counts every request by its full URL, query string included.
   `random/values.jsonl`, `browserhive:capture.random` is `recorded: true` with as many draw lines as `draws`, and the
   crawl_host step's run arguments carry `record_random: true`. With `false`, `recorded` is `false` with
   `skipped: "not-requested"` and there is no `random/` entry.
+
+### robots.txt exemptions
+
+`robots-exemptions.e2e.test.ts` registers rows through capture-ledger's `POST /api/robots-exemptions` and
+starts crawls from capture-fixtures' `/exempt/hub`, which robots.txt forbids (`Disallow: /exempt/`) and which
+links to `/exempt/status/1`, `/exempt/status/2` and `/exempt/likes` (capture-fixtures v0.39.0 or later).
+
+- **With no row, the seed is skipped** with the reason `robots`, and capture-fixtures never receives it.
+- **With a row for the hub (`/exempt/hub$`, `seeds`) and one for the status pages (`/exempt/status/*`,
+  `links`)**, capture-fixtures receives the hub and the two status pages and never `/exempt/likes`. Every
+  request under `/exempt/` carries the rows' User-Agent. The ledger's page rows name the row
+  (`robotsExemptionId`), and the hub's WACZ has `browserhive:capture.robotsOverride`.
+- **After both rows are revoked, the next crawl skips the seed again.**
+
+**The subject the test signs in as must be an admin of the organization** (`pnpm run fga:grant admin <the
+e2e user's sub> acme` in capture-ledger): only a human admin may register or revoke a row, and the crawl
+permission alone answers 403. capture-ledger must take its identity from JWTs, and the stack needs a
+capture-ledger and a BrowserHive that know exemptions. The test revokes the rows it made; it also revokes
+any active row on the capture-fixtures host before it starts, so that a row left by a failed run does not
+turn the next registration into a 409.
 
 ### Scheduled runs
 

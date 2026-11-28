@@ -58,6 +58,11 @@ schema:
       type: boolean
       description: ""
       default: null
+    robots_overrides:
+      type: object
+      description: ""
+      default: null
+      format: resource-record
     scripts:
       type: array
       description: ""

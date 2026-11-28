@@ -1,5 +1,5 @@
 /**
- * flow (`crawl_level.flow/flow.yaml`) が crawl_host の引数を運ぶ形。
+ * flow (`crawl_level.flow/flow.yaml`) が部品 (plan_level・crawl_host・report_level・fail_crawl) の引数を運ぶ形。
  *
  * 引数を渡すのは flow の `input_transforms` で、書き忘れた引数は Windmill が `null` で届ける —— 黙って「無い」に
  * 倒れる。`secret_archive` なら、keep と宣言した値が隠れる側に倒れ、取り込みは成功するので気づけない。本物の
@@ -68,6 +68,54 @@ describe("flow が crawl_host の引数を運ぶ", () => {
     expect(flow.schema.properties["record_random"]).toMatchObject({
       type: "boolean",
       default: false,
+    });
+  });
+});
+
+/**
+ * robots.txt の例外 (t-6bc6)。判じるのは plan_level で、flow は 3 か所で運ぶだけ: 行と深さを plan_level へ、ホストの束の
+ * 名乗りと申告を crawl_host へ、外した頁の一覧を report_level へ。どれも書き忘れると null で届き、黙って
+ * 「例外なし」「申告なし」「番号なし」に倒れる (クロールは成功する)。
+ */
+describe("flow が robots.txt の例外を運ぶ", () => {
+  const plan = flow.value.modules.find((module) => module.id === "plan");
+  const report = flow.value.modules.find((module) => module.id === "report");
+
+  it("plan の段は plan_level の引数を全部運び、深さと行は flow の入力そのまま", () => {
+    expect(Object.keys(plan?.value.input_transforms ?? {}).sort()).toEqual(
+      Object.keys(schemaOf("plan_level")).sort(),
+    );
+    expect(plan?.value.input_transforms?.["depth"]).toEqual({
+      type: "javascript",
+      expr: "flow_input.depth",
+    });
+    expect(plan?.value.input_transforms?.["robots_exemptions"]).toEqual({
+      type: "javascript",
+      expr: "flow_input.robots_exemptions",
+    });
+  });
+
+  it("robots_exemptions は flow の schema に並びで在り、必須ではない（古い capture-ledger は送らない）", () => {
+    expect(flow.schema.properties["robots_exemptions"]).toMatchObject({ type: "array" });
+    expect(flow.schema.required).not.toContain("robots_exemptions");
+  });
+
+  it("crawl_host の名乗りと申告は、plan_level がホストの束に載せた物をそのまま運ぶ", () => {
+    // クロールの user_agent (flow_input.user_agent) を直に渡すと、例外の行の名乗りが相手に届かない
+    expect(crawlHostStep()?.value.input_transforms?.["user_agent"]).toEqual({
+      type: "javascript",
+      expr: "flow_input.iter.value.userAgent",
+    });
+    expect(crawlHostStep()?.value.input_transforms?.["robots_overrides"]).toEqual({
+      type: "javascript",
+      expr: "flow_input.iter.value.robotsOverrides",
+    });
+  });
+
+  it("report の段は、plan_level が外した頁の一覧をそのまま渡す（番号を付けるのは report_level）", () => {
+    expect(report?.value.input_transforms?.["overridden"]).toEqual({
+      type: "javascript",
+      expr: "results.plan.overridden",
     });
   });
 });

@@ -230,6 +230,40 @@ describe("クロール 1 本の判断を描く", () => {
     ]);
   });
 
+  it("robots.txt を例外で外して撮った物は、落とした物とは別の見出しと表で出す", () => {
+    const rendered = renderCrawl(DETAIL, {
+      ...GOT,
+      robotsOverridden: [
+        {
+          exemptionId: "7",
+          hostname: "capture-fixtures.capture-ledger",
+          pages: 2,
+          samples: ["http://capture-fixtures.capture-ledger:8080/exempt/status/1"],
+        },
+      ],
+    });
+    expect(rendered.render_all).toHaveLength(7);
+    expect(rendered.render_all[5]).toEqual({
+      markdown: "#### robots.txt を例外で外して撮った物（例外の行・ホスト名ごと）",
+    });
+    expect(table(rendered, 2)).toEqual([
+      {
+        例外: "#7",
+        ホスト名: "capture-fixtures.capture-ledger",
+        "URL の数": 2,
+        例: "http://capture-fixtures.capture-ledger:8080/exempt/status/1",
+      },
+    ]);
+    // 落とした物の表には混ぜない
+    expect(table(rendered, 1)).toEqual(table(renderCrawl(DETAIL, GOT), 1));
+  });
+
+  it("例外で外した物が無い・空・欄ごと無い（古い capture-ledger）なら、今までと同じ出力", () => {
+    const before = renderCrawl(DETAIL, GOT);
+    expect(before.render_all).toHaveLength(5);
+    expect(renderCrawl(DETAIL, { ...GOT, robotsOverridden: [] })).toEqual(before);
+  });
+
   it("落とした物が無ければ、表の代わりにそう言う", () => {
     const rendered = renderCrawl(DETAIL, { ...GOT, decisions: [], robots: [] });
     expect(rendered.render_all.at(-1)).toEqual({ markdown: "落とした物はありません。" });

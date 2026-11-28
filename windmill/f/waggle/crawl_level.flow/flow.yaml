@@ -41,10 +41,19 @@ value:
           host_parallelism:
             type: javascript
             expr: flow_input.host_parallelism
-          # 字に BrowserHive があれば、robots をその名前で照らす
+          # 字に BrowserHive があれば、robots をその名前で照らす。例外の行の無いホストの名乗りにもなる
           user_agent:
             type: javascript
             expr: flow_input.user_agent
+          # robots.txt の例外 (t-6bc6)。範囲が seeds の行は深さ 0 でだけ効くので、深さも渡す。行は capture-ledger が
+          # この段に効きうる物だけを選んで送る。古い capture-ledger は送らないので null で届き、plan_level が
+          # 「例外なし」と読む (今までどおり robots.txt に従う)。**判じるのは plan_level** で、ここは運ぶだけ。
+          depth:
+            type: javascript
+            expr: flow_input.depth
+          robots_exemptions:
+            type: javascript
+            expr: flow_input.robots_exemptions
     # **TS のスクリプトを JS にする。** capture-ledger が持つのは書いたままの TS (sha256 は TS のバイト列)。
     # BrowserHive が評価するのは JS (sha256 は JS のバイト列)。その継ぎ目がこの段で、
     # 変換するのは ts-compile-service —— 型が通らなければ 422 でこの段が落ち、failure_module が
@@ -116,16 +125,23 @@ value:
                 secret_archive:
                   type: javascript
                   expr: flow_input.secret_archive
-                # 頼まれた User-Agent。**flow は運ぶだけで解かない** ({chrome} を解くのは BrowserHive)。
-                # capture-ledger は必ず文字列を送る (指定なしは "")。ここを書き忘れると null で届き、crawl_host が投げる。
+                # このホストで名乗る User-Agent。**決めるのは plan_level** で、ホストの束に載せてくる: robots.txt の例外の
+                # 行が効くホストは行の名乗り、ほかはクロールの user_agent (capture-ledger が必ず送る字。指定なしは "")。
+                # flow は運ぶだけで解かない ({chrome} を解くのは BrowserHive)。plan_level は必ず字を載せる ——
+                # ここを書き忘れると null で届き、crawl_host が投げる。
                 user_agent:
                   type: javascript
-                  expr: flow_input.user_agent
+                  expr: flow_input.iter.value.userAgent
                 # 頁の JS が受け取った乱数を控えるか (BrowserHive の recordRandom)。capture-ledger は必ず真偽を送る
                 # (頼まれていなければ false)。ここを書き忘れると null で届き、crawl_host が投げる。
                 record_random:
                   type: javascript
                   expr: flow_input.record_random
+                # robots.txt を例外で外した頁の申告 (URL → 申告)。plan_level がホストの束に載せた物を、そのまま運ぶ。
+                # 外した頁の無いホストでは束に無いので null で届き、crawl_host が「無い」と読む。
+                robots_overrides:
+                  type: javascript
+                  expr: flow_input.iter.value.robotsOverrides
             # crawl_host が投げたら、再起動を待つぶんの間隔で 2 回再試行する (初回と合わせて計 3 回)。
             # 再試行はホストを 1 件目から撮り直す。だから crawl_host が投げるのは、まだ何も撮っていないとき
             # だけ —— ホストの 1 件目で BrowserHive が全部居ない (ServerUnavailable) か、引数が欠けたか、
@@ -171,6 +187,10 @@ value:
           compiled:
             type: javascript
             expr: results.compile
+          # robots.txt を例外で外して通した頁と行の番号。結果に番号を付けるのは report_level (式に判断を置かない)
+          overridden:
+            type: javascript
+            expr: results.plan.overridden
       # **報告は再試行してよい** (CAPTURE-180)。capture-ledger は同じ段の鍵の 2 回目に最初の答えを返し、数も次の段も
       # 重ねない。応答が切れた・capture-ledger が起こし直していた、で段ごと落とすと、撮った段がまるごと failed で締まる。
       # 30 秒の間隔で 5 回 (計 2 分半) —— 報告中の期限 (2 分) より長くして、途中で capture-ledger が落ちた報告を
@@ -362,9 +382,58 @@ schema:
       type: boolean
       description: 頁の JS が受け取った乱数 (Math.random・crypto.getRandomValues・crypto.randomUUID) を控えるか。真なら BrowserHive が値を変えずに BrowserHive WACZ の random/values.jsonl に控える
       default: false
+    robots_exemptions:
+      # robots.txt の例外の行 (t-6bc6)。組織の admin が capture-ledger に登録した行のうち、このクロールのこの段に
+      # 効きうる物 (組織・期限・取り消し・人か機械か) を capture-ledger が選び、残りの枚数を付けて送る。
+      # **必須にしない** —— 送らない古い capture-ledger では null で届き、plan_level が「例外なし」と読む。
+      type: array
+      description: robots.txt の例外の行。当たる頁は、robots.txt が断っていても撮る。判じるのは plan_level。無ければ今までどおり robots.txt に従う
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+            description: 行の番号 (数字の字)
+          host:
+            type: string
+            description: 行が効くホスト (url.host の形)
+          pathPattern:
+            type: string
+            description: 当てる path の型。robots.txt と同じ書き方 (* と末尾の $)
+          scope:
+            type: string
+            description: seeds は深さ 0 だけ、links はどの深さにも効く
+            enum:
+              - seeds
+              - links
+          userAgent:
+            type: string
+            description: このホストで名乗る User-Agent
+          remaining:
+            type: integer
+            description: この段で、この行で外してよい残りの枚数
+            minimum: 0
+          declaration:
+            type: object
+            description: WACZ に書く申告。BrowserHive の robotsOverride にそのまま渡る
+            properties:
+              exemptionId:
+                type: string
+              reason:
+                type: string
+              pathPattern:
+                type: string
+              scope:
+                type: string
+              grantedBy:
+                type: string
+              grantedAt:
+                type: string
+              expiresAt:
+                type: string
   # capture-ledger が送るのは crawl_id / depth / level_key / frontier / 間隔 / 並列度 /
   # capture_formats / signing / scripts / variables / secrets / secret_archive / user_agent / record_random と、受け取り先を
-  # 出している配備では artifact_sink。並列度は plan_level が BrowserHive のエンドポイントの数で頭打ちにしてから for-loop に渡る。
+  # 出している配備では artifact_sink、robots.txt の例外を知る版では robots_exemptions。並列度は plan_level が BrowserHive のエンドポイントの数で頭打ちにしてから for-loop に渡る。
   # schema に無い入力を capture-ledger が送っても、Windmill は既定で引数を schema に照らさないので断らない (frontier の
   # 要素の lastFinishedAt も、ここに書いていないのに plan_level まで届いている)。
   # capture-ledger は自分がコンテナからどう見えるかを知らないし、flow の資格 (u/admin/ledger_client) も持っていない。

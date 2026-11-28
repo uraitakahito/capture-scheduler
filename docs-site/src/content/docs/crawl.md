@@ -12,7 +12,7 @@ plan_level           group by host, fetch robots.txt once per host
   ↓
 compile_scripts      type-check the catalog's TypeScript and turn it into JavaScript (ts-compile-service)
   ↓
-for-each             parallel across hosts (parallelism = host_parallelism)
+for-each             parallel across hosts (parallelism = min(host_parallelism, BrowserHive endpoints))
   crawl_host           sequential within a host: finish → wait → next
   ↓
 report_level         report to capture-ledger, receive the next level
@@ -140,6 +140,60 @@ Note `Math.max`, not `Math.min`. **We do not shorten what the other side asked
 for.** The two-sided test in `test/plan-level.test.ts` exists because an
 implementation that simply always used robots' value passes a one-sided test.
 
+The second `Math.max` is a floor for [robots.txt exemptions](#robotstxt-exemptions): a host where
+this level takes at least one page that robots.txt forbids never gets a gap shorter than 2000 ms,
+even when the crawl asked for less (the API accepts 0). A host with no such page keeps the gap
+computed above.
+
+## robots.txt exemptions
+
+An organization's admin can register **robots.txt exemptions** in capture-ledger: a host, a path
+pattern, a scope (`seeds` or `links`) and the User-Agent to use on that host. A page that matches a row
+is captured even though robots.txt forbids it. **The verdict is still `plan_level`'s, in one place.**
+Which rows can apply to this level of this crawl — the organization, expiry, revocation, a person or a
+machine, how many pages are left — is capture-ledger's to decide; it passes those rows as the flow input
+`robots_exemptions`, each with the pages `remaining` for this level and the `declaration` to write into
+the WACZ. A capture-ledger that does not know exemptions sends nothing, the input arrives as `null`, and
+`plan_level` behaves as before.
+
+For each host, the rows in effect are those with the same `host` whose `scope` is `links`, or `seeds` at
+depth 0 (the flow passes `depth` to `plan_level` for this). Then:
+
+- **robots.txt is still fetched and read, and `Crawl-delay` still counts.** A row lifts only a page that
+  robots.txt forbids. A page it allows gets nothing attached, and so does every page of a host whose
+  robots.txt could not be read.
+- **A forbidden page passes when its URL matches a row's `pathPattern` and that row has pages left.**
+  The pattern is read by robots-parser as a one-line rule (`Disallow: <pattern>`), so `*` and a trailing
+  `$` mean what they mean in robots.txt. With several matching rows, the longest pattern wins, then the
+  lowest id; a row with nothing left is passed over for the next matching one. Each page taken lowers
+  that row's count by one.
+- **A forbidden page that matches no row is skipped with the reason `robots`**, as before. One that
+  matches only rows with nothing left is skipped with `robots-exemption-limit`.
+- **The host is captured under the row's User-Agent** — every page of it, allowed ones included — and
+  robots.txt is matched under that name too (see [Per-crawl User-Agent](#per-crawl-user-agent)).
+- **The gap on that host is at least 2000 ms** once a page was taken this way (above).
+
+`plan_level` checks each row's shape again before using it: the path pattern (starts with `/`, one
+line of printable ASCII without spaces or `#`, at most 256 characters), the User-Agent
+(`BrowserHive/<version>`, optionally followed by `(+https://…)`, with no name of a browser or of another
+crawler), `remaining` (an integer of 0 or more) and `declaration` (an object). These are the same rules
+as capture-ledger's check at registration (`src/exemptions/validate.ts`), applied a second time. A row
+that fails is not applied, and the log names its id and the reason. If the rows in effect for one host
+name two different User-Agents, none of them is applied — capture-ledger keeps one per organization and
+host, so two means the input is broken. In every such case the host falls back to robots.txt.
+
+What was taken travels on two paths, and the flow's expressions only carry it:
+
+- `plan_level` returns `overridden` (`url` and `exemptionId`). `report_level` receives it and adds
+  `robotsExemptionId` to the matching results, in TypeScript. With nothing overridden the report body is
+  exactly what it was — an older capture-ledger refuses a field it does not know with 400.
+- `plan_level` puts `robotsOverrides` (URL → declaration) on the host's group. `crawl_host` adds the
+  declaration to that page's request as `robotsOverride`, unchanged, **only when `capture_formats` has
+  `wacz`**: BrowserHive writes it to `browserhive:capture.robotsOverride` in the WACZ's
+  `datapackage.json` without checking it, and refuses it with 400 on a request that makes no WACZ. Without
+  a WACZ the exemption is still recorded on capture-ledger's page row. BrowserHive itself still does not
+  read robots.txt.
+
 ## One BrowserHive holds one browser
 
 BrowserHive has no queue and no pool: `POST /captures` is one round trip, and a
@@ -256,6 +310,14 @@ value without Headless, and leaves the key out when it is empty. `crawl_host` th
 not arrive, because a crawl that silently kept the browser's value would still succeed. `plan_level` uses it to
 read robots.txt rules: text containing `BrowserHive` is matched under that name (its group first, then
 `*`); otherwise under `*`. The request that fetches robots.txt does not change.
+
+**The User-Agent is decided per host, by `plan_level`.** Each host group carries a `userAgent`, and the
+flow hands that to `crawl_host` (not the crawl's `user_agent` directly). On a host where a
+[robots.txt exemption](#robotstxt-exemptions) is in effect for this level, it is the row's User-Agent,
+for every page of the host, and the crawl's own value is not used there; robots.txt is matched under the
+name that follows from it (`BrowserHive`, since a row's User-Agent must be `BrowserHive/<version>`). On
+every other host it is the crawl's `user_agent`, or `""` when that did not arrive — always a string,
+because `crawl_host` throws on `null`.
 
 ## Per-crawl random recording
 

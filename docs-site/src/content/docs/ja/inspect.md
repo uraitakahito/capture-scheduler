@@ -5,7 +5,7 @@ description: クロールの規則が辿った・撮るだけにした・落と�
 
 クロールの規則は、リンクを 1 本ずつ「撮って辿る」「撮るだけ」「落とす」に分ける。決めるのは
 **capture-ledger** で、flow ではない。だから Windmill の run には、撮ったページと、`plan_level` が
-robots.txt で見送ったページは出ても、**規則で落としたリンクは出ない**。capture-ledger は段ごとに
+robots.txt で見送ったページ・robots.txt の例外で外して通したページは出ても、**規則で落としたリンクは出ない**。capture-ledger は段ごとに
 それを残しており（`crawl_decisions`）、この repo の 2 本の script が Windmill の中から読む。
 
 どちらもクロールの通り道には居ない。知りたいときに Windmill の画面（か API）から走らせる。何も書かない。
@@ -23,6 +23,9 @@ robots.txt で見送ったページは出ても、**規則で落としたリン�
   印を付ける —— 当たらない規則は、たいてい書いた人の意図と違うことを言っている。
 - **落とした物**をホスト名ごとに: 規則で落としたリンク、どの規則にも当たらなかったリンク（これも
   落とす）、robots.txt のために取らなかったページ。
+- **robots.txt を例外で外して撮った物**を、例外の行とホスト名ごとに、別の見出しで: robots.txt が断ったが、
+  登録した行で撮った頁（[リンクを辿る](/crawl/#robotstxt-の例外)）。見出しが出るのは、そういう頁が在り、
+  capture-ledger が `GET /api/crawls/:id/decisions` で `robotsOverridden` を返すときだけ。
 
 前の 8 字は [capture-workbench](https://github.com/uraitakahito/capture-workbench) と Windmill の run の画面に出る形。script は capture-ledger のクロールの一覧の
 新しいページから引き当て、2 本が同じ字で始まれば、どちらも選ばずに両方を名指して止まる。

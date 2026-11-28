@@ -24,7 +24,10 @@ So this repository contains **no URLs**. The URLs and the policy values arrive f
 That split is worth keeping. A runner that also knows what to capture becomes
 a second place to look when the wrong thing is captured — and the two places
 disagree eventually. The exception is robots.txt: the flow drops the pages it forbids, and reports
-each of them back to capture-ledger with the reason, so the ledger still has the record.
+each of them back to capture-ledger with the reason, so the ledger still has the record. A page that
+matches a **robots.txt exemption** an organization's admin registered in capture-ledger is captured
+anyway: the ledger passes the rows that can apply, the flow matches them against the pages robots.txt
+forbids, and reports which row let each page through ([Following links](/crawl/#robotstxt-exemptions)).
 
 ## Capturing, one level at a time
 

@@ -73,6 +73,14 @@ export interface PageResult {
   manifestLocation?: string;
   /** 書けなかった理由。taskId を持つ結果はこの 2 つのどちらか一方を持つ。 */
   manifestError?: string;
+  /** robots.txt を例外で外して撮った頁の、行の番号。`main` が `overridden` から付ける。外した頁にだけ在る。 */
+  robotsExemptionId?: string;
+}
+
+/** `plan_level` が robots.txt を例外で外して通した頁と、その行の番号 (`plan_level.ts` の同名の型)。 */
+export interface Overridden {
+  url: string;
+  exemptionId: string;
 }
 
 export interface NextPage {
@@ -108,7 +116,26 @@ export async function main(
   level_key: string,
   results: PageResult[],
   compiled: CompiledLevel,
+  /**
+   * `plan_level` が robots.txt を例外で外して通した頁。flow が `results.plan.overridden` をそのまま渡す。
+   * `null`・`undefined` は空 (古い flow の形・行の無い段)。
+   */
+  overridden: Overridden[] | null = null,
 ): Promise<LevelOutcome> {
+  // **外した頁の結果に、行の番号を付ける。** flow の式ではなくここで付ける (単体試験の在る所に置く)。
+  // 外した頁が無ければ、送る本文は今までと 1 字も変わらない —— 例外を知らない capture-ledger は、知らない欄を
+  // 400 で断るので、欄は外した頁が在るときだけ出す。
+  const exemptionOf = new Map(
+    (Array.isArray(overridden) ? overridden : []).map((o) => [o.url, o.exemptionId]),
+  );
+  const reported =
+    exemptionOf.size === 0
+      ? results
+      : results.map((result) => {
+          const robotsExemptionId = exemptionOf.get(result.url);
+          return robotsExemptionId === undefined ? result : { ...result, robotsExemptionId };
+        });
+
   // **設定は変数から読む。引数では受けない。**
   // Windmill は schema の既定値を UI からの実行にしか埋めない (`crawl_host.ts` に詳しい)。
   // トークンは IdP (Cognito・手元は Floci) から段ごとに取る。capture-ledger からは送らない。
@@ -124,7 +151,7 @@ export async function main(
     },
     body: JSON.stringify({
       depth,
-      results,
+      results: reported,
       // 走った JS の hash と変換の記録。capture-ledger は固定したスクリプトの各要素に写し、段ごとに同じ値かを見る
       // (違えば 409)。capture-ledger 側では必須 —— 載せ忘れは 400 で、この段が落ちる
       compiled: {

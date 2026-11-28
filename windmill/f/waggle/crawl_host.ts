@@ -124,6 +124,28 @@ export interface CaptureSettings {
    * 真のときだけ鍵を送る —— 偽は省いたのと同じで、それより前の BrowserHive は知らない欄を 400 で断る。
    */
   recordRandom?: boolean;
+  /**
+   * robots.txt を例外で外した頁の申告 (URL → 申告)。`plan_level` がホストの束に載せた物で、**その URL の要求にだけ**
+   * `robotsOverride` として付ける。BrowserHive は確かめずに BrowserHive WACZ の `datapackage.json`
+   * (`browserhive:capture.robotsOverride`) に書く。付けるのは `formats.wacz` が真のときだけ —— WACZ の無い要求に
+   * 付けると BrowserHive は 400 で断る (書く先が無い)。
+   */
+  robotsOverrides?: Record<string, RobotsOverride>;
+}
+
+/**
+ * robots.txt を例外で外した、という求める側の申告 (BrowserHive の `model/main.smithy` の `RobotsOverride`)。
+ * capture-ledger が行から組み、flow と `plan_level` を素通りしてここへ届く。**この層は中身を見ず、書き換えない** ——
+ * BrowserHive は知らない member を 400 で断り、時刻は `Z` で終わる UTC の字しか受けない。
+ */
+export interface RobotsOverride {
+  exemptionId: string;
+  reason: string;
+  pathPattern: string;
+  scope: "seeds" | "links";
+  grantedBy: string;
+  grantedAt: string;
+  expiresAt: string;
 }
 
 /**
@@ -569,6 +591,14 @@ const captureOne = async (
   retry: BusyRetry,
   log: (message: string) => void,
 ): Promise<PageResult> => {
+  // この URL を robots.txt の例外で外したなら、その申告。`hasOwn` で引く (URL は鍵なので、継いだ名前に当てない)。
+  const robotsOverride =
+    capture.robotsOverrides !== undefined && Object.hasOwn(capture.robotsOverrides, url)
+      ? capture.robotsOverrides[url]
+      : undefined;
+  if (robotsOverride !== undefined && !capture.formats.wacz) {
+    log(`${url} は robots.txt の例外で外したが、WACZ を撮らないので申告を付けない`);
+  }
   const request = {
     url,
     labels: [],
@@ -594,6 +624,9 @@ const captureOne = async (
       : { userAgent: capture.userAgent }),
     // 乱数を控えるか。真のときだけ送る (偽なら鍵ごと省く。v31.1.0 より前の BrowserHive は知らない欄を 400 で断る)。
     ...(capture.recordRandom === true ? { recordRandom: true } : {}),
+    // robots.txt を例外で外した頁の申告。そのまま渡す。WACZ を撮らない要求には付けない (BrowserHive は 400 で断る。
+    // 申告の行き先は WACZ だけ)。外したことは、capture-ledger の頁の行にも残る (`report_level`)。
+    ...(robotsOverride !== undefined && capture.formats.wacz ? { robotsOverride } : {}),
   };
 
   for (let attempt = 1; ; attempt += 1) {
@@ -790,6 +823,11 @@ export async function main(
    * (`null` を含む) 取り違えなので投げる (`askedRecordRandom`)。
    */
   record_random?: boolean | null,
+  /**
+   * robots.txt を例外で外した頁の申告 (URL → 申告)。`plan_level` がホストの束に載せ、flow が運ぶ。外した頁の無い
+   * ホストと、行を送らない古い capture-ledger からは `null` で届くので、「無い」と読む (`given`)。
+   */
+  robots_overrides?: Record<string, RobotsOverride> | null,
 ): Promise<PageResult[]> {
   const userAgent = askedUserAgent(user_agent);
   const recordRandom = askedRecordRandom(record_random);
@@ -829,6 +867,7 @@ export async function main(
       secretArchive: kept,
       userAgent,
       recordRandom,
+      robotsOverrides: given(robots_overrides) ?? {},
     },
     per_host_delay_ms,
     initial_delay_ms,

@@ -5,8 +5,8 @@ description: Two Windmill scripts that read capture-ledger's record of which lin
 
 A crawl's rules sort its links one by one into followed, captured only, or dropped —
 and **capture-ledger** makes that call, not the flow. So a Windmill run shows the pages
-that were captured and the robots.txt skips from `plan_level`, but **not the links the
-rules dropped**. capture-ledger records those for every level (`crawl_decisions`), and two
+that were captured, the robots.txt skips from `plan_level` and the pages it took through a
+robots.txt exemption, but **not the links the rules dropped**. capture-ledger records those for every level (`crawl_decisions`), and two
 scripts in this repository read that record from inside Windmill.
 
 Neither is part of a crawl. Run them from the Windmill UI, or its API, when you want to
@@ -26,6 +26,10 @@ Shows the crawl — seeds, depth and page caps, how it ended — and then:
   did not mean.
 - **what was dropped**, by host name: links a rule dropped, links no rule matched (dropped too),
   and pages robots.txt kept the crawl from taking.
+- **what was captured through a robots.txt exemption**, by row and host name, under its own heading:
+  pages robots.txt forbids that a registered row let the crawl take
+  ([Following links](/crawl/#robotstxt-exemptions)). The heading appears only when there is such a page,
+  and only with a capture-ledger that answers `robotsOverridden` in `GET /api/crawls/:id/decisions`.
 
 The first 8 characters are what [capture-workbench](https://github.com/uraitakahito/capture-workbench) and Windmill's run pages show. The script looks
 them up in the newest pages of capture-ledger's crawl list; when two crawls start with the same

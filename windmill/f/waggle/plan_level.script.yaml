@@ -27,6 +27,10 @@ schema:
             description: ""
             originalType: string
       originalType: record[]
+    depth:
+      type: number
+      description: ""
+      default: null
     host_parallelism:
       type: number
       description: ""
@@ -39,6 +43,76 @@ schema:
       type: boolean
       description: ""
       default: true
+    robots_exemptions:
+      type: array
+      description: ""
+      default: null
+      format: resource-robots_exemption
+      items:
+        type: object
+        properties:
+          declaration:
+            type: object
+            description: ""
+            properties:
+              exemptionId:
+                type: string
+                description: ""
+                originalType: string
+              expiresAt:
+                type: string
+                description: ""
+                originalType: string
+              grantedAt:
+                type: string
+                description: ""
+                originalType: string
+              grantedBy:
+                type: string
+                description: ""
+                originalType: string
+              pathPattern:
+                type: string
+                description: ""
+                originalType: string
+              reason:
+                type: string
+                description: ""
+                originalType: string
+              scope:
+                type: string
+                description: ""
+                enum:
+                  - seeds
+                  - links
+                originalType: enum
+          host:
+            type: string
+            description: ""
+            originalType: string
+          id:
+            type: string
+            description: ""
+            originalType: string
+          pathPattern:
+            type: string
+            description: ""
+            originalType: string
+          remaining:
+            type: number
+            description: ""
+          scope:
+            type: string
+            description: ""
+            enum:
+              - seeds
+              - links
+            originalType: enum
+          userAgent:
+            type: string
+            description: ""
+            originalType: string
+      originalType: record[]
     user_agent:
       type: string
       description: ""

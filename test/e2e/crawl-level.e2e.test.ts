@@ -12,9 +12,9 @@ import { mintToken, startKey } from "./helpers/stack.js";
  *
  * Windmill のエンドポイント (`/jobs/run/f/...`) を直接叩けば速いが、それでは意味が無い。
  * この試験の目的は **capture-ledger が実際に送る引数**を通すことで、capture-ledger が送るのは
- * `crawl_id` / `depth` / `frontier` / `per_host_delay_ms` / `host_parallelism` /
- * `capture_formats` / `signing` / `scripts` / `variables` / `secrets` / `user_agent` と、受け取り先を出している配備では
- * `artifact_sink`。
+ * `crawl_id` / `depth` / `level_key` / `frontier` / `per_host_delay_ms` / `host_parallelism` /
+ * `capture_formats` / `signing` / `scripts` / `variables` / `secrets` / `secret_archive` / `user_agent` /
+ * `record_random` と、受け取り先を出している配備では `artifact_sink`、robots.txt の例外を知る版では `robots_exemptions`。
  * `respect_robots` は**送られない**。
  *
  * ## なぜ単体では代わりにならないか
