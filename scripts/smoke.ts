@@ -162,7 +162,9 @@ if (token === undefined) {
       "cd ../capture-ledger && pnpm run dev:up --from idp (.env の WINDMILL_TOKEN も要る)",
   );
 }
-const auth = { authorization: `Bearer ${token}` };
+// **日本語で頼む。** capture-ledger は、自分で書く文 (1 枚も撮れずに終わったクロールの `error`) を頼みの言語で返し、
+// 言語の付かない頼みには英語で返す (t-evv8)。smoke は、その文を日本語の直し方と並べて証拠に写す (`smoke/read-crawl.ts`)
+const auth = { authorization: `Bearer ${token}`, "accept-language": "ja" };
 
 const ledger = async (
   path: string,
