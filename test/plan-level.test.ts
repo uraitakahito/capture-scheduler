@@ -62,7 +62,7 @@ vi.mock("windmill-client", () => ({
 }));
 
 /** エンドポイントごとの `GET /status` の答え。既定は 2 つとも繋がっていて、同じ字を答える。 */
-type StatusAnswer = { connected: boolean; userAgent?: string } | "down";
+type StatusAnswer = { connected: boolean; userAgent?: string } | "down" | "http500" | "not-json";
 const BOTH_UP: Record<string, StatusAnswer> = {
   "http://bh-1:50051": { connected: true, userAgent: BROWSER_UA },
   "http://bh-2:50051": { connected: true, userAgent: BROWSER_UA },
@@ -83,6 +83,12 @@ const serving = (body: string | undefined, status: Record<string, StatusAnswer> 
       const answer = status[url.slice(0, -"/status".length)];
       if (answer === undefined || answer === "down")
         return Promise.reject(new Error("ECONNREFUSED"));
+      if (answer === "http500") return Promise.resolve({ ok: false, status: 500 } as Response);
+      if (answer === "not-json")
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.reject(new SyntaxError("Unexpected token <")),
+        } as Response);
       return Promise.resolve({
         ok: true,
         json: () =>
@@ -872,7 +878,7 @@ describe("robots.txt を、撮る時と同じ名乗りで読む（CAPTURE-508）
     expect(calls).toEqual([]);
   });
 
-  it("欄の無い答え（v32.3.0 より前の BrowserHive）は、答えなかったのと同じ", async () => {
+  it("欄の無い答え（v32.3.0 より前の BrowserHive）が 1 つでも在れば段を落とす —— そのエンドポイントが撮ると字が食い違う", async () => {
     serving(OPEN, {
       "http://bh-1:50051": { connected: true },
       "http://bh-2:50051": { connected: true },
@@ -880,6 +886,26 @@ describe("robots.txt を、撮る時と同じ名乗りで読む（CAPTURE-508）
     await expect(main([at("http://m:8080/a")], 1000, true, null, "")).rejects.toThrow(
       "v32.3.0 より前",
     );
+
+    // 欄の在るエンドポイントが並んでいても落とす（黙って外さない）
+    const { calls } = serving(OPEN, {
+      "http://bh-1:50051": { connected: true, userAgent: BROWSER_UA },
+      "http://bh-2:50051": { connected: true },
+    });
+    await expect(main([at("http://m:8080/a")], 1000, true, null, "")).rejects.toThrow(
+      "http://bh-2:50051",
+    );
+    expect(calls).toEqual([]);
+  });
+
+  it("/status が 500 を返す・本文が JSON でないエンドポイントは、答えなかったのと同じ（残りで読む）", async () => {
+    const http500 = serving(OPEN, { ...BOTH_UP, "http://bh-2:50051": "http500" });
+    await main([at("http://m:8080/a")], 1000, true, null, "");
+    expect(http500.agents).toEqual([BROWSER_UA]);
+
+    const notJson = serving(OPEN, { ...BOTH_UP, "http://bh-1:50051": "not-json" });
+    await main([at("http://m:8080/a")], 1000, true, null, "");
+    expect(notJson.agents).toEqual([BROWSER_UA]);
   });
 
   it("繋がったエンドポイントどうしで字が違えば段を落とす", async () => {

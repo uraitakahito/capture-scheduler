@@ -72,6 +72,10 @@ flow の入力から、ホストの `userAgent` と `robotsOverrides` は `plan_
 `secrets` / `secret_archive` / `user_agent` / `record_random` と、受け取り先を出している配備では `artifact_sink`、
 robots.txt の例外を知る capture-ledger では `robots_exemptions` で、**`respect_robots` は入っていない**。
 
+名乗りを指定しないクロール（ほとんどの e2e）は、**BrowserHive v32.3.0 以上**が要る —— `plan_level` が `GET /status` の
+`browser.userAgent` で robots.txt を読み、欄が無ければ段を落とす。`user-agent.e2e.test.ts` と `robots-exemptions.e2e.test.ts` は、
+robots.txt が頁と同じ字で届くことも見る。
+
 最初の試験が見ているのは 5 つ:
 
 1. **capture-fixtures が `/links/hidden` を一度も受け取っていない**こと。robots.txt が禁じている

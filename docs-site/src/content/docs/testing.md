@@ -79,6 +79,10 @@ because the point is to carry the arguments capture-ledger actually sends:
 `artifact_sink` where capture-ledger serves the sink, and `robots_exemptions` from a capture-ledger that knows
 robots.txt exemptions. **`respect_robots` is not among them.**
 
+Crawls that name no User-Agent (most of the e2e) need **BrowserHive v32.3.0 or later**: `plan_level` reads
+robots.txt under `browser.userAgent` from `GET /status`, and fails the level when the field is missing.
+`user-agent.e2e.test.ts` and `robots-exemptions.e2e.test.ts` also see that robots.txt arrives under the same value as the pages.
+
 The first one asserts five things:
 
 1. **capture-fixtures never received `/links/hidden`**, which its robots.txt disallows. The

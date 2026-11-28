@@ -224,6 +224,8 @@ export interface EndpointIdentity {
   userAgent?: string;
   /** 答えなかった・名乗りの欄が無かった訳。 */
   problem?: string;
+  /** 答えたが `browser.userAgent` の欄が無い (BrowserHive v32.3.0 より前)。取り込みは受けるので、答えなかったのとは違う。 */
+  stale?: boolean;
 }
 
 const STATUS_DEADLINE_MS = 10_000;
@@ -245,6 +247,7 @@ const askIdentity = async (target: string, caPem: string): Promise<EndpointIdent
         target,
         connected,
         problem: "browser.userAgent が無い (BrowserHive v32.3.0 より前)",
+        stale: true,
       };
     }
     return { target, connected, userAgent };
@@ -260,8 +263,21 @@ const askIdentity = async (target: string, caPem: string): Promise<EndpointIdent
  * Chromium の image を替えた後、切れたエンドポイントは古い字を答え続けるので、それも比べると、取り込みで繋ぎ直したエンドポイントとだけ字が
  * 割れて段が落ち、落ちた段は取り込みを送らないので、切れたエンドポイントはいつまでも繋ぎ直さない。繋がったエンドポイントが 1 つも無い時だけ、
  * 切れたエンドポイントが控えた字を使う (取り込みで繋ぎ直すまでの 1 段は、古い字で読むことがある)。
+ *
+ * **答えたのに欄が無いエンドポイント (BrowserHive v32.3.0 より前) が 1 つでも在れば落とす。** そのエンドポイントは取り込みを
+ * 受けるので (`crawl_host` は busy か届かない時だけ次へ進む)、黙って外すと、新しいエンドポイントの字で読んだ robots.txt と、
+ * 古い browser の字で撮る頁が食い違う。
+ *
+ * 繋がったエンドポイントどうしで字が割れるのは、Chromium の版を 1 台ずつ替えた時。全部の Chromium の版を揃えれば戻る。
  */
 export const decideBrowserDefault = (answers: EndpointIdentity[]): string => {
+  const stale = answers.filter((a) => a.stale === true);
+  if (stale.length > 0) {
+    throw new Error(
+      "名乗りを答えない BrowserHive が在る (v32.3.0 より前。そのエンドポイントが撮ると、読んだ字と撮る字が食い違う): " +
+        stale.map((a) => a.target).join("; "),
+    );
+  }
   const named = answers.filter((a) => a.userAgent !== undefined);
   const connected = named.filter((a) => a.connected);
   const pool = connected.length > 0 ? connected : named;
@@ -274,7 +290,7 @@ export const decideBrowserDefault = (answers: EndpointIdentity[]): string => {
   const agents = new Set(pool.map((a) => a.userAgent));
   if (agents.size > 1) {
     throw new Error(
-      "エンドポイントで名乗りが違う (robots.txt を撮る時と同じ名乗りで読めない): " +
+      "エンドポイントで名乗りが違う (robots.txt を撮る時と同じ名乗りで読めない。全部の Chromium の版を揃える): " +
         pool.map((a) => `${a.target} ${a.userAgent ?? ""}`).join("; "),
     );
   }

@@ -316,11 +316,16 @@ text containing `BrowserHive` is matched under that name (its group first, then 
   text the way BrowserHive does (empty means the default; `{chrome}` becomes the default with
   `HeadlessChrome/` turned into `Chrome/`).
 - Only connected endpoints are compared, and the level fails if they differ. When none is connected, the
-  value a disconnected endpoint kept is used. When no endpoint answers, the level fails. **It never reads
+  value a disconnected endpoint kept is used. When no endpoint answers, the level fails. When any BrowserHive answers without the
+  `browser.userAgent` field (older than v32.3.0), the level fails too: captures on that endpoint would go out
+  under a different value than the one robots.txt was read under. **It never reads
   under Bun's default User-Agent**: sites that answer depending on the User-Agent (www.ana.co.jp does not
   answer Bun) went unread, and their Disallow lines had no effect (CAPTURE-94).
 - Right after the Chromium image changes, with no endpoint connected, the first level may read under the
   old value a disconnected endpoint kept (BrowserHive reconnects only inside a capture).
+- **Replace the Chromium behind every endpoint together.** Replaced one at a time, once the replaced endpoint
+  reconnects during a capture the two connected endpoints disagree, and levels that name no User-Agent fail with
+  "エンドポイントで名乗りが違う". Replacing them all brings it back.
 - When the input does not arrive (`null`), `plan_level` throws too.
 - A robots.txt that cannot be read (404, 5xx, timeout) still counts as no restriction.
 
