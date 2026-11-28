@@ -1,9 +1,13 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
+  capturedUserAgent,
+  decideBrowserDefault,
   endpointCount,
   exemptionProblem,
-  main,
+  main as planMain,
+  needsBrowserDefault,
   parallelismFor,
+  parseEndpoints,
   robotsToken,
   type Candidate,
   type RobotsExemption,
@@ -12,8 +16,8 @@ import {
 /**
  * 段の計画。**この repo の Windmill script で唯一、判断が集まっている場所。**
  *
- * IO は robots.txt を取る `fetch` 1 つだけなので、それを差し替えれば全部見える。
- * Windmill も capture-ledger も browserhive も要らない。
+ * IO は `fetch` だけ —— robots.txt と、名乗りを解くのに要る時だけ BrowserHive の `GET /status`。
+ * それを差し替えれば全部見える。Windmill も capture-ledger も browserhive も要らない。
  *
  * ここに試験が無かった間に、`respect_robots` が `null` で届いて robots が一度も
  * 読まれない状態が出荷された。**クロールは成功し、アーカイブも正常に見えた** ——
@@ -22,24 +26,80 @@ import {
 
 /** BrowserHive のエンドポイントの一覧。並列度の上限になる。試験は 2 つで固定。 */
 const VARS: Record<string, string> = {
-  "u/admin/browserhive_endpoints": JSON.stringify(["bh-1:50051", "bh-2:50051"]),
+  "u/admin/browserhive_endpoints": JSON.stringify(["http://bh-1:50051", "http://bh-2:50051"]),
+  "u/admin/browserhive_tls_ca": "",
 };
+
+/** 口が答える既定の名乗り (browser の字そのまま)。 */
+const BROWSER_UA =
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36";
+
+/**
+ * `main` に、capture-ledger と同じ既定の `user_agent` (指定なしの "") を渡す。`null` は取り違えで段を落とすので、
+ * 名乗りを見ない試験は "" で呼ぶ。`null` を見る試験は、名指して渡す。
+ */
+const main = (
+  candidates: Parameters<typeof planMain>[0],
+  perHostDelayMs: number,
+  respectRobots: boolean | null = true,
+  hostParallelism: number | null = null,
+  userAgent: string | null = "",
+  depth: number | null = null,
+  exemptions: RobotsExemption[] | null = null,
+) =>
+  planMain(
+    candidates,
+    perHostDelayMs,
+    respectRobots,
+    hostParallelism,
+    userAgent,
+    depth,
+    exemptions,
+  );
 
 vi.mock("windmill-client", () => ({
   getVariable: (path: string) => Promise.resolve(VARS[path]),
 }));
 
-/** robots.txt を返す fetch。呼ばれた URL を記録する。 */
-const robotsServing = (body: string | undefined) => {
+/** 口ごとの `GET /status` の答え。既定は 2 つとも繋がっていて、同じ字を答える。 */
+type StatusAnswer = { connected: boolean; userAgent?: string } | "down";
+const BOTH_UP: Record<string, StatusAnswer> = {
+  "http://bh-1:50051": { connected: true, userAgent: BROWSER_UA },
+  "http://bh-2:50051": { connected: true, userAgent: BROWSER_UA },
+};
+
+/**
+ * robots.txt と `GET /status` に答える fetch。robots.txt を取った URL と、送った名乗りを記録する
+ * (`calls` は robots.txt だけ。`/status` は `statusCalls`)。
+ */
+const serving = (body: string | undefined, status: Record<string, StatusAnswer> = BOTH_UP) => {
   const calls: string[] = [];
-  const fake = vi.fn((input: string | URL) => {
-    calls.push(String(input));
+  const agents: (string | undefined)[] = [];
+  const statusCalls: string[] = [];
+  const fake = vi.fn((input: string | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.endsWith("/status")) {
+      statusCalls.push(url);
+      const answer = status[url.slice(0, -"/status".length)];
+      if (answer === undefined || answer === "down")
+        return Promise.reject(new Error("ECONNREFUSED"));
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({ busy: false, browser: { url: "http://chromium:9222/", ...answer } }),
+      } as Response);
+    }
+    calls.push(url);
+    agents.push((init?.headers as Record<string, string> | undefined)?.["user-agent"]);
     if (body === undefined) return Promise.resolve({ ok: false, status: 404 } as Response);
     return Promise.resolve({ ok: true, text: () => Promise.resolve(body) } as Response);
   });
   vi.stubGlobal("fetch", fake);
-  return calls;
+  return { calls, agents, statusCalls };
 };
+
+/** robots.txt を返す fetch。robots.txt を取った URL を記録する (`/status` には既定の答えを返す)。 */
+const robotsServing = (body: string | undefined) => serving(body).calls;
 
 const at = (url: string, lastFinishedAt?: string | null): Candidate => ({
   url,
@@ -101,7 +161,8 @@ describe("robots を読むかどうか", () => {
       "fetch",
       vi.fn(() => Promise.reject(new Error("ECONNREFUSED"))),
     );
-    const plan = await main([at("http://m:8080/a")], 1000, true);
+    // 名乗りを指定する (BrowserHive に訊かない) ので、投げるのは robots.txt の取得だけ
+    const plan = await main([at("http://m:8080/a")], 1000, true, null, "Probe/1");
     expect(plan.groups[0]!.urls).toEqual(["http://m:8080/a"]);
   });
 });
@@ -133,10 +194,12 @@ describe("robots を照らす名前", () => {
     expect(plan.groups[0]!.urls).toEqual(["http://m:8080/named-only"]);
   });
 
-  it("届かなければ（null）* の組で照らす", async () => {
-    robotsServing(TWO_GROUPS);
-    const plan = await main(CANDIDATES, 1000, true, null, null);
-    expect(plan.skipped).toEqual([{ url: "http://m:8080/everyone", reason: "robots" }]);
+  it("届かなければ（null）段を落とす —— 読む名乗りを決められない（crawl_host の askedUserAgent と揃える）", async () => {
+    const { calls } = serving(TWO_GROUPS);
+    await expect(main(CANDIDATES, 1000, true, null, null)).rejects.toThrow(
+      "user_agent が届いていない",
+    );
+    expect(calls).toEqual([]);
   });
 
   it("Crawl-delay も同じ組から読む", async () => {
@@ -500,17 +563,18 @@ describe("robots.txt の例外", () => {
     expect(got.groups.find((g) => g.host === "other:8080")!.userAgent).toBe("{chrome} Probe");
   });
 
-  it("クロールの user_agent が届いていない（null）なら、行の無いホストの束は null のまま運ぶ（crawl_host が投げる）", async () => {
+  it("クロールの user_agent が届いていない（null）なら、行の無いホストが在れば段を落とす。行の在るホストだけなら行の名乗りで進む", async () => {
     // capture-ledger は必ず字を送る。null を "" に替えると、送り忘れが browser の字のまま黙って撮られる
     robotsServing(EXEMPT);
-    const withRows = await main([at("http://other:8080/a")], 1000, true, null, null, 1, [row()]);
-    expect(withRows.groups[0]!.userAgent).toBeNull();
+    await expect(
+      main([at("http://other:8080/a")], 1000, true, null, null, 1, [row()]),
+    ).rejects.toThrow("user_agent が届いていない");
 
     robotsServing(EXEMPT);
-    const without = await main([at("http://other:8080/a")], 1000, true);
-    expect(without.groups[0]!.userAgent).toBeNull();
+    const onlyRowHost = await main([at("http://m:8080/open")], 1000, true, null, null, 1, [row()]);
+    expect(onlyRowHost.groups[0]!.userAgent).toBe(AGENT);
 
-    // 指定なしは、capture-ledger が送る "" がそのまま載る
+    // 指定なしは、capture-ledger が送る "" がそのまま載る (解くのは BrowserHive)
     robotsServing(EXEMPT);
     const unset = await main([at("http://other:8080/a")], 1000, true, null, "");
     expect(unset.groups[0]!.userAgent).toBe("");
@@ -733,5 +797,147 @@ describe("並列度は BrowserHive のエンドポイントの数で頭を押さ
     // 「並列度 0」として通すと、for-loop は何も回さずに段が空で成功する。
     expect(() => endpointCount("[]")).toThrow("空でない");
     expect(() => endpointCount("bh-1:50051")).toThrow("JSON");
+  });
+});
+
+describe("robots.txt を、撮る時と同じ名乗りで読む（CAPTURE-508）", () => {
+  const OPEN = "User-agent: *\nDisallow:\n";
+
+  it("指定した字なら、その字で読み、BrowserHive には訊かない", async () => {
+    const { agents, statusCalls } = serving(OPEN);
+    await main([at("http://m:8080/a")], 1000, true, null, "BrowserHive/0.0-check");
+    expect(agents).toEqual(["BrowserHive/0.0-check"]);
+    expect(statusCalls).toEqual([]);
+  });
+
+  it('指定なし（""）なら、BrowserHive の既定の字で読む。訊くのは 1 段に 1 回、全部の口に', async () => {
+    const { agents, statusCalls } = serving(OPEN);
+    await main([at("http://m:8080/a"), at("http://n:8080/b")], 1000, true, null, "");
+    expect(agents).toEqual([BROWSER_UA, BROWSER_UA]);
+    expect(statusCalls.sort()).toEqual(["http://bh-1:50051/status", "http://bh-2:50051/status"]);
+  });
+
+  it("{chrome} は、既定の字の HeadlessChrome/ を Chrome/ にした物で解いて読む", async () => {
+    const { agents } = serving(OPEN);
+    await main([at("http://m:8080/a")], 1000, true, null, "{chrome} BrowserHive");
+    expect(agents).toEqual([BROWSER_UA.replace("HeadlessChrome/", "Chrome/") + " BrowserHive"]);
+  });
+
+  it("例外の行が当たるホストは、行の名乗りで読む（クロールの字が空でも、そのホストのためには訊かない）", async () => {
+    const AGENT_ROW = "BrowserHive/1.0 (+https://site.test/why)";
+    const exemption: RobotsExemption = {
+      id: "7",
+      host: "m:8080",
+      pathPattern: "/x",
+      scope: "links",
+      userAgent: AGENT_ROW,
+      remaining: 1,
+      declaration: {
+        reason: "r",
+        grantedBy: "g",
+        grantedAt: "2026-11-28T00:00:00Z",
+        expiresAt: "2026-12-28T00:00:00Z",
+      },
+    } as unknown as RobotsExemption;
+    const { agents, statusCalls } = serving(OPEN);
+    await main([at("http://m:8080/a")], 1000, true, null, "", 1, [exemption]);
+    expect(agents).toEqual([AGENT_ROW]);
+    expect(statusCalls).toEqual([]);
+  });
+
+  it("respect_robots が false なら、BrowserHive にも訊かない", async () => {
+    const { calls, statusCalls } = serving(OPEN);
+    await main([at("http://m:8080/a")], 1000, false, null, "");
+    expect(calls).toEqual([]);
+    expect(statusCalls).toEqual([]);
+  });
+
+  it("束に載せる字は解かない（解くのは BrowserHive）", async () => {
+    serving(OPEN);
+    const plan = await main([at("http://m:8080/a")], 1000, true, null, "{chrome} BrowserHive");
+    expect(plan.groups[0]!.userAgent).toBe("{chrome} BrowserHive");
+  });
+
+  it("1 つの口が答えなくても、残りの口の字で読む", async () => {
+    const { agents } = serving(OPEN, { ...BOTH_UP, "http://bh-2:50051": "down" });
+    await main([at("http://m:8080/a")], 1000, true, null, "");
+    expect(agents).toEqual([BROWSER_UA]);
+  });
+
+  it("どの口も答えなければ段を落とし、robots.txt を Bun の名乗りで読みに行かない", async () => {
+    const { calls } = serving(OPEN, { "http://bh-1:50051": "down", "http://bh-2:50051": "down" });
+    await expect(main([at("http://m:8080/a")], 1000, true, null, "")).rejects.toThrow(
+      "既定の名乗りを読めない",
+    );
+    expect(calls).toEqual([]);
+  });
+
+  it("欄の無い答え（v32.3.0 より前の BrowserHive）は、答えなかったのと同じ", async () => {
+    serving(OPEN, {
+      "http://bh-1:50051": { connected: true },
+      "http://bh-2:50051": { connected: true },
+    });
+    await expect(main([at("http://m:8080/a")], 1000, true, null, "")).rejects.toThrow(
+      "v32.3.0 より前",
+    );
+  });
+
+  it("繋がった口どうしで字が違えば段を落とす", async () => {
+    serving(OPEN, {
+      "http://bh-1:50051": { connected: true, userAgent: BROWSER_UA },
+      "http://bh-2:50051": { connected: true, userAgent: "Other/1" },
+    });
+    await expect(main([at("http://m:8080/a")], 1000, true, null, "")).rejects.toThrow(
+      "口で名乗りが違う",
+    );
+  });
+
+  it("切れた口の古い字は、繋がった口が在れば比べない（1 つの口だけが繋ぎ直して字が替わっても落ちない）", async () => {
+    const { agents } = serving(OPEN, {
+      "http://bh-1:50051": { connected: true, userAgent: "New/2" },
+      "http://bh-2:50051": { connected: false, userAgent: "Old/1" },
+    });
+    await main([at("http://m:8080/a")], 1000, true, null, "");
+    expect(agents).toEqual(["New/2"]);
+  });
+
+  it("繋がった口が無ければ、切れた口が控えた字で読む（字が割れていれば落とす）", async () => {
+    expect(
+      decideBrowserDefault([
+        { target: "a", connected: false, userAgent: "Old/1" },
+        { target: "b", connected: false, userAgent: "Old/1" },
+      ]),
+    ).toBe("Old/1");
+    expect(() =>
+      decideBrowserDefault([
+        { target: "a", connected: false, userAgent: "Old/1" },
+        { target: "b", connected: false, userAgent: "New/2" },
+      ]),
+    ).toThrow("口で名乗りが違う");
+  });
+
+  it("解き方は BrowserHive の resolveUserAgent と同じ（$ を特別な記号として読まない）", () => {
+    expect(capturedUserAgent("", "X HeadlessChrome/1 Y")).toBe("X HeadlessChrome/1 Y");
+    expect(capturedUserAgent("{chrome} BH {chrome}", "X HeadlessChrome/1")).toBe(
+      "X Chrome/1 BH X Chrome/1",
+    );
+    expect(capturedUserAgent("{chrome}", "A $& B")).toBe("A $& B");
+    expect(needsBrowserDefault("")).toBe(true);
+    expect(needsBrowserDefault("{chrome} BrowserHive")).toBe(true);
+    expect(needsBrowserDefault("BrowserHive/1.0")).toBe(false);
+  });
+
+  it("口の一覧の読み方は crawl_host の parseEndpoints と同じ", async () => {
+    const crawlHost = await import("../windmill/f/waggle/crawl_host.js");
+    for (const raw of [
+      JSON.stringify(["http://a:1/", " https://b:2 "]),
+      JSON.stringify(["http://a:1//"]),
+    ]) {
+      expect(parseEndpoints(raw)).toEqual(crawlHost.parseEndpoints(raw));
+    }
+    for (const raw of ["[]", "x", JSON.stringify(["bh-1:50051"]), JSON.stringify([""])]) {
+      expect(() => parseEndpoints(raw)).toThrow();
+      expect(() => crawlHost.parseEndpoints(raw)).toThrow();
+    }
   });
 });

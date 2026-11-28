@@ -20,7 +20,8 @@ import { readWacz, settingsOf } from "./helpers/wacz.js";
  * 単体で見えるのは「crawl_host が要求に載せる形」までで、flow が `user_agent` を運ぶか (`flow.yaml` の input_transforms)、
  * 次の段にも配られるか、BrowserHive が `{chrome}` を解くかは、本物を通さないと言えない。判定は 3 か所で採る:
  *
- *   - **相手が見た字** —— capture-fixtures のリクエストログ (`/__requests`)。robots.txt は別の道具が取るので除く
+ *   - **相手が見た字** —— capture-fixtures のリクエストログ (`/__requests`)。robots.txt (`plan_level` が取る) も、頁と同じ字で
+ *     届く (CAPTURE-508。前は Bun の既定の名乗りで取っていた)
  *   - **capture-ledger の行** —— `GET /api/crawls/:id` の `userAgent` (打った字)
  *   - **WACZ** —— `datapackage.json` の `settings.userAgent` (解いた字)
  *
@@ -32,12 +33,25 @@ interface Logged {
   userAgent?: string;
 }
 
-/** 相手が見た要求。robots.txt を除く。 */
+/** 相手が見た要求。robots.txt も含む。 */
 const seenByFixtures = async (): Promise<Logged[]> => {
   const { requests } = (await json(await fetch(`${FIXTURES_HOST}/__requests`))) as unknown as {
     requests: Logged[];
   };
-  return requests.filter((r) => !r.url.includes("robots.txt"));
+  return requests;
+};
+
+/** robots.txt が、撮った字と同じ字で届いたか (1 回以上・Bun の名乗りが無い)。 */
+const expectRobotsReadAs = (seen: Logged[], recorded: string): void => {
+  const robots = seen.filter((r) => pathOf(r.url) === "/robots.txt");
+  expect(robots.length, "robots.txt が取られていない").toBeGreaterThan(0);
+  expect(new Set(robots.map((r) => r.userAgent)), "robots.txt を撮る字と違う字で読んだ").toEqual(
+    new Set([recorded]),
+  );
+  expect(
+    seen.some((r) => /\bBun\//.test(r.userAgent ?? "")),
+    "Bun の名乗りで取った要求が在る",
+  ).toBe(false);
 };
 
 const pathOf = (url: string): string => new URL(url, "http://x").pathname;
@@ -99,6 +113,7 @@ describe("クロールごとの User-Agent", () => {
     expect(new Set(seen.map((r) => r.userAgent)), "字の違う要求が在る").toEqual(
       new Set([recorded]),
     );
+    expectRobotsReadAs(seen, recorded);
 
     // BrowserHive の名前で照らしても、名指しの組が無ければ * の組に落ちて断られる
     expect(paths, "robots が禁じたページに触れた").not.toContain("/links/hidden");
@@ -124,7 +139,10 @@ describe("クロールごとの User-Agent", () => {
       "userAgent"
     ] as string;
     expect(recorded).toContain("HeadlessChrome");
-    expect(new Set((await seenByFixtures()).map((r) => r.userAgent))).toEqual(new Set([recorded]));
+    const seen = await seenByFixtures();
+    expect(new Set(seen.map((r) => r.userAgent))).toEqual(new Set([recorded]));
+    // 指定なしの robots.txt は、BrowserHive の GET /status が答える既定の字で読む
+    expectRobotsReadAs(seen, recorded);
 
     const jobs = await jobsOf(got);
     expect(userAgentArgOf(jobs, "plan_level")).toEqual([""]);
@@ -150,11 +168,30 @@ describe("クロールごとの User-Agent", () => {
     expect(recorded).not.toContain("HeadlessChrome");
     expect(recorded).not.toContain("{chrome}");
     expect(recorded).not.toContain("BrowserHive");
-    expect(new Set((await seenByFixtures()).map((r) => r.userAgent))).toEqual(new Set([recorded]));
+    const seen = await seenByFixtures();
+    expect(new Set(seen.map((r) => r.userAgent))).toEqual(new Set([recorded]));
+    // {chrome} は plan_level も BrowserHive と同じ決まりで解く。ずれれば、ここで字が 2 つになる
+    expectRobotsReadAs(seen, recorded);
 
     const jobs = await jobsOf(got);
     expect(userAgentArgOf(jobs, "plan_level")).toEqual([asked]);
     expect(new Set(userAgentArgOf(jobs, "crawl_host"))).toEqual(new Set([asked]));
+  });
+
+  it("{chrome} の無い字は、robots.txt も頁もその字のまま届き、/links/hidden には触れない", async () => {
+    await resetFixtures();
+    const seed = `${FIXTURES}/links/hub`;
+    const asked = "BrowserHive/0.0-check";
+
+    const got = await api.finished(
+      await api.start({ seeds: [seed], maxDepth: 1, maxPages: 5, userAgent: asked }),
+    );
+    expect(got["state"], String(got["error"])).toBe("succeeded");
+
+    const seen = await seenByFixtures();
+    expect(new Set(seen.map((r) => r.userAgent))).toEqual(new Set([asked]));
+    expectRobotsReadAs(seen, asked);
+    expect(new Set(seen.map((r) => pathOf(r.url)))).not.toContain("/links/hidden");
   });
 
   it("形に合わない字は 400 で断り、相手に何も届かない", async () => {

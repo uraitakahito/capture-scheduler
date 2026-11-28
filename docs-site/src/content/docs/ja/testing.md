@@ -47,7 +47,8 @@ doctor の点検は、同じ場所を `CAPTURE_LEDGER_DIR` から読む。
 
 script が import するのは `windmill-client` で、`plan_level.ts` だけが `robots-parser` も import する。
 どちらも devDependency なので、script はそのまま vitest に読み込める。IO は差し替える:
-`vi.stubGlobal("fetch", …)` と `vi.mock("windmill-client", …)`。
+`vi.stubGlobal("fetch", …)` と `vi.mock("windmill-client", …)`。`plan_level` の `fetch` は、robots.txt と、名乗りを解くのに
+要る時だけ BrowserHive の `GET /status` に答える（`test/plan-level.test.ts` の `serving`。送った名乗りも記録する）。
 
 `flow.yaml` そのものを読む単体が 1 本ある（`crawl-level-flow.test.ts`）。`plan_level`・`crawl_host`・`report_level`・
 `fail_crawl` の引数（`.script.yaml` の schema）は全部、その段の `input_transforms` が運ぶこと（`fail_crawl` は

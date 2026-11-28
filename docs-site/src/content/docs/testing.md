@@ -48,7 +48,9 @@ stay open.
 
 The scripts import `windmill-client`, and `plan_level.ts` alone also imports
 `robots-parser`. Both are dev dependencies, so the scripts import into vitest directly. IO is stubbed:
-`vi.stubGlobal("fetch", …)` and `vi.mock("windmill-client", …)`.
+`vi.stubGlobal("fetch", …)` and `vi.mock("windmill-client", …)`. `plan_level`'s `fetch` answers robots.txt and, only when
+the User-Agent needs resolving, BrowserHive's `GET /status` (`serving` in `test/plan-level.test.ts`, which also records the
+User-Agent sent).
 
 One unit test reads `flow.yaml` itself (`crawl-level-flow.test.ts`): every argument of `plan_level`,
 `crawl_host`, `report_level` and `fail_crawl` (their `.script.yaml` schemas) must be carried by an
