@@ -113,6 +113,54 @@ describe("報告の送り方", () => {
   });
 });
 
+/**
+ * robots.txt の例外 (t-6bc6)。`plan_level` が外して通した頁の結果に、行の番号を付けて報告する。付けるのは flow の式では
+ * なくここ。例外を知らない capture-ledger は知らない欄を 400 で断るので、外した頁が無ければ本文は今までと同じ。
+ */
+describe("robots.txt を例外で外した頁", () => {
+  const RESULTS = [
+    ...CAPTURED,
+    { url: "http://m/exempt/status/1", status: "captured" as const, taskId: "t2" },
+    { url: "http://m/exempt/status/2", status: "failed" as const, skipReason: "timeout" },
+    { url: "http://m/exempt/likes", status: "skipped" as const, skipReason: "robots" },
+  ];
+
+  const bodyWith = async (...overridden: [unknown?]) => {
+    const seen = responding(200, { next: [], stopReason: null });
+    await main("c-1", 1, LEVEL_KEY, RESULTS, COMPILED, ...(overridden as []));
+    return String(seen[0]!.init.body);
+  };
+
+  it("外した頁が無ければ（空・null・undefined・渡さない）、本文は今までと 1 字も変わらない", async () => {
+    const before = JSON.stringify({ depth: 1, results: RESULTS, compiled: SENT });
+    expect(await bodyWith()).toBe(before);
+    expect(await bodyWith([])).toBe(before);
+    expect(await bodyWith(null)).toBe(before);
+    expect(await bodyWith(undefined)).toBe(before);
+  });
+
+  it("外した頁の結果にだけ robotsExemptionId を付ける（撮れた頁も、失敗した頁も）", async () => {
+    const body = JSON.parse(
+      await bodyWith([
+        { url: "http://m/exempt/status/1", exemptionId: "7" },
+        { url: "http://m/exempt/status/2", exemptionId: "9" },
+      ]),
+    ) as { results: Record<string, unknown>[] };
+
+    expect(body.results).toEqual([
+      CAPTURED[0],
+      { ...RESULTS[1], robotsExemptionId: "7" },
+      { ...RESULTS[2], robotsExemptionId: "9" },
+      RESULTS[3],
+    ]);
+  });
+
+  it("結果に無い URL の行は、何も足さない", async () => {
+    const body = await bodyWith([{ url: "http://m/nowhere", exemptionId: "7" }]);
+    expect(body).not.toContain("robotsExemptionId");
+  });
+});
+
 describe("run のログ", () => {
   it("終わった理由を書き、打ち切りとは言わない", async () => {
     // `completed` は全部辿った印。「completed で打ち切り」と書くと、ログが逆のことを言う。

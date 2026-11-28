@@ -52,6 +52,23 @@ schema:
       description: ""
       default: null
       originalType: string
+    overridden:
+      type: array
+      description: ""
+      default: null
+      format: resource-overridden
+      items:
+        type: object
+        properties:
+          exemptionId:
+            type: string
+            description: ""
+            originalType: string
+          url:
+            type: string
+            description: ""
+            originalType: string
+      originalType: record[]
     results:
       type: array
       description: ""
@@ -77,6 +94,10 @@ schema:
             description: ""
             originalType: string
           manifestLocation:
+            type: string
+            description: ""
+            originalType: string
+          robotsExemptionId:
             type: string
             description: ""
             originalType: string
