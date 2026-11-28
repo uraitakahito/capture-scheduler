@@ -48,7 +48,9 @@ stay open.
 
 The scripts import `windmill-client`, and `plan_level.ts` alone also imports
 `robots-parser`. Both are dev dependencies, so the scripts import into vitest directly. IO is stubbed:
-`vi.stubGlobal("fetch", …)` and `vi.mock("windmill-client", …)`.
+`vi.stubGlobal("fetch", …)` and `vi.mock("windmill-client", …)`. `plan_level`'s `fetch` answers robots.txt and, only when
+the User-Agent needs resolving, BrowserHive's `GET /status` (`serving` in `test/plan-level.test.ts`, which also records the
+User-Agent sent).
 
 One unit test reads `flow.yaml` itself (`crawl-level-flow.test.ts`): every argument of `plan_level`,
 `crawl_host`, `report_level` and `fail_crawl` (their `.script.yaml` schemas) must be carried by an
@@ -76,6 +78,10 @@ because the point is to carry the arguments capture-ledger actually sends:
 `capture_formats`, `signing`, `scripts`, `variables`, `secrets`, `secret_archive`, `user_agent`, `record_random`,
 `artifact_sink` where capture-ledger serves the sink, and `robots_exemptions` from a capture-ledger that knows
 robots.txt exemptions. **`respect_robots` is not among them.**
+
+Crawls that name no User-Agent (most of the e2e) need **BrowserHive v32.3.0 or later**: `plan_level` reads
+robots.txt under `browser.userAgent` from `GET /status`, and fails the level when the field is missing.
+`user-agent.e2e.test.ts` and `robots-exemptions.e2e.test.ts` also see that robots.txt arrives under the same value as the pages.
 
 The first one asserts five things:
 

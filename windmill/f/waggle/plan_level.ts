@@ -172,16 +172,146 @@ export const parallelismFor = (
 ): number => Math.max(1, Math.min(hostParallelism ?? DEFAULT_HOST_PARALLELISM, endpoints));
 
 /**
- * robots.txt を引く。
+ * `u/admin/browserhive_endpoints` を URL の並びにする。**`crawl_host.ts` の `parseEndpoints` と同じ決まり** ——
+ * Windmill の script どうしは import しないので写す。変えるときは両方を変える (試験が同じ入力で同じ一覧を見張る)。
+ */
+export const parseEndpoints = (raw: string): string[] => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(`browserhive_endpoints が JSON ではありません: ${raw.slice(0, 80)}`);
+  }
+  if (
+    !Array.isArray(parsed) ||
+    parsed.length === 0 ||
+    !parsed.every((e): e is string => typeof e === "string" && e.trim() !== "")
+  ) {
+    throw new Error(
+      `browserhive_endpoints は空でない文字列の配列にしてください: ${raw.slice(0, 80)}`,
+    );
+  }
+  return parsed.map((entry) => {
+    const target = entry.trim().replace(/\/+$/, "");
+    if (!/^https?:\/\//.test(target)) {
+      throw new Error(
+        `browserhive_endpoints は http(s):// の URL にしてください (BrowserHive v12 から HTTP): ${target}`,
+      );
+    }
+    return target;
+  });
+};
+
+/** 名乗りの字を解くのに、BrowserHive の既定の字が要るか。空 (指定なし) か、`{chrome}` を含む字。 */
+export const needsBrowserDefault = (userAgent: string): boolean =>
+  userAgent === "" || userAgent.includes("{chrome}");
+
+/**
+ * 撮る時に送られる字。**BrowserHive の `resolveUserAgent` (`src/capture/page-capturer.ts`) と同じ決まり** ——
+ * 空なら browser の既定の字、`{chrome}` は既定の字の `HeadlessChrome/` を `Chrome/` にした物。置き換える字は
+ * 関数で渡す (字の中の `$` を `String.replace` の記号として読ませない)。ずれれば読む字と撮る字が食い違うので、
+ * e2e (`user-agent.e2e.test.ts`) が、robots.txt と頁に同じ字が届くことを見張る。
+ */
+export const capturedUserAgent = (asked: string, browserDefault: string): string =>
+  asked === ""
+    ? browserDefault
+    : asked.replaceAll("{chrome}", () => browserDefault.replace("HeadlessChrome/", "Chrome/"));
+
+/** エンドポイント 1 つの `GET /status` の答えのうち、名乗りに要る所。 */
+export interface EndpointIdentity {
+  target: string;
+  connected: boolean;
+  userAgent?: string;
+  /** 答えなかった・名乗りの欄が無かった訳。 */
+  problem?: string;
+  /** 答えたが `browser.userAgent` の欄が無い (BrowserHive v32.3.0 より前)。取り込みは受けるので、答えなかったのとは違う。 */
+  stale?: boolean;
+}
+
+const STATUS_DEADLINE_MS = 10_000;
+
+/** エンドポイント 1 つに `GET /status` を訊く。投げない (答えなかった訳を `problem` に入れて返す)。CA の渡し方は `crawl_host` と同じ。 */
+const askIdentity = async (target: string, caPem: string): Promise<EndpointIdentity> => {
+  const init: RequestInit & { tls?: { ca: string } } = {
+    signal: AbortSignal.timeout(STATUS_DEADLINE_MS),
+    ...(caPem === "" ? {} : { tls: { ca: caPem } }),
+  };
+  try {
+    const res = await fetch(`${target}/status`, init);
+    if (!res.ok) return { target, connected: false, problem: `HTTP ${String(res.status)}` };
+    const body = (await res.json()) as { browser?: { connected?: unknown; userAgent?: unknown } };
+    const userAgent = body.browser?.userAgent;
+    const connected = body.browser?.connected === true;
+    if (typeof userAgent !== "string" || userAgent === "") {
+      return {
+        target,
+        connected,
+        problem: "browser.userAgent が無い (BrowserHive v32.3.0 より前)",
+        stale: true,
+      };
+    }
+    return { target, connected, userAgent };
+  } catch (error) {
+    return { target, connected: false, problem: String(error) };
+  }
+};
+
+/**
+ * 答えから、BrowserHive の既定の名乗りを 1 つに決める。決められなければ投げる (段を落とす。Bun の名乗りには戻さない)。
+ *
+ * **比べるのは繋がっているエンドポイントだけ。** BrowserHive は繋ぎ直しを取り込みの中でしかしない (`GET /status` は繋ぎ直さない)。
+ * Chromium の image を替えた後、切れたエンドポイントは古い字を答え続けるので、それも比べると、取り込みで繋ぎ直したエンドポイントとだけ字が
+ * 割れて段が落ち、落ちた段は取り込みを送らないので、切れたエンドポイントはいつまでも繋ぎ直さない。繋がったエンドポイントが 1 つも無い時だけ、
+ * 切れたエンドポイントが控えた字を使う (取り込みで繋ぎ直すまでの 1 段は、古い字で読むことがある)。
+ *
+ * **答えたのに欄が無いエンドポイント (BrowserHive v32.3.0 より前) が 1 つでも在れば落とす。** そのエンドポイントは取り込みを
+ * 受けるので (`crawl_host` は busy か届かない時だけ次へ進む)、黙って外すと、新しいエンドポイントの字で読んだ robots.txt と、
+ * 古い browser の字で撮る頁が食い違う。
+ *
+ * 繋がったエンドポイントどうしで字が割れるのは、Chromium の版を 1 台ずつ替えた時。全部の Chromium の版を揃えれば戻る。
+ */
+export const decideBrowserDefault = (answers: EndpointIdentity[]): string => {
+  const stale = answers.filter((a) => a.stale === true);
+  if (stale.length > 0) {
+    throw new Error(
+      "名乗りを答えない BrowserHive が在る (v32.3.0 より前。そのエンドポイントが撮ると、読んだ字と撮る字が食い違う): " +
+        stale.map((a) => a.target).join("; "),
+    );
+  }
+  const named = answers.filter((a) => a.userAgent !== undefined);
+  const connected = named.filter((a) => a.connected);
+  const pool = connected.length > 0 ? connected : named;
+  if (pool.length === 0) {
+    throw new Error(
+      "BrowserHive の既定の名乗りを読めない (どのエンドポイントも GET /status の browser.userAgent を答えない): " +
+        answers.map((a) => `${a.target} ${a.problem ?? "?"}`).join("; "),
+    );
+  }
+  const agents = new Set(pool.map((a) => a.userAgent));
+  if (agents.size > 1) {
+    throw new Error(
+      "エンドポイントで名乗りが違う (robots.txt を撮る時と同じ名乗りで読めない。全部の Chromium の版を揃える): " +
+        pool.map((a) => `${a.target} ${a.userAgent ?? ""}`).join("; "),
+    );
+  }
+  return pool[0]!.userAgent!;
+};
+
+/**
+ * robots.txt を引く。**撮る時と同じ名乗り (`userAgent`) で取りに行く** —— 名乗りで答えを変える site がある
+ * (Bun の既定の名乗りに答えない site では、規則が読めず、Disallow が効かなかった。CAPTURE-94)。
  *
  * **読めなければ「制限なし」として扱う。** 404 も接続失敗も同じ ——
  * robots.txt が無いことは、取ってはいけないという意味ではない。
  * ただし取得そのものは 1 ホスト 1 回だけにする。
  */
-const fetchRobots = async (host: string, scheme: string) => {
+const fetchRobots = async (host: string, scheme: string, userAgent: string) => {
   const url = `${scheme}//${host}/robots.txt`;
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    const res = await fetch(url, {
+      headers: { "user-agent": userAgent },
+      signal: AbortSignal.timeout(10_000),
+    });
     if (!res.ok) return undefined;
     return robotsParser(url, await res.text());
   } catch {
@@ -395,20 +525,47 @@ export async function main(
   const groups: HostGroup[] = [];
   const skipped: Skipped[] = [];
   const overridden: Overridden[] = [];
+  const rawEndpoints = await wmill.getVariable("u/admin/browserhive_endpoints");
 
-  for (const [host, list] of byHost) {
+  // **名乗りはホストごとに、robots.txt を読む前に決める。** この段で効く行が在れば、そのホストの頁はみな (robots.txt が
+  // 断っていない頁も) 行の名乗りで撮り、robots.txt もその名乗りで読んで照らす —— 相手に見せる名前と、規則を読む名前を揃える。
+  const hosts = [...byHost].map(([host, list]) => {
+    const exemptions = exemptionsFor(usable, host, depth);
+    const userAgent = exemptions[0]?.row.userAgent ?? user_agent;
+    // capture-ledger は必ず字を送る (指定なしは "")。null は flow か capture-ledger の取り違えで、撮る段の `crawl_host` も
+    // 投げる (`askedUserAgent`)。読む名乗りを決められないので、ここで落とす (Bun の名乗りで読まない)。
+    if (userAgent === null) {
+      throw new Error(
+        "user_agent が届いていない (flow.yaml の input_transforms と capture-ledger の版を確かめる)",
+      );
+    }
+    return { host, list, exemptions, userAgent };
+  });
+
+  // 字が空か `{chrome}` を含むホストを読む時だけ、BrowserHive に既定の名乗りを訊く (1 段に 1 回、全部のエンドポイントに)。
+  let browserDefault: string | undefined;
+  if (respectRobots && hosts.some(({ userAgent }) => needsBrowserDefault(userAgent))) {
+    // 空の CA は「TLS を使わない」(`crawl_host` と同じ)。
+    const caPem = await wmill.getVariable("u/admin/browserhive_tls_ca");
+    browserDefault = decideBrowserDefault(
+      await Promise.all(parseEndpoints(rawEndpoints).map((target) => askIdentity(target, caPem))),
+    );
+  }
+
+  for (const { host, list, exemptions, userAgent } of hosts) {
     const first = list[0];
     if (first === undefined) continue;
     // scheme は最初の URL から取る。同じホストで混在していれば、そちらは別の
     // origin なので既に範囲の絞り込みで落ちている (capture-ledger 側の `inScope`)。
     const scheme = new URL(first.url).protocol;
-    const robots = respectRobots ? await fetchRobots(host, scheme) : undefined;
-
-    // **名乗りはホストごとに決める。** この段で効く行が在れば、そのホストの頁はみな (robots.txt が断っていない頁も)
-    // 行の名乗りで撮り、robots.txt もその名乗りで照らす —— 相手に見せる名前と、規則を読む名前を揃える。
-    const exemptions = exemptionsFor(usable, host, depth);
-    const userAgent = exemptions[0]?.row.userAgent ?? user_agent;
-    const token = robotsToken(userAgent);
+    // 読む字は撮る時に送られる字 (空と `{chrome}` は BrowserHive の既定の字で解く)。照らす名前もこの字から決める。
+    const readAs = needsBrowserDefault(userAgent)
+      ? browserDefault === undefined
+        ? userAgent
+        : capturedUserAgent(userAgent, browserDefault)
+      : userAgent;
+    const robots = respectRobots ? await fetchRobots(host, scheme, readAs) : undefined;
+    const token = robotsToken(readAs);
     // 型は、robots-parser に 1 行の規則として読ませる (型の読み方が robots.txt と揃う)。base は robots.txt と同じ
     // origin にする —— origin の違う URL を、robots-parser は判じない。
     const patterns = exemptions.map((exemption) => ({
@@ -480,7 +637,7 @@ export async function main(
     });
   }
 
-  const endpoints = endpointCount(await wmill.getVariable("u/admin/browserhive_endpoints"));
+  const endpoints = endpointCount(rawEndpoints);
   const parallelism = parallelismFor(host_parallelism, endpoints);
 
   const total = groups.reduce((n, g) => n + g.urls.length, 0);

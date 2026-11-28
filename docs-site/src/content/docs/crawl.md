@@ -8,7 +8,7 @@ pinned) and hands capture-scheduler **one level at a time**. The flow is
 `f/waggle/crawl_level`; one execution is one level.
 
 ```
-plan_level           group by host, fetch robots.txt once per host
+plan_level           group by host, fetch robots.txt once per host under the capture's User-Agent
   ↓
 compile_scripts      type-check the catalog's TypeScript and turn it into JavaScript (ts-compile-service)
   ↓
@@ -307,9 +307,27 @@ A crawl can ask for its own `User-Agent` (`userAgent` on capture-ledger's `POST 
 capture-ledger always sends it as `user_agent`, empty when none was asked for. **The flow carries it and
 does not resolve it**: `crawl_host` passes the text to BrowserHive, which turns `{chrome}` into the browser's own
 value without Headless, and leaves the key out when it is empty. `crawl_host` throws when the input does
-not arrive, because a crawl that silently kept the browser's value would still succeed. `plan_level` uses it to
-read robots.txt rules: text containing `BrowserHive` is matched under that name (its group first, then
-`*`); otherwise under `*`. The request that fetches robots.txt does not change.
+not arrive, because a crawl that silently kept the browser's value would still succeed. `plan_level`
+**fetches robots.txt under the User-Agent the capture will send**, and matches the rules under that text:
+text containing `BrowserHive` is matched under that name (its group first, then `*`); otherwise under `*`.
+
+- For a host whose text is empty or contains `{chrome}`, it asks every BrowserHive endpoint once per level
+  for `browser.userAgent` on `GET /status` (the browser's default; BrowserHive v32.3.0 on) and resolves the
+  text the way BrowserHive does (empty means the default; `{chrome}` becomes the default with
+  `HeadlessChrome/` turned into `Chrome/`).
+- Only connected endpoints are compared, and the level fails if they differ. When none is connected, the
+  value a disconnected endpoint kept is used. When no endpoint answers, the level fails. When any BrowserHive answers without the
+  `browser.userAgent` field (older than v32.3.0), the level fails too: captures on that endpoint would go out
+  under a different value than the one robots.txt was read under. **It never reads
+  under Bun's default User-Agent**: sites that answer depending on the User-Agent (www.ana.co.jp does not
+  answer Bun) went unread, and their Disallow lines had no effect (CAPTURE-94).
+- Right after the Chromium image changes, with no endpoint connected, the first level may read under the
+  old value a disconnected endpoint kept (BrowserHive reconnects only inside a capture).
+- **Replace the Chromium behind every endpoint together.** Replaced one at a time, once the replaced endpoint
+  reconnects during a capture the two connected endpoints disagree, and levels that name no User-Agent fail with
+  "エンドポイントで名乗りが違う". Replacing them all brings it back.
+- When the input does not arrive (`null`), `plan_level` throws too.
+- A robots.txt that cannot be read (404, 5xx, timeout) still counts as no restriction.
 
 **The User-Agent is decided per host, by `plan_level`.** Each host group carries a `userAgent`, and the
 flow hands that to `crawl_host` (not the crawl's `user_agent` directly). On a host where a

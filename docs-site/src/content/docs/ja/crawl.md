@@ -8,7 +8,7 @@ capture-ledger の `POST /api/crawls` が起点の URL を受け取り（定期�
 flow は `f/waggle/crawl_level` で、1 回の実行が 1 段。
 
 ```
-plan_level           ホストで束ね、robots.txt を 1 ホスト 1 回引く
+plan_level           ホストで束ね、撮る時の名乗りで robots.txt を 1 ホスト 1 回引く
   ↓
 compile_scripts      TypeScript のスクリプトを型検査して JavaScript にする（ts-compile-service）
   ↓
@@ -260,8 +260,22 @@ BrowserHive から写しているものは他に無い。`crawl_host` は Browse
 `user_agent` として必ず送り、頼まれていなければ空の字になる。**flow は運ぶだけで解かない** —— `crawl_host` は字を
 BrowserHive へ渡し、`{chrome}` を browser の字から Headless を外した物にするのは BrowserHive で、空なら鍵ごと送らない。
 入力が届かないと `crawl_host` は投げる。黙って browser の字のまま撮っても、クロールは成功に見えるため。`plan_level` は
-robots.txt の規則を照らすのに使う: 字に `BrowserHive` があればその名前で（その組が先で、無ければ `*`）、無ければ
-`*` で照らす。robots.txt を取りに行く要求は変わらない。
+**robots.txt を、撮る時に送られる字で取りに行き**、その字で規則を照らす: 字に `BrowserHive` があればその名前で
+（その組が先で、無ければ `*`）、無ければ `*` で照らす。
+
+- 字が空か `{chrome}` を含むホストを読む時は、1 段に 1 回、全部の BrowserHive のエンドポイントに `GET /status` の
+  `browser.userAgent`（browser の既定の字。BrowserHive v32.3.0 から）を訊き、BrowserHive と同じ決まりで解く
+  （空なら既定の字、`{chrome}` は既定の字の `HeadlessChrome/` を `Chrome/` にした物）。
+- 比べるのは繋がっているエンドポイントだけで、字が違えば段を落とす。繋がったエンドポイントが無い時だけ、切れたエンドポイントが控えた字を使う。
+  どのエンドポイントも答えなければ段を落とす。答えたのに `browser.userAgent` の欄が無い（v32.3.0 より前の）BrowserHive が
+  1 つでも在れば、段を落とす（そのエンドポイントが撮ると、読んだ字と撮る字が食い違う）。**Bun の既定の名乗りでは読まない** —— 名乗りで答えを変える site（Bun に答えない
+  www.ana.co.jp など）では、規則が読めず Disallow が効かなかった（CAPTURE-94）。
+- Chromium の image を替えた直後、繋がったエンドポイントが無ければ、最初の 1 段は切れたエンドポイントが控えた古い字で読むことがある
+  （BrowserHive は取り込みの中でしか繋ぎ直さない）。
+- **Chromium は全部のエンドポイントを続けて替える。** 1 台ずつ替えると、替えたエンドポイントが取り込みで繋ぎ直した後は、
+  繋がった 2 つの字が割れ、名乗りを指定しない段は「エンドポイントで名乗りが違う」で落ちる。全部を替えれば戻る。
+- 入力が届かない（`null`）時は、`plan_level` も投げる。
+- robots.txt が読めない時（404・5xx・時間切れ）は、今までどおり制限なしとして扱う。
 
 **名乗りはホストごとに `plan_level` が決める。** ホストの束が `userAgent` を持ち、flow はそれを `crawl_host` に渡す
 （クロールの `user_agent` を直には渡さない）。この段で [robots.txt の例外](#robotstxt-の例外)の行が効くホストでは、

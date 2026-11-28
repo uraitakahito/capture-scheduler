@@ -9,7 +9,7 @@
     "fflate": "capture-ledger から取り出した WACZ (zip) を開くためだけに要る。開くのは 2 か所: e2e (test/e2e/helpers/wacz.ts) は中の全 member を読み、smoke (scripts/smoke.ts) は pages/pages.jsonl だけを読んで、検索に当たるはずの時点を決める。配備にも flow の実行にも単体にも使わない。WARC の gzip は node:zlib で解く (組み込みで足りる) ので、ここに要るのは zip の側だけ。",
     "sharp": "docs サイトの画像最適化 (astro:assets の <Image>) が要求する。windmill-ui のスクリーンショットを配信サイズに落とすためだけに要る。site:build (= CI の site job) が使う。撮影の puppeteer とは別で、こちらは CI でも走る。"
   },
-  "version": "0.42.0",
+  "version": "0.43.0",
   "private": true,
   "description": "Windmill の上で capture-ledger のクロールを回す（1 段ずつ BrowserHive に撮らせる）",
   "type": "module",

@@ -123,12 +123,16 @@ const revokeActive = async (): Promise<void> => {
 const pagesOf = async (crawlId: string): Promise<Page[]> =>
   (await api.get(`/api/crawls/${crawlId}/pages`))["pages"] as Page[];
 
-/** 相手が見た要求のうち、`/exempt/` の下の物。robots.txt は別の道具が取るので入らない。 */
-const seenUnderExempt = async (): Promise<Logged[]> => {
+/** 相手が見た要求のうち、`/exempt/` の下の物と、`/robots.txt` (plan_level が取る)。 */
+const seenByFixtures = async (): Promise<{ exempt: Logged[]; robots: Logged[] }> => {
   const { requests } = (await json(await fetch(`${FIXTURES_HOST}/__requests`))) as unknown as {
     requests: Logged[];
   };
-  return requests.filter((r) => new URL(r.url, "http://x").pathname.startsWith("/exempt/"));
+  const pathOf = (r: Logged) => new URL(r.url, "http://x").pathname;
+  return {
+    exempt: requests.filter((r) => pathOf(r).startsWith("/exempt/")),
+    robots: requests.filter((r) => pathOf(r) === "/robots.txt"),
+  };
 };
 
 /** 起点の hub から 1 段だけ辿るクロールを 1 本通す。 */
@@ -176,12 +180,17 @@ describe("robots.txt の例外", () => {
     expect(counts["/exempt/status/2"], "型に当たる link が撮れていない").toBeGreaterThan(0);
     expect(counts["/exempt/likes"] ?? 0, "型に当たらない link に触れた").toBe(0);
 
-    // 名乗りは行の字 (クロールの User-Agent は頼んでいない)
-    const seen = await seenUnderExempt();
+    // 名乗りは行の字 (クロールの User-Agent は頼んでいない)。robots.txt も行の名乗りで読む (CAPTURE-508)
+    const { exempt: seen, robots } = await seenByFixtures();
     expect(seen.length).toBeGreaterThan(0);
     expect(new Set(seen.map((r) => r.userAgent)), "行の名乗りでない要求が在る").toEqual(
       new Set([AGENT]),
     );
+    expect(robots.length, "robots.txt が取られていない").toBeGreaterThan(0);
+    expect(
+      new Set(robots.map((r) => r.userAgent)),
+      "robots.txt を行の名乗りで読んでいない",
+    ).toEqual(new Set([AGENT]));
 
     // 頁の行に、外した行の番号が残る。likes は robots の見送りのまま
     const pages = await pagesOf(crawlId);

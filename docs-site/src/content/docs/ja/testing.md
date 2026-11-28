@@ -47,7 +47,8 @@ doctor の点検は、同じ場所を `CAPTURE_LEDGER_DIR` から読む。
 
 script が import するのは `windmill-client` で、`plan_level.ts` だけが `robots-parser` も import する。
 どちらも devDependency なので、script はそのまま vitest に読み込める。IO は差し替える:
-`vi.stubGlobal("fetch", …)` と `vi.mock("windmill-client", …)`。
+`vi.stubGlobal("fetch", …)` と `vi.mock("windmill-client", …)`。`plan_level` の `fetch` は、robots.txt と、名乗りを解くのに
+要る時だけ BrowserHive の `GET /status` に答える（`test/plan-level.test.ts` の `serving`。送った名乗りも記録する）。
 
 `flow.yaml` そのものを読む単体が 1 本ある（`crawl-level-flow.test.ts`）。`plan_level`・`crawl_host`・`report_level`・
 `fail_crawl` の引数（`.script.yaml` の schema）は全部、その段の `input_transforms` が運ぶこと（`fail_crawl` は
@@ -70,6 +71,10 @@ flow の入力から、ホストの `userAgent` と `robotsOverrides` は `plan_
 `per_host_delay_ms` / `host_parallelism` / `capture_formats` / `signing` / `scripts` / `variables` /
 `secrets` / `secret_archive` / `user_agent` / `record_random` と、受け取り先を出している配備では `artifact_sink`、
 robots.txt の例外を知る capture-ledger では `robots_exemptions` で、**`respect_robots` は入っていない**。
+
+名乗りを指定しないクロール（ほとんどの e2e）は、**BrowserHive v32.3.0 以上**が要る —— `plan_level` が `GET /status` の
+`browser.userAgent` で robots.txt を読み、欄が無ければ段を落とす。`user-agent.e2e.test.ts` と `robots-exemptions.e2e.test.ts` は、
+robots.txt が頁と同じ字で届くことも見る。
 
 最初の試験が見ているのは 5 つ:
 
