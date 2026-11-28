@@ -97,10 +97,12 @@ export interface HostGroup {
   host: string;
   urls: string[];
   /**
-   * このホストで名乗る User-Agent。この段で効く例外の行が在れば行の名乗り、無ければクロールの `user_agent`
-   * (無ければ `""`)。**必ず字** —— `crawl_host` は `null` を取り違えとして投げる。
+   * このホストで名乗る User-Agent。この段で効く例外の行が在れば行の名乗り、無ければクロールの `user_agent` を
+   * **そのまま**運ぶ。capture-ledger は `user_agent` を必ず字で送る (指定なしは `""`)。`null` は flow か
+   * capture-ledger の取り違えで、ここで `""` に替えると、名乗りを頼んだクロールが browser の字のまま黙って
+   * 撮られる —— 替えずに運び、`crawl_host` が投げる (`askedUserAgent`)。
    */
-  userAgent: string;
+  userAgent: string | null;
   /**
    * robots.txt を例外で外した頁の申告 (URL → 申告)。外した頁が在るときだけ持つ。`crawl_host` が、その頁の
    * 撮る要求にだけ付ける。
@@ -405,7 +407,7 @@ export async function main(
     // **名乗りはホストごとに決める。** この段で効く行が在れば、そのホストの頁はみな (robots.txt が断っていない頁も)
     // 行の名乗りで撮り、robots.txt もその名乗りで照らす —— 相手に見せる名前と、規則を読む名前を揃える。
     const exemptions = exemptionsFor(usable, host, depth);
-    const userAgent = exemptions[0]?.row.userAgent ?? user_agent ?? "";
+    const userAgent = exemptions[0]?.row.userAgent ?? user_agent;
     const token = robotsToken(userAgent);
     // 型は、robots-parser に 1 行の規則として読ませる (型の読み方が robots.txt と揃う)。base は robots.txt と同じ
     // origin にする —— origin の違う URL を、robots-parser は判じない。

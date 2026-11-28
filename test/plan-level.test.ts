@@ -500,15 +500,20 @@ describe("robots.txt の例外", () => {
     expect(got.groups.find((g) => g.host === "other:8080")!.userAgent).toBe("{chrome} Probe");
   });
 
-  it("クロールの user_agent が届かなくても（null）、束の名乗りは空の字で、null にならない", async () => {
-    // crawl_host は null を取り違えとして投げる (askedUserAgent)。束には必ず字を載せる
+  it("クロールの user_agent が届いていない（null）なら、行の無いホストの束は null のまま運ぶ（crawl_host が投げる）", async () => {
+    // capture-ledger は必ず字を送る。null を "" に替えると、送り忘れが browser の字のまま黙って撮られる
     robotsServing(EXEMPT);
     const withRows = await main([at("http://other:8080/a")], 1000, true, null, null, 1, [row()]);
-    expect(withRows.groups[0]!.userAgent).toBe("");
+    expect(withRows.groups[0]!.userAgent).toBeNull();
 
     robotsServing(EXEMPT);
     const without = await main([at("http://other:8080/a")], 1000, true);
-    expect(without.groups[0]!.userAgent).toBe("");
+    expect(without.groups[0]!.userAgent).toBeNull();
+
+    // 指定なしは、capture-ledger が送る "" がそのまま載る
+    robotsServing(EXEMPT);
+    const unset = await main([at("http://other:8080/a")], 1000, true, null, "");
+    expect(unset.groups[0]!.userAgent).toBe("");
   });
 
   it("robots.txt を照らす名前は、行の名乗りから決まる（BrowserHive の組が在れば、その組）", async () => {

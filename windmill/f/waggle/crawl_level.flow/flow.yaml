@@ -127,8 +127,9 @@ value:
                   expr: flow_input.secret_archive
                 # このホストで名乗る User-Agent。**決めるのは plan_level** で、ホストの束に載せてくる: robots.txt の例外の
                 # 行が効くホストは行の名乗り、ほかはクロールの user_agent (capture-ledger が必ず送る字。指定なしは "")。
-                # flow は運ぶだけで解かない ({chrome} を解くのは BrowserHive)。plan_level は必ず字を載せる ——
-                # ここを書き忘れると null で届き、crawl_host が投げる。
+                # flow は運ぶだけで解かない ({chrome} を解くのは BrowserHive)。plan_level は、行の無いホストでは
+                # クロールの user_agent をそのまま載せる —— capture-ledger が送り忘れた null も、ここを書き忘れた
+                # null も、crawl_host が投げる。
                 user_agent:
                   type: javascript
                   expr: flow_input.iter.value.userAgent

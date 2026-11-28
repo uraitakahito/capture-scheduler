@@ -267,7 +267,11 @@ robots.txt の規則を照らすのに使う: 字に `BrowserHive` があれば�
 （クロールの `user_agent` を直には渡さない）。この段で [robots.txt の例外](#robotstxt-の例外)の行が効くホストでは、
 そのホストの頁はみな行の名乗りで撮り、クロールの字はそこでは使わない。robots.txt を照らす名前も、その名乗りから
 決まる（行の名乗りは `BrowserHive/<版>` の形なので `BrowserHive`）。ほかのホストでは、クロールの `user_agent`、
-届いていなければ `""` —— 必ず字にする（`crawl_host` は `null` を投げる）。
+届いたままを運ぶ: capture-ledger は必ず字を送り、`null`（capture-ledger か flow の書き忘れ）は、今までどおり
+`crawl_host` が投げる（頼んでいないのに browser の字のまま撮らない）。
+
+範囲が `seeds` の行が効くのは深さ 0 だけなので、そのホストの名乗りと、robots.txt を照らす名前は、深さ 0 では
+行の物、深さ 1 から先ではクロールの物になる。
 
 ## クロールごとの乱数の控え
 

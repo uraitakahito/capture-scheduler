@@ -316,8 +316,12 @@ flow hands that to `crawl_host` (not the crawl's `user_agent` directly). On a ho
 [robots.txt exemption](#robotstxt-exemptions) is in effect for this level, it is the row's User-Agent,
 for every page of the host, and the crawl's own value is not used there; robots.txt is matched under the
 name that follows from it (`BrowserHive`, since a row's User-Agent must be `BrowserHive/<version>`). On
-every other host it is the crawl's `user_agent`, or `""` when that did not arrive — always a string,
-because `crawl_host` throws on `null`.
+every other host it is the crawl's `user_agent`, carried as it arrived: capture-ledger always sends a
+string, and a `null` — capture-ledger or the flow forgetting it — still makes `crawl_host` throw rather
+than capture under the browser's own name unasked.
+
+A row whose scope is `seeds` is in effect at depth 0 only, so on its host the User-Agent — and the name
+robots.txt is matched under — is the row's at depth 0 and the crawl's from depth 1 on.
 
 ## Per-crawl random recording
 
