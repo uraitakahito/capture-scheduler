@@ -51,9 +51,14 @@ schema:
       items:
         type: object
         properties:
+          id:
+            type: string
+            description: ""
+            originalType: string
           declaration:
             type: object
             description: ""
+            format: resource-robots_declaration
             properties:
               exemptionId:
                 type: string
@@ -87,10 +92,6 @@ schema:
                   - links
                 originalType: enum
           host:
-            type: string
-            description: ""
-            originalType: string
-          id:
             type: string
             description: ""
             originalType: string
