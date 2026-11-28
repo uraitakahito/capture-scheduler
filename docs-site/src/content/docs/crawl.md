@@ -72,7 +72,7 @@ A replay bundle is derived from what was captured and can be rebuilt
 anything the ledger answers with 200**: the store refused the write (`error`), a WACZ could not be
 inspected (`failed` above 0, picked up by the next replay bundle), or there was no WACZ to include yet
 (`rev: null`). It writes one log line and returns. Throwing would skip the index step and make `fail_crawl` close the crawl as `failed` (if its
-next level is already running, capture-ledger does not close it: the failure is not the newest level's; see "Level keys" below). It throws only when the ledger does not answer 200 — 400 (the body),
+next level is already running, capture-ledger does not close it: the failure is not the newest level's; see "Level keys" above). It throws only when the ledger does not answer 200 — 400 (the body),
 401 (the token), 404 (no such crawl, no crawl permission for the token's `sub`, or a capture-ledger too
 old to have the endpoint), 5xx — or answers in the wrong shape.
 
