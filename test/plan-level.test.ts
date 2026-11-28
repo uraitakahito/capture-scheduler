@@ -30,7 +30,7 @@ const VARS: Record<string, string> = {
   "u/admin/browserhive_tls_ca": "",
 };
 
-/** 口が答える既定の名乗り (browser の字そのまま)。 */
+/** エンドポイントが答える既定の名乗り (browser の字そのまま)。 */
 const BROWSER_UA =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36";
 
@@ -61,7 +61,7 @@ vi.mock("windmill-client", () => ({
   getVariable: (path: string) => Promise.resolve(VARS[path]),
 }));
 
-/** 口ごとの `GET /status` の答え。既定は 2 つとも繋がっていて、同じ字を答える。 */
+/** エンドポイントごとの `GET /status` の答え。既定は 2 つとも繋がっていて、同じ字を答える。 */
 type StatusAnswer = { connected: boolean; userAgent?: string } | "down";
 const BOTH_UP: Record<string, StatusAnswer> = {
   "http://bh-1:50051": { connected: true, userAgent: BROWSER_UA },
@@ -810,7 +810,7 @@ describe("robots.txt を、撮る時と同じ名乗りで読む（CAPTURE-508）
     expect(statusCalls).toEqual([]);
   });
 
-  it('指定なし（""）なら、BrowserHive の既定の字で読む。訊くのは 1 段に 1 回、全部の口に', async () => {
+  it('指定なし（""）なら、BrowserHive の既定の字で読む。訊くのは 1 段に 1 回、全部のエンドポイントに', async () => {
     const { agents, statusCalls } = serving(OPEN);
     await main([at("http://m:8080/a"), at("http://n:8080/b")], 1000, true, null, "");
     expect(agents).toEqual([BROWSER_UA, BROWSER_UA]);
@@ -858,13 +858,13 @@ describe("robots.txt を、撮る時と同じ名乗りで読む（CAPTURE-508）
     expect(plan.groups[0]!.userAgent).toBe("{chrome} BrowserHive");
   });
 
-  it("1 つの口が答えなくても、残りの口の字で読む", async () => {
+  it("1 つのエンドポイントが答えなくても、残りのエンドポイントの字で読む", async () => {
     const { agents } = serving(OPEN, { ...BOTH_UP, "http://bh-2:50051": "down" });
     await main([at("http://m:8080/a")], 1000, true, null, "");
     expect(agents).toEqual([BROWSER_UA]);
   });
 
-  it("どの口も答えなければ段を落とし、robots.txt を Bun の名乗りで読みに行かない", async () => {
+  it("どのエンドポイントも答えなければ段を落とし、robots.txt を Bun の名乗りで読みに行かない", async () => {
     const { calls } = serving(OPEN, { "http://bh-1:50051": "down", "http://bh-2:50051": "down" });
     await expect(main([at("http://m:8080/a")], 1000, true, null, "")).rejects.toThrow(
       "既定の名乗りを読めない",
@@ -882,17 +882,17 @@ describe("robots.txt を、撮る時と同じ名乗りで読む（CAPTURE-508）
     );
   });
 
-  it("繋がった口どうしで字が違えば段を落とす", async () => {
+  it("繋がったエンドポイントどうしで字が違えば段を落とす", async () => {
     serving(OPEN, {
       "http://bh-1:50051": { connected: true, userAgent: BROWSER_UA },
       "http://bh-2:50051": { connected: true, userAgent: "Other/1" },
     });
     await expect(main([at("http://m:8080/a")], 1000, true, null, "")).rejects.toThrow(
-      "口で名乗りが違う",
+      "エンドポイントで名乗りが違う",
     );
   });
 
-  it("切れた口の古い字は、繋がった口が在れば比べない（1 つの口だけが繋ぎ直して字が替わっても落ちない）", async () => {
+  it("切れたエンドポイントの古い字は、繋がったエンドポイントが在れば比べない（1 つのエンドポイントだけが繋ぎ直して字が替わっても落ちない）", async () => {
     const { agents } = serving(OPEN, {
       "http://bh-1:50051": { connected: true, userAgent: "New/2" },
       "http://bh-2:50051": { connected: false, userAgent: "Old/1" },
@@ -901,7 +901,7 @@ describe("robots.txt を、撮る時と同じ名乗りで読む（CAPTURE-508）
     expect(agents).toEqual(["New/2"]);
   });
 
-  it("繋がった口が無ければ、切れた口が控えた字で読む（字が割れていれば落とす）", async () => {
+  it("繋がったエンドポイントが無ければ、切れたエンドポイントが控えた字で読む（字が割れていれば落とす）", async () => {
     expect(
       decideBrowserDefault([
         { target: "a", connected: false, userAgent: "Old/1" },
@@ -913,7 +913,7 @@ describe("robots.txt を、撮る時と同じ名乗りで読む（CAPTURE-508）
         { target: "a", connected: false, userAgent: "Old/1" },
         { target: "b", connected: false, userAgent: "New/2" },
       ]),
-    ).toThrow("口で名乗りが違う");
+    ).toThrow("エンドポイントで名乗りが違う");
   });
 
   it("解き方は BrowserHive の resolveUserAgent と同じ（$ を特別な記号として読まない）", () => {
@@ -927,7 +927,7 @@ describe("robots.txt を、撮る時と同じ名乗りで読む（CAPTURE-508）
     expect(needsBrowserDefault("BrowserHive/1.0")).toBe(false);
   });
 
-  it("口の一覧の読み方は crawl_host の parseEndpoints と同じ", async () => {
+  it("エンドポイントの一覧の読み方は crawl_host の parseEndpoints と同じ", async () => {
     const crawlHost = await import("../windmill/f/waggle/crawl_host.js");
     for (const raw of [
       JSON.stringify(["http://a:1/", " https://b:2 "]),

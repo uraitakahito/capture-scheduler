@@ -217,7 +217,7 @@ export const capturedUserAgent = (asked: string, browserDefault: string): string
     ? browserDefault
     : asked.replaceAll("{chrome}", () => browserDefault.replace("HeadlessChrome/", "Chrome/"));
 
-/** 口 1 つの `GET /status` の答えのうち、名乗りに要る所。 */
+/** エンドポイント 1 つの `GET /status` の答えのうち、名乗りに要る所。 */
 export interface EndpointIdentity {
   target: string;
   connected: boolean;
@@ -228,7 +228,7 @@ export interface EndpointIdentity {
 
 const STATUS_DEADLINE_MS = 10_000;
 
-/** 口 1 つに `GET /status` を訊く。投げない (答えなかった訳を `problem` に入れて返す)。CA の渡し方は `crawl_host` と同じ。 */
+/** エンドポイント 1 つに `GET /status` を訊く。投げない (答えなかった訳を `problem` に入れて返す)。CA の渡し方は `crawl_host` と同じ。 */
 const askIdentity = async (target: string, caPem: string): Promise<EndpointIdentity> => {
   const init: RequestInit & { tls?: { ca: string } } = {
     signal: AbortSignal.timeout(STATUS_DEADLINE_MS),
@@ -256,10 +256,10 @@ const askIdentity = async (target: string, caPem: string): Promise<EndpointIdent
 /**
  * 答えから、BrowserHive の既定の名乗りを 1 つに決める。決められなければ投げる (段を落とす。Bun の名乗りには戻さない)。
  *
- * **比べるのは繋がっている口だけ。** BrowserHive は繋ぎ直しを取り込みの中でしかしない (`GET /status` は繋ぎ直さない)。
- * Chromium の image を替えた後、切れた口は古い字を答え続けるので、それも比べると、取り込みで繋ぎ直した口とだけ字が
- * 割れて段が落ち、落ちた段は取り込みを送らないので、切れた口はいつまでも繋ぎ直さない。繋がった口が 1 つも無い時だけ、
- * 切れた口が控えた字を使う (取り込みで繋ぎ直すまでの 1 段は、古い字で読むことがある)。
+ * **比べるのは繋がっているエンドポイントだけ。** BrowserHive は繋ぎ直しを取り込みの中でしかしない (`GET /status` は繋ぎ直さない)。
+ * Chromium の image を替えた後、切れたエンドポイントは古い字を答え続けるので、それも比べると、取り込みで繋ぎ直したエンドポイントとだけ字が
+ * 割れて段が落ち、落ちた段は取り込みを送らないので、切れたエンドポイントはいつまでも繋ぎ直さない。繋がったエンドポイントが 1 つも無い時だけ、
+ * 切れたエンドポイントが控えた字を使う (取り込みで繋ぎ直すまでの 1 段は、古い字で読むことがある)。
  */
 export const decideBrowserDefault = (answers: EndpointIdentity[]): string => {
   const named = answers.filter((a) => a.userAgent !== undefined);
@@ -267,14 +267,14 @@ export const decideBrowserDefault = (answers: EndpointIdentity[]): string => {
   const pool = connected.length > 0 ? connected : named;
   if (pool.length === 0) {
     throw new Error(
-      "BrowserHive の既定の名乗りを読めない (どの口も GET /status の browser.userAgent を答えない): " +
+      "BrowserHive の既定の名乗りを読めない (どのエンドポイントも GET /status の browser.userAgent を答えない): " +
         answers.map((a) => `${a.target} ${a.problem ?? "?"}`).join("; "),
     );
   }
   const agents = new Set(pool.map((a) => a.userAgent));
   if (agents.size > 1) {
     throw new Error(
-      "口で名乗りが違う (robots.txt を撮る時と同じ名乗りで読めない): " +
+      "エンドポイントで名乗りが違う (robots.txt を撮る時と同じ名乗りで読めない): " +
         pool.map((a) => `${a.target} ${a.userAgent ?? ""}`).join("; "),
     );
   }
@@ -526,7 +526,7 @@ export async function main(
     return { host, list, exemptions, userAgent };
   });
 
-  // 字が空か `{chrome}` を含むホストを読む時だけ、BrowserHive に既定の名乗りを訊く (1 段に 1 回、全部の口に)。
+  // 字が空か `{chrome}` を含むホストを読む時だけ、BrowserHive に既定の名乗りを訊く (1 段に 1 回、全部のエンドポイントに)。
   let browserDefault: string | undefined;
   if (respectRobots && hosts.some(({ userAgent }) => needsBrowserDefault(userAgent))) {
     // 空の CA は「TLS を使わない」(`crawl_host` と同じ)。
